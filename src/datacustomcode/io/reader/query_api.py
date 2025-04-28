@@ -15,7 +15,11 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Final, Union
+from typing import (
+    TYPE_CHECKING,
+    Final,
+    Union,
+)
 
 from pyspark.sql.types import (
     BooleanType,

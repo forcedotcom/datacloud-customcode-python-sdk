@@ -25,9 +25,9 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Union,
     Dict,
     List,
+    Union,
 )
 
 from loguru import logger
@@ -57,13 +57,7 @@ def _join_strip_url(*args: str) -> str:
 
 
 JSONValue = Union[
-    Dict[str, "JSONValue"],
-    List["JSONValue"],
-    str,
-    int,
-    float,
-    bool,
-    None
+    Dict[str, "JSONValue"], List["JSONValue"], str, int, float, bool, None
 ]
 
 

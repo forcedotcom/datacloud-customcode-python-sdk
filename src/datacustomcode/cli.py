@@ -12,11 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from importlib import metadata
 import json
 import os
 import sys
-from typing import Union, List
-from importlib import metadata
+from typing import List, Union
 
 import click
 from loguru import logger

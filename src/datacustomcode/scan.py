@@ -15,7 +15,11 @@
 from __future__ import annotations
 
 import ast
-from typing import Union, Dict, List, FrozenSet
+from typing import (
+    Dict,
+    List,
+    Union,
+)
 
 import pydantic
 

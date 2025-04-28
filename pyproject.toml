@@ -118,6 +118,8 @@ pytest = "*"
 pytest-cov = "*"
 pytest-html = "*"
 pytest-xdist = "*"
+types-PyYAML = "*"
+types-requests = "*"
 
 [tool.poetry.plugins."poetry.plugin"]
 
