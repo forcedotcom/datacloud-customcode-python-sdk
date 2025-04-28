@@ -1,0 +1,15 @@
+reader_config:
+  type_config_name: QueryAPIDataCloudReader
+
+writer_config:
+  type_config_name: PrintDataCloudWriter
+
+spark_config:
+  app_name: DC Custom Code Python SDK Testing
+  master: local[*]
+  options:
+    spark.driver.host: localhost
+    spark.driver.bindAddress: 127.0.0.1
+    spark.submit.deployMode: client
+    spark.sql.execution.arrow.pyspark.enabled: 'true'
+    spark.driver.extraJavaOptions: -Djava.security.manager=allow
