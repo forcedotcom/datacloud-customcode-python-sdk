@@ -6,6 +6,8 @@ This package provides a development kit for creating custom data transformations
 
 More specifically, this codebase gives you ability to test code locally before pushing to Data Cloud's remote execution engine, greatly reducing how long it takes to develop.
 
+Use of this project with Salesforce is subject to the [TERMS OF USE](./TERMS_OF_USE.md)
+
 ## Installation
 The SDK can be downloaded directly from PyPI with `pip`:
 ```
