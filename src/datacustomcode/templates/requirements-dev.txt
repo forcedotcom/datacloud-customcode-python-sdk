@@ -1,0 +1,10 @@
+# Required packages for the project - Do not modify
+salesforce-cdp-connector>=1.0.16
+pyspark
+pandas
+numpy
+pydantic
+jupyterlab
+ipywidgets
+tqdm
+salesforce-data-customcode
