@@ -1,9 +1,27 @@
 [build-system]
 build-backend = "poetry_dynamic_versioning.backend"
 requires = [
-  "poetry-core>=1.0.0",
+  "poetry-core>=2.0.0",
   "poetry-dynamic-versioning>=1.0.0,<2.0.0"
 ]
+
+[project]
+authors = []
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Operating System :: Unix",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11"
+]
+description = "Data Cloud Custom Code SDK"
+dynamic = ["version"]
+license = "Apache-2.0"
+name = "sfdc-datacloud-customcode-sdk"
+readme = "README.md"
+requires-python = ">=3.10,<3.12"
+version = "0.1.0"
 
 [tool.black]
 exclude = '''
@@ -70,27 +88,11 @@ warn_return_any = true
 warn_unused_configs = true
 
 [tool.poetry]
-authors = []
-classifiers = [
-  "Development Status :: 4 - Beta",
-  "Operating System :: Unix",
-  "Programming Language :: Python",
-  "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12"
-]
-description = "Data Cloud Custom Code SDK"
 include = [
   {path = "src/datacustomcode/templates/**/*", format = "sdist"},
   {path = "src/datacustomcode/config.yaml", format = "sdist"}
 ]
-license = "Apache-2.0"
-name = "sfdc-datacloud-customcode-sdk"
 packages = [{include = "datacustomcode", from = "src"}]
-readme = "README.md"
-version = "0.1.0"
 
 [tool.poetry.build]
 generate-setup-file = false
@@ -102,7 +104,7 @@ numpy = "*"
 pandas = "*"
 pydantic = "^1.8.2 || ^2.0.0"
 pyspark = "*"
-python = ">=3.9,<4.0"
+python = ">=3.10,<3.12"
 pyyaml = "^6.0"
 salesforce-cdp-connector = "*"
 setuptools_scm = "^7.1.0"
