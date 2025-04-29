@@ -42,7 +42,6 @@ This will yield all necessary files to get started:
 * `requirements-dev.txt` <span style="color:grey;font-style:italic;">(Do not update)</span> – These are the dependencies for the development environment.
 * `jupyterlab.sh` <span style="color:grey;font-style:italic;">(Do not update)</span> – Helper script for setting up Jupyter.
 * `requirements.txt` – Here you define the requirements that you will need remotely
-* `requirements.txt` – Here you define the requirements that you will need remotely
 * `payload` – This folder will be compressed and deployed to the remote execution environment.
   * `config.json` – This config defines permissions on the back and can be generated programmatically with `scan` CLI method.
   * `entrypoint.py` – The script that defines the data transformation logic.
