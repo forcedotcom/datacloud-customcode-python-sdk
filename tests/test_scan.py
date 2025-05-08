@@ -286,12 +286,12 @@ class TestDcConfigJson:
         )
         temp_path = create_test_script(content)
         try:
-            config = dc_config_json_from_file(temp_path)
-            assert config["permissions"]["read"]["dlo"] == ["input_dlo"]
-            assert config["permissions"]["write"]["dlo"] == ["output_dlo"]
-            assert "dmo" not in config["permissions"]["read"]
-            assert "dmo" not in config["permissions"]["write"]
-            assert config["entryPoint"] == os.path.basename(temp_path)
+            result = dc_config_json_from_file(temp_path)
+            assert result["entryPoint"] == os.path.basename(temp_path)
+            assert result["dataspace"] == "default"
+            assert result["sdkVersion"] == "1.2.3"  # From mocked version
+            assert result["permissions"]["read"]["dlo"] == ["input_dlo"]
+            assert result["permissions"]["write"]["dlo"] == ["output_dlo"]
         finally:
             os.unlink(temp_path)
 
@@ -313,11 +313,13 @@ class TestDcConfigJson:
         temp_path = create_test_script(content)
         try:
             config = dc_config_json_from_file(temp_path)
+            assert config["entryPoint"] == os.path.basename(temp_path)
+            assert config["dataspace"] == "default"
+            assert config["sdkVersion"] == "1.2.3"  # From mocked version
             assert config["permissions"]["read"]["dmo"] == ["input_dmo"]
             assert config["permissions"]["write"]["dmo"] == ["output_dmo"]
             assert "dlo" not in config["permissions"]["read"]
             assert "dlo" not in config["permissions"]["write"]
-            assert config["entryPoint"] == os.path.basename(temp_path)
         finally:
             os.unlink(temp_path)
 

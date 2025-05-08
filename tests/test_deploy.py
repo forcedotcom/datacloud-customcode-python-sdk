@@ -22,12 +22,12 @@ with patch("datacustomcode.version.get_version", return_value="1.2.3"):
         _make_api_call,
         _retrieve_access_token,
         create_data_transform,
-        create_data_transform_config,
         create_deployment,
         deploy_full,
         get_data_transform_config,
         get_deployments,
         run_data_transform,
+        verify_data_transform_config,
         wait_for_deployment,
         zip_and_upload_directory,
     )
@@ -235,30 +235,21 @@ class TestDataTransformConfig:
         assert result.input == "input_dlo"
         assert result.output == "output_dlo"
 
-    @patch("datacustomcode.deploy.get_data_transform_config")
-    @patch("datacustomcode.deploy.json.dump")
-    @patch("builtins.open", new_callable=mock_open)
-    def test_create_data_transform_config(
-        self, mock_file, mock_json_dump, mock_get_config
-    ):
-        """Test creating data transform config file."""
-        mock_get_config.return_value = DataTransformConfig(
-            input="input_dlo", output="output_dlo"
-        )
+    @patch("datacustomcode.deploy.os.path.exists")
+    def test_verify_data_transform_config_exists(self, mock_exists):
+        """Test verifying data transform config file exists."""
+        mock_exists.return_value = True
+        verify_data_transform_config("/test/dir")
+        mock_exists.assert_called_once_with("/test/dir/config.json")
 
-        create_data_transform_config("/test/dir")
-
-        mock_get_config.assert_called_once_with("/test/dir")
-        mock_file.assert_called_once_with("/test/dir/config.json", "w")
-        mock_json_dump.assert_called_once()
-
-        # Verify the config contains all required fields including sdkVersion
-        config_data = mock_json_dump.call_args[0][0]
-        assert config_data["entryPoint"] == "entrypoint.py"
-        assert config_data["dataspace"] == "default"
-        assert config_data["permissions"]["read"]["dlo"] == "input_dlo"
-        assert config_data["permissions"]["write"]["dlo"] == "output_dlo"
-        assert config_data["sdkVersion"] == "1.2.3"
+    @patch("datacustomcode.deploy.os.path.exists")
+    def test_verify_data_transform_config_missing(self, mock_exists):
+        """Test verifying data transform config file when it doesn't exist."""
+        mock_exists.return_value = False
+        with pytest.raises(
+            FileNotFoundError, match="config.json not found in /test/dir"
+        ):
+            verify_data_transform_config("/test/dir")
 
 
 class TestCreateDataTransform:
@@ -288,7 +279,7 @@ class TestCreateDataTransform:
 class TestDeployFull:
     @patch("datacustomcode.deploy._retrieve_access_token")
     @patch("datacustomcode.deploy.prepare_dependency_archive")
-    @patch("datacustomcode.deploy.create_data_transform_config")
+    @patch("datacustomcode.deploy.verify_data_transform_config")
     @patch("datacustomcode.deploy.create_deployment")
     @patch("datacustomcode.deploy.zip_and_upload_directory")
     @patch("datacustomcode.deploy.wait_for_deployment")
@@ -299,7 +290,7 @@ class TestDeployFull:
         mock_wait,
         mock_zip_upload,
         mock_create_deployment,
-        mock_create_config,
+        mock_verify_config,
         mock_prepare,
         mock_retrieve_token,
     ):
@@ -331,7 +322,7 @@ class TestDeployFull:
         # Assertions
         mock_retrieve_token.assert_called_once_with(credentials)
         mock_prepare.assert_called_once_with("/test/dir")
-        mock_create_config.assert_called_once_with("/test/dir")
+        mock_verify_config.assert_called_once_with("/test/dir")
         mock_create_deployment.assert_called_once_with(access_token, metadata)
         mock_zip_upload.assert_called_once_with(
             "/test/dir", "https://upload.example.com"

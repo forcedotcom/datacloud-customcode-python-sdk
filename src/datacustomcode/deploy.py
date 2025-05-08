@@ -15,7 +15,6 @@
 from __future__ import annotations
 
 from html import unescape
-import json
 import os
 import shutil
 import tarfile
@@ -36,7 +35,6 @@ import requests
 
 from datacustomcode.cmd import cmd_output
 from datacustomcode.scan import scan_file
-from datacustomcode.version import get_version
 
 if TYPE_CHECKING:
     from datacustomcode.credentials import Credentials
@@ -281,14 +279,6 @@ class DataTransformConfig(BaseModel):
     output: Union[str, list[str]]
 
 
-DATA_TRANSFORM_CONFIG_TEMPLATE: dict[str, Any] = {
-    "entryPoint": "entrypoint.py",
-    "dataspace": "default",
-    "permissions": {"read": {"dlo": ""}, "write": {"dlo": ""}},
-    "sdkVersion": get_version(),
-}
-
-
 def get_data_transform_config(directory: str) -> DataTransformConfig:
     """Get the data transform config from the entrypoint.py file."""
     entrypoint_file = os.path.join(directory, "entrypoint.py")
@@ -298,16 +288,13 @@ def get_data_transform_config(directory: str) -> DataTransformConfig:
     return DataTransformConfig(input=input_, output=output)
 
 
-def create_data_transform_config(directory: str) -> None:
-    """Create a data transform config.json file in the directory."""
-    data_transform_config = get_data_transform_config(directory)
-    request_hydrated = DATA_TRANSFORM_CONFIG_TEMPLATE.copy()
-    request_hydrated["permissions"]["read"]["dlo"] = data_transform_config.input
-    request_hydrated["permissions"]["write"]["dlo"] = data_transform_config.output
-    logger.debug(f"Creating data transform config in {directory}")
-    json.dump(
-        request_hydrated, open(os.path.join(directory, "config.json"), "w"), indent=4
-    )
+def verify_data_transform_config(directory: str) -> None:
+    """Verify that the data transform config.json file exists in the directory."""
+    config_path = os.path.join(directory, "config.json")
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f"config.json not found in {directory}")
+
+    logger.debug(f"Verified data transform config in {directory}")
 
 
 def create_data_transform(
@@ -359,7 +346,7 @@ def deploy_full(
 
     # prepare payload
     prepare_dependency_archive(directory)
-    create_data_transform_config(directory)
+    verify_data_transform_config(directory)
 
     # create deployment and upload payload
     deployment = create_deployment(access_token, metadata)
