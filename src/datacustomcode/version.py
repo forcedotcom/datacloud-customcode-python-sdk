@@ -24,4 +24,4 @@ def get_version() -> str:
         str: The version string from package metadata.
     """
     # First try to get version from installed package metadata
-    return importlib.metadata.version("sfdc-datacloud-customcode-sdk")
+    return importlib.metadata.version("salesforce-data-customcode")
