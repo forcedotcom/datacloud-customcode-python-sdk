@@ -18,7 +18,7 @@ classifiers = [
 description = "Data Cloud Custom Code SDK"
 dynamic = ["version"]
 license = "Apache-2.0"
-name = "sfdc-datacloud-customcode-sdk"
+name = "salesforce-data-customcode"
 readme = "README.md"
 requires-python = ">=3.10,<3.12"
 version = "0.1.0"
