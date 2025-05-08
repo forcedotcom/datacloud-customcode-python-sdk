@@ -10,7 +10,6 @@ import pytest
 import requests
 
 from datacustomcode.credentials import Credentials
-from datacustomcode.version import get_version
 
 # Patch get_version before importing deploy module
 with patch("datacustomcode.version.get_version", return_value="1.2.3"):
