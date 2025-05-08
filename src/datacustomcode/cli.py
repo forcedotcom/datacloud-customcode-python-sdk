@@ -101,13 +101,25 @@ def deploy(profile: str, path: str, name: str, version: str, description: str):
 @cli.command()
 @click.argument("directory", default=".")
 def init(directory: str):
+    from datacustomcode.scan import dc_config_json_from_file
     from datacustomcode.template import copy_template
 
     click.echo("Copying template to " + click.style(directory, fg="blue", bold=True))
     copy_template(directory)
+    entrypoint_path = os.path.join(directory, "payload", "entrypoint.py")
+    config_location = os.path.join(os.path.dirname(entrypoint_path), "config.json")
+    config_json = dc_config_json_from_file(entrypoint_path)
+    with open(config_location, "w") as f:
+        json.dump(config_json, f, indent=2)
+
     click.echo(
         "Start developing by updating the code in "
-        + click.style(f"{directory}/payload/entrypoint.py", fg="blue", bold=True)
+        + click.style(entrypoint_path, fg="blue", bold=True)
+    )
+    click.echo(
+        "You can run "
+        + click.style(f"datacustomcode scan {entrypoint_path}", fg="blue", bold=True)
+        + " to automatically update config.json when you make changes to your code"
     )
 
 

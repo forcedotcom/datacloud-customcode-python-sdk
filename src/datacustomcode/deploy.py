@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 from html import unescape
+import json
 import os
 import shutil
 import tarfile
@@ -30,11 +31,11 @@ from typing import (
 )
 
 from loguru import logger
+import pydantic
 from pydantic import BaseModel
 import requests
 
 from datacustomcode.cmd import cmd_output
-from datacustomcode.scan import scan_file
 
 if TYPE_CHECKING:
     from datacustomcode.credentials import Credentials
@@ -77,8 +78,10 @@ def _make_api_call(
     logger.debug(f"Request params: {kwargs}")
 
     response = requests.request(method=method, url=url, headers=headers, **kwargs)
-    response.raise_for_status()
     json_response = response.json()
+    if response.status_code >= 400:
+        logger.debug(f"Error Response: {json_response}")
+    response.raise_for_status()
     assert isinstance(
         json_response, dict
     ), f"Unexpected response type: {type(json_response)}"
@@ -223,51 +226,17 @@ def wait_for_deployment(
             callback(status)
         if status == "Deployed":
             logger.debug(
-                "Deployment completed, Elapsed time: {time.time() - start_time}"
+                f"Deployment completed.\nElapsed time: {time.time() - start_time}"
             )
             break
         time.sleep(1)
 
 
 DATA_TRANSFORM_REQUEST_TEMPLATE: dict[str, Any] = {
-    "metadata": {
-        "dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v8.json",
-        "dbt_version": "1.4.6",
-        "generated_at": "2023-04-25T18:54:11.375589Z",
-        "invocation_id": "d6c68c69-533a-4d54-861e-1493d6cd8092",
-        "env": {},
-        "project_id": "jaffle_shop",
-        "user_id": "1ca8403c-a1a5-43af-8b88-9265e948b9d2",
-        "send_anonymous_usage_stats": True,
-        "adapter_type": "spark",
-    },
-    "nodes": {
-        "model.dcexample.dim_listings_w_hosts": {
-            "name": "dim_listings_w_hosts",
-            "resource_type": "model",
-            "relation_name": "{OUTPUT_DLO}",
-            "config": {"materialized": "table"},
-            "compiled_code": "",
-            "depends_on": {"nodes": []},
-        }
-    },
-    "sources": {
-        "source.dcexample.listings": {
-            "name": "listings",
-            "resource_type": "source",
-            "relation_name": "{INPUT_DLO}",
-            "identifier": "{INPUT_DLO}",
-        }
-    },
+    "nodes": {},
+    "sources": {},
     "macros": {
-        "macro.dcexample.byoc": {
-            "name": "byoc_example",
-            "resource_type": "macro",
-            "path": "",
-            "original_file_path": "",
-            "unique_id": "unique id",
-            "macro_sql": "",
-            "supported_languages": None,
+        "macro.byoc": {
             "arguments": [{"name": "{SCRIPT_NAME}", "type": "BYOC_SCRIPT"}],
         }
     },
@@ -275,25 +244,47 @@ DATA_TRANSFORM_REQUEST_TEMPLATE: dict[str, Any] = {
 
 
 class DataTransformConfig(BaseModel):
-    input: Union[str, list[str]]
-    output: Union[str, list[str]]
+    sdkVersion: str
+    entryPoint: str
+    dataspace: str
+    permissions: Permissions
+
+
+class Permissions(BaseModel):
+    read: Union[DloPermission]
+    write: Union[DloPermission]
+
+
+class DloPermission(BaseModel):
+    dlo: list[str]
 
 
 def get_data_transform_config(directory: str) -> DataTransformConfig:
-    """Get the data transform config from the entrypoint.py file."""
-    entrypoint_file = os.path.join(directory, "entrypoint.py")
-    data_access_layer_calls = scan_file(entrypoint_file)
-    input_ = data_access_layer_calls.input_str
-    output = data_access_layer_calls.output_str
-    return DataTransformConfig(input=input_, output=output)
+    """Get the data transform config from the config.json file."""
+    config_path = os.path.join(directory, "config.json")
+    try:
+        with open(config_path, "r") as f:
+            config = json.loads(f.read())
+            return DataTransformConfig(**config)
+    except FileNotFoundError as err:
+        raise FileNotFoundError(
+            f"config.json not found in {config_path}"
+        ) from err
+    except json.JSONDecodeError as err:
+        raise ValueError(
+            f"config.json in {config_path} is not valid JSON"
+        ) from err
+    except pydantic.ValidationError as err:
+        missing_fields = [str(err["loc"][0]) for err in err.errors()]
+        raise ValueError(
+            f"config.json in {config_path} is missing required "
+            f"fields: {', '.join(missing_fields)}"
+        ) from err
 
 
 def verify_data_transform_config(directory: str) -> None:
-    """Verify that the data transform config.json file exists in the directory."""
-    config_path = os.path.join(directory, "config.json")
-    if not os.path.exists(config_path):
-        raise FileNotFoundError(f"config.json not found in {directory}")
-
+    """Verify the data transform config.json contents."""
+    get_data_transform_config(directory)
     logger.debug(f"Verified data transform config in {directory}")
 
 
@@ -306,28 +297,31 @@ def create_data_transform(
     script_name = metadata.name
     data_transform_config = get_data_transform_config(directory)
     request_hydrated = DATA_TRANSFORM_REQUEST_TEMPLATE.copy()
-    request_hydrated["nodes"]["model.dcexample.dim_listings_w_hosts"][
-        "relation_name"
-    ] = data_transform_config.input
-    request_hydrated["sources"]["source.dcexample.listings"][
-        "relation_name"
-    ] = data_transform_config.output
-    request_hydrated["sources"]["source.dcexample.listings"][
-        "identifier"
-    ] = data_transform_config.output
-    request_hydrated["macros"]["macro.dcexample.byoc"]["arguments"][0][
-        "name"
-    ] = script_name
+
+    # Add nodes for each write DLO
+    for i, dlo in enumerate(data_transform_config.permissions.write.dlo, 1):
+        request_hydrated["nodes"][f"node{i}"] = {
+            "relation_name": dlo,
+            "config": {"materialized": "table"},
+            "compiled_code": "",
+        }
+
+    # Add sources for each read DLO
+    for i, dlo in enumerate(data_transform_config.permissions.read.dlo, 1):
+        request_hydrated["sources"][f"source{i}"] = {"relation_name": dlo}
+
+    request_hydrated["macros"]["macro.byoc"]["arguments"][0]["name"] = script_name
 
     body = {
         "definition": {
-            "type": "DBT",
+            "type": "DCSQL",
             "manifest": request_hydrated,
             "version": "56.0",
         },
         "label": f"{metadata.name}",
         "name": f"{metadata.name}",
         "type": "BATCH",
+        "dataSpaceName": data_transform_config.dataspace,
     }
 
     url = _join_strip_url(access_token.instance_url, DATA_TRANSFORMS_PATH)
