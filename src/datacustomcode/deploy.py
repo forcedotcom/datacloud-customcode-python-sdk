@@ -267,17 +267,13 @@ def get_data_transform_config(directory: str) -> DataTransformConfig:
             config = json.loads(f.read())
             return DataTransformConfig(**config)
     except FileNotFoundError as err:
-        raise FileNotFoundError(
-            f"config.json not found in {config_path}"
-        ) from err
+        raise FileNotFoundError(f"config.json not found at {config_path}") from err
     except json.JSONDecodeError as err:
-        raise ValueError(
-            f"config.json in {config_path} is not valid JSON"
-        ) from err
+        raise ValueError(f"config.json at {config_path} is not valid JSON") from err
     except pydantic.ValidationError as err:
         missing_fields = [str(err["loc"][0]) for err in err.errors()]
         raise ValueError(
-            f"config.json in {config_path} is missing required "
+            f"config.json at {config_path} is missing required "
             f"fields: {', '.join(missing_fields)}"
         ) from err
 

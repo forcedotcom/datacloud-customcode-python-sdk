@@ -249,9 +249,10 @@ class TestDataTransformConfig:
         """Test verifying data transform config file when it doesn't exist."""
         mock_exists.return_value = False
         with pytest.raises(
-            FileNotFoundError, match="config.json not found in /test/dir/payload"
+            FileNotFoundError,
+            match="config.json not found at /test/dir/payload/config.json",
         ):
-            verify_data_transform_config("/test/dir")
+            verify_data_transform_config("/test/dir/payload")
 
     @patch("datacustomcode.deploy.os.path.exists")
     @patch("builtins.open", new_callable=mock_open, read_data='{"invalid": "json"')
@@ -259,9 +260,10 @@ class TestDataTransformConfig:
         """Test verifying data transform config with invalid JSON."""
         mock_exists.return_value = True
         with pytest.raises(
-            ValueError, match="config.json in /test/dir/payload is not valid JSON"
+            ValueError,
+            match="config.json at /test/dir/payload/config.json is not valid JSON",
         ):
-            verify_data_transform_config("/test/dir")
+            verify_data_transform_config("/test/dir/payload")
 
     @patch("datacustomcode.deploy.os.path.exists")
     @patch("builtins.open", new_callable=mock_open, read_data='{"sdkVersion": "1.0.0"}')
@@ -270,10 +272,10 @@ class TestDataTransformConfig:
         mock_exists.return_value = True
         with pytest.raises(
             ValueError,
-            match="config.json in /test/dir/payload is missing required fields: "
-            "entryPoint, dataspace, permissions",
+            match="config.json at /test/dir/payload/config.json is missing "
+            "required fields: entryPoint, dataspace, permissions",
         ):
-            verify_data_transform_config("/test/dir")
+            verify_data_transform_config("/test/dir/payload")
 
 
 class TestCreateDataTransform:
