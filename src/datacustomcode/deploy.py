@@ -36,6 +36,7 @@ import requests
 
 from datacustomcode.cmd import cmd_output
 from datacustomcode.scan import scan_file
+from datacustomcode.version import get_version
 
 if TYPE_CHECKING:
     from datacustomcode.credentials import Credentials
@@ -284,6 +285,7 @@ DATA_TRANSFORM_CONFIG_TEMPLATE: dict[str, Any] = {
     "entryPoint": "entrypoint.py",
     "dataspace": "default",
     "permissions": {"read": {"dlo": ""}, "write": {"dlo": ""}},
+    "sdkVersion": get_version(),
 }
 
 

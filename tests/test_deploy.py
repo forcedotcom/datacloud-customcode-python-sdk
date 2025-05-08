@@ -10,24 +10,27 @@ import pytest
 import requests
 
 from datacustomcode.credentials import Credentials
-from datacustomcode.deploy import (
-    AccessTokenResponse,
-    CreateDeploymentResponse,
-    DataTransformConfig,
-    DeploymentsResponse,
-    TransformationJobMetadata,
-    _make_api_call,
-    _retrieve_access_token,
-    create_data_transform,
-    create_data_transform_config,
-    create_deployment,
-    deploy_full,
-    get_data_transform_config,
-    get_deployments,
-    run_data_transform,
-    wait_for_deployment,
-    zip_and_upload_directory,
-)
+
+# Patch get_version before importing deploy module
+with patch("datacustomcode.version.get_version", return_value="1.2.3"):
+    from datacustomcode.deploy import (
+        AccessTokenResponse,
+        CreateDeploymentResponse,
+        DataTransformConfig,
+        DeploymentsResponse,
+        TransformationJobMetadata,
+        _make_api_call,
+        _retrieve_access_token,
+        create_data_transform,
+        create_data_transform_config,
+        create_deployment,
+        deploy_full,
+        get_data_transform_config,
+        get_deployments,
+        run_data_transform,
+        wait_for_deployment,
+        zip_and_upload_directory,
+    )
 
 
 class TestMakeApiCall:
@@ -248,10 +251,14 @@ class TestDataTransformConfig:
         mock_get_config.assert_called_once_with("/test/dir")
         mock_file.assert_called_once_with("/test/dir/config.json", "w")
         mock_json_dump.assert_called_once()
-        # Check permissions in config
-        config = mock_json_dump.call_args[0][0]
-        assert config["permissions"]["read"]["dlo"] == "input_dlo"
-        assert config["permissions"]["write"]["dlo"] == "output_dlo"
+
+        # Verify the config contains all required fields including sdkVersion
+        config_data = mock_json_dump.call_args[0][0]
+        assert config_data["entryPoint"] == "entrypoint.py"
+        assert config_data["dataspace"] == "default"
+        assert config_data["permissions"]["read"]["dlo"] == "input_dlo"
+        assert config_data["permissions"]["write"]["dlo"] == "output_dlo"
+        assert config_data["sdkVersion"] == "1.2.3"
 
 
 class TestCreateDataTransform:
