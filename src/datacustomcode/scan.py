@@ -16,14 +16,26 @@ from __future__ import annotations
 
 import ast
 from typing import (
+    Any,
     Dict,
-    List,
     Union,
 )
 
 import pydantic
 
+from datacustomcode.version import get_version
+
 DATA_ACCESS_METHODS = ["read_dlo", "read_dmo", "write_to_dlo", "write_to_dmo"]
+
+DATA_TRANSFORM_CONFIG_TEMPLATE = {
+    "sdkVersion": get_version(),
+    "entryPoint": "",
+    "dataspace": "default",
+    "permissions": {
+        "read": {},
+        "write": {},
+    },
+}
 
 
 class DataAccessLayerCalls(pydantic.BaseModel):
@@ -129,25 +141,22 @@ def scan_file(file_path: str) -> DataAccessLayerCalls:
         return visitor.found()
 
 
-def dc_config_json_from_file(file_path: str) -> dict:
+def dc_config_json_from_file(file_path: str) -> dict[str, Any]:
     """Create a Data Cloud Custom Code config JSON from a script."""
     output = scan_file(file_path)
-    read = {}
+    config = DATA_TRANSFORM_CONFIG_TEMPLATE.copy()
+    config["entryPoint"] = file_path.rpartition("/")[-1]
+
+    read: dict[str, list[str]] = {}
     if output.read_dlo:
         read["dlo"] = list(output.read_dlo)
     else:
         read["dmo"] = list(output.read_dmo)
-    write = {}
+    write: dict[str, list[str]] = {}
     if output.write_to_dlo:
         write["dlo"] = list(output.write_to_dlo)
     else:
         write["dmo"] = list(output.write_to_dmo)
-    config: Dict[str, Union[str, Dict[str, Dict[str, List[str]]]]] = {
-        "entryPoint": file_path.rpartition("/")[-1],
-        "dataspace": "default",
-        "permissions": {
-            "read": read,
-            "write": write,
-        },
-    }
+
+    config["permissions"] = {"read": read, "write": write}
     return config

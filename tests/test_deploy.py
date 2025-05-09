@@ -10,6 +10,7 @@ import pytest
 import requests
 
 from datacustomcode.credentials import Credentials
+from datacustomcode.deploy import DloPermission, Permissions
 
 # Patch get_version before importing deploy module
 with patch("datacustomcode.version.get_version", return_value="1.2.3"):
@@ -22,12 +23,12 @@ with patch("datacustomcode.version.get_version", return_value="1.2.3"):
         _make_api_call,
         _retrieve_access_token,
         create_data_transform,
-        create_data_transform_config,
         create_deployment,
         deploy_full,
         get_data_transform_config,
         get_deployments,
         run_data_transform,
+        verify_data_transform_config,
         wait_for_deployment,
         zip_and_upload_directory,
     )
@@ -38,6 +39,7 @@ class TestMakeApiCall:
     def test_make_api_call_with_token(self, mock_request):
         """Test API call with authentication token."""
         mock_response = MagicMock()
+        mock_response.status_code = 200
         mock_response.json.return_value = {"key": "value"}
         mock_request.return_value = mock_response
 
@@ -57,6 +59,7 @@ class TestMakeApiCall:
     def test_make_api_call_invalid_response(self, mock_request):
         """Test API call with non-dict response."""
         mock_response = MagicMock()
+        mock_response.status_code = 200
         mock_response.json.return_value = ["list", "response"]  # Non-dict response
         mock_request.return_value = mock_response
 
@@ -185,16 +188,16 @@ class TestWaitForDeployment:
         callback = MagicMock()
 
         # Mock deployment statuses
-        mock_time.side_effect = [100, 101]  # Start time, check time
+        mock_time.side_effect = [100, 101, 102]  # Start time, check time, final time
         mock_get_deployments.return_value = DeploymentsResponse(
             deploymentStatus="Deployed"
         )
 
         wait_for_deployment(access_token, metadata, callback)
 
-        mock_get_deployments.assert_called_once()
+        # Verify the callback was called with the correct status
         callback.assert_called_once_with("Deployed")
-        mock_sleep.assert_not_called()  # No sleep since first check returns "Deployed"
+        mock_sleep.assert_not_called()
 
     @patch("datacustomcode.deploy.time.sleep")
     @patch("datacustomcode.deploy.time.time")
@@ -221,44 +224,58 @@ class TestWaitForDeployment:
 
 
 class TestDataTransformConfig:
-    @patch("datacustomcode.deploy.scan_file")
-    def test_get_data_transform_config(self, mock_scan_file):
-        """Test getting data transform config from entrypoint file."""
-        mock_scan_file.return_value = MagicMock(
-            input_str="input_dlo", output_str="output_dlo"
-        )
-
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data=(
+            '{"sdkVersion": "1.0.0", "entryPoint": "entrypoint.py", '
+            '"dataspace": "test_dataspace", '
+            '"permissions": {"read": {"dlo": ["input_dlo"]}, '
+            '"write": {"dlo": ["output_dlo"]}}}'
+        ),
+    )
+    def test_get_data_transform_config(self, mock_file):
+        """Test getting data transform config from config.json file."""
         result = get_data_transform_config("/test/dir")
-
-        mock_scan_file.assert_called_once_with("/test/dir/entrypoint.py")
         assert isinstance(result, DataTransformConfig)
-        assert result.input == "input_dlo"
-        assert result.output == "output_dlo"
+        assert result.sdkVersion == "1.0.0"
+        assert result.entryPoint == "entrypoint.py"
+        assert result.dataspace == "test_dataspace"
+        assert result.permissions.read.dlo == ["input_dlo"]
+        assert result.permissions.write.dlo == ["output_dlo"]
 
-    @patch("datacustomcode.deploy.get_data_transform_config")
-    @patch("datacustomcode.deploy.json.dump")
-    @patch("builtins.open", new_callable=mock_open)
-    def test_create_data_transform_config(
-        self, mock_file, mock_json_dump, mock_get_config
-    ):
-        """Test creating data transform config file."""
-        mock_get_config.return_value = DataTransformConfig(
-            input="input_dlo", output="output_dlo"
-        )
+    @patch("datacustomcode.deploy.os.path.exists")
+    def test_verify_data_transform_config_missing(self, mock_exists):
+        """Test verifying data transform config file when it doesn't exist."""
+        mock_exists.return_value = False
+        with pytest.raises(
+            FileNotFoundError,
+            match="config.json not found at /test/dir/payload/config.json",
+        ):
+            verify_data_transform_config("/test/dir/payload")
 
-        create_data_transform_config("/test/dir")
+    @patch("datacustomcode.deploy.os.path.exists")
+    @patch("builtins.open", new_callable=mock_open, read_data='{"invalid": "json"')
+    def test_verify_data_transform_config_invalid_json(self, mock_file, mock_exists):
+        """Test verifying data transform config with invalid JSON."""
+        mock_exists.return_value = True
+        with pytest.raises(
+            ValueError,
+            match="config.json at /test/dir/payload/config.json is not valid JSON",
+        ):
+            verify_data_transform_config("/test/dir/payload")
 
-        mock_get_config.assert_called_once_with("/test/dir")
-        mock_file.assert_called_once_with("/test/dir/config.json", "w")
-        mock_json_dump.assert_called_once()
-
-        # Verify the config contains all required fields including sdkVersion
-        config_data = mock_json_dump.call_args[0][0]
-        assert config_data["entryPoint"] == "entrypoint.py"
-        assert config_data["dataspace"] == "default"
-        assert config_data["permissions"]["read"]["dlo"] == "input_dlo"
-        assert config_data["permissions"]["write"]["dlo"] == "output_dlo"
-        assert config_data["sdkVersion"] == "1.2.3"
+    @patch("datacustomcode.deploy.os.path.exists")
+    @patch("builtins.open", new_callable=mock_open, read_data='{"sdkVersion": "1.0.0"}')
+    def test_verify_data_transform_config_missing_fields(self, mock_file, mock_exists):
+        """Test verifying data transform config with missing required fields."""
+        mock_exists.return_value = True
+        with pytest.raises(
+            ValueError,
+            match="config.json at /test/dir/payload/config.json is missing "
+            "required fields: entryPoint, dataspace, permissions",
+        ):
+            verify_data_transform_config("/test/dir/payload")
 
 
 class TestCreateDataTransform:
@@ -274,7 +291,13 @@ class TestCreateDataTransform:
         )
 
         mock_get_config.return_value = DataTransformConfig(
-            input="input_dlo", output="output_dlo"
+            sdkVersion="1.0.0",
+            entryPoint="entrypoint.py",
+            dataspace="test_dataspace",
+            permissions=Permissions(
+                read=DloPermission(dlo=["input_dlo"]),
+                write=DloPermission(dlo=["output_dlo"]),
+            ),
         )
         mock_make_api_call.return_value = {"id": "transform_id"}
 
@@ -282,13 +305,28 @@ class TestCreateDataTransform:
 
         mock_get_config.assert_called_once_with("/test/dir")
         mock_make_api_call.assert_called_once()
+
+        # Verify the request body structure
+        request_body = mock_make_api_call.call_args[1]["json"]
+        assert request_body["definition"]["type"] == "DCSQL"
+        assert request_body["dataSpaceName"] == "test_dataspace"
+        assert "nodes" in request_body["definition"]["manifest"]
+        assert "sources" in request_body["definition"]["manifest"]
+        assert "macros" in request_body["definition"]["manifest"]
+        assert (
+            request_body["definition"]["manifest"]["macros"]["macro.byoc"]["arguments"][
+                0
+            ]["name"]
+            == "test_job"
+        )
+
         assert result == {"id": "transform_id"}
 
 
 class TestDeployFull:
     @patch("datacustomcode.deploy._retrieve_access_token")
     @patch("datacustomcode.deploy.prepare_dependency_archive")
-    @patch("datacustomcode.deploy.create_data_transform_config")
+    @patch("datacustomcode.deploy.verify_data_transform_config")
     @patch("datacustomcode.deploy.create_deployment")
     @patch("datacustomcode.deploy.zip_and_upload_directory")
     @patch("datacustomcode.deploy.wait_for_deployment")
@@ -299,7 +337,7 @@ class TestDeployFull:
         mock_wait,
         mock_zip_upload,
         mock_create_deployment,
-        mock_create_config,
+        mock_verify_config,
         mock_prepare,
         mock_retrieve_token,
     ):
@@ -331,7 +369,7 @@ class TestDeployFull:
         # Assertions
         mock_retrieve_token.assert_called_once_with(credentials)
         mock_prepare.assert_called_once_with("/test/dir")
-        mock_create_config.assert_called_once_with("/test/dir")
+        mock_verify_config.assert_called_once_with("/test/dir")
         mock_create_deployment.assert_called_once_with(access_token, metadata)
         mock_zip_upload.assert_called_once_with(
             "/test/dir", "https://upload.example.com"
