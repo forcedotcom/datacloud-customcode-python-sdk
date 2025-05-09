@@ -26,7 +26,7 @@ jobs:
       run: poetry install --no-interaction --only main
 
     - name: Build package
-      run: poetry build
+      run: make package
 
     - name: Store package
       uses: actions/upload-artifact@v4
