@@ -1,9 +1,6 @@
 [build-system]
 build-backend = "poetry_dynamic_versioning.backend"
-requires = [
-  "poetry-core>=2.0.0",
-  "poetry-dynamic-versioning>=1.0.0,<2.0.0"
-]
+requires = ["poetry-core>=2.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
 
 [project]
 authors = []
@@ -21,7 +18,6 @@ license = "Apache-2.0"
 name = "salesforce-data-customcode"
 readme = "README.md"
 requires-python = ">=3.10,<3.12"
-version = "0.1.0"
 
 [tool.black]
 exclude = '''
@@ -93,6 +89,7 @@ include = [
   {path = "src/datacustomcode/config.yaml", format = "sdist"}
 ]
 packages = [{include = "datacustomcode", from = "src"}]
+version = "0.0.0"
 
 [tool.poetry.build]
 generate-setup-file = false
