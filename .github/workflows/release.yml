@@ -41,6 +41,9 @@ jobs:
       name: pypi
       url: https://pypi.org/project/salesforce-data-customcode/
     steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
