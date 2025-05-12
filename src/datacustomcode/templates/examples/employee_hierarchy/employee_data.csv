@@ -1,0 +1,13 @@
+id,name,position,manager_id
+1,Alice,CEO,
+2,Bob,VP Engineering,1
+3,Charlie,VP Sales,1
+4,David,Engineering Lead,2
+5,Eve,Engineering Lead,2
+6,Frank,Sales Manager,3
+7,Grace,Software Eng.,4
+8,Hannah,Software Eng.,4
+9,Ian,Software Eng.,5
+10,Jack,Sales Rep,6
+11,Kelly,Sales Rep,6
+12,Leo,Intern,7
