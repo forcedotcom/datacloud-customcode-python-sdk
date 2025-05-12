@@ -156,8 +156,10 @@ def init(directory: str):
 @click.argument("filename")
 @click.option("--config")
 @click.option("--dry-run", is_flag=True)
-def scan(filename: str, config: str, dry_run: bool):
-    from datacustomcode.scan import dc_config_json_from_file
+@click.option("--no-requirements", is_flag=True, help="Skip generating requirements.txt file")
+def scan(filename: str, config: str, dry_run: bool, no_requirements: bool):
+    from datacustomcode.scan import dc_config_json_from_file, write_requirements_file
+
 
     config_location = config or os.path.join(os.path.dirname(filename), "config.json")
     click.echo(
@@ -171,6 +173,13 @@ def scan(filename: str, config: str, dry_run: bool):
     if not dry_run:
         with open(config_location, "w") as f:
             json.dump(config_json, f, indent=2)
+
+        if not no_requirements:
+            requirements_path = write_requirements_file(filename)
+            click.echo(
+                "Generated requirements file: "
+                + click.style(requirements_path, fg="blue", bold=True)
+            )
 
 
 @cli.command()
