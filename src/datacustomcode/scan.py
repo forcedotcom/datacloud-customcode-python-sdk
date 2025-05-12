@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from __future__ import annotations
+import os
+from typing import Union, Dict, List, FrozenSet, Set
 
 import ast
 from typing import (
@@ -129,6 +131,98 @@ class ClientMethodVisitor(ast.NodeVisitor):
             write_to_dlo=frozenset(self._write_to_dlo_instances),
             write_to_dmo=frozenset(self._write_to_dmo_instances),
         )
+
+
+class ImportVisitor(ast.NodeVisitor):
+    """AST Visitor that extracts external package imports from Python code."""
+
+    # Standard library modules that should be excluded from requirements
+    STANDARD_LIBS = {
+        "abc", "argparse", "ast", "asyncio", "base64", "collections", "configparser",
+        "contextlib", "copy", "csv", "datetime", "enum", "functools", "glob", "hashlib",
+        "http", "importlib", "inspect", "io", "itertools", "json", "logging", "math",
+        "os", "pathlib", "pickle", "random", "re", "shutil", "site", "socket", "sqlite3",
+        "string", "subprocess", "sys", "tempfile", "threading", "time", "traceback",
+        "typing", "uuid", "warnings", "xml", "zipfile"
+    }
+
+    # Additional packages to exclude from requirements.txt
+    EXCLUDED_PACKAGES = {
+        "datacustomcode",  # Internal package
+        "pyspark",  # Provided by the runtime environment
+    }
+
+    def __init__(self) -> None:
+        self.imports: Set[str] = set()
+
+    def visit_Import(self, node: ast.Import) -> None:
+        """Visit an import statement (e.g., import os, sys)."""
+        for name in node.names:
+            # Get the top-level package name
+            package = name.name.split('.')[0]
+            if (package not in self.STANDARD_LIBS and
+                    package not in self.EXCLUDED_PACKAGES and
+                    not package.startswith('_')):
+                self.imports.add(package)
+        self.generic_visit(node)
+
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        """Visit a from-import statement (e.g., from os import path)."""
+        if node.module is not None:
+            # Get the top-level package
+            package = node.module.split('.')[0]
+            if (package not in self.STANDARD_LIBS and
+                    package not in self.EXCLUDED_PACKAGES and
+                    not package.startswith('_')):
+                self.imports.add(package)
+        self.generic_visit(node)
+
+
+def scan_file_for_imports(file_path: str) -> Set[str]:
+    """Scan a Python file for external package imports."""
+    with open(file_path, "r") as f:
+        code = f.read()
+        tree = ast.parse(code)
+        visitor = ImportVisitor()
+        visitor.visit(tree)
+        return visitor.imports
+
+
+def write_requirements_file(file_path: str, output_dir: str = None) -> str:
+    """
+    Scan a Python file for imports and write them to requirements.txt.
+
+    Args:
+        file_path: Path to the Python file to scan
+        output_dir: Directory where requirements.txt should be created (defaults to parent directory)
+
+    Returns:
+        Path to the generated requirements.txt file
+    """
+    imports = scan_file_for_imports(file_path)
+
+    if not output_dir:
+        # Use the parent directory rather than same directory as the file
+        file_dir = os.path.dirname(file_path)
+        output_dir = os.path.dirname(file_dir) if file_dir else "."
+
+    requirements_path = os.path.join(output_dir, "requirements.txt")
+
+    # If the file exists, read existing requirements and merge with new ones
+    existing_requirements = set()
+    if os.path.exists(requirements_path):
+        with open(requirements_path, "r") as f:
+            existing_requirements = {line.strip() for line in f if line.strip()}
+
+    # Merge existing requirements with newly discovered ones
+    all_requirements = existing_requirements.union(imports)
+
+    # Write the combined requirements
+    with open(requirements_path, "w") as f:
+        for package in sorted(all_requirements):
+            f.write(f"{package}\n")
+
+    return requirements_path
 
 
 def scan_file(file_path: str) -> DataAccessLayerCalls:

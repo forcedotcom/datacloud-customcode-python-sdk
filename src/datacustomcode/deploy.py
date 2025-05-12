@@ -169,23 +169,41 @@ def prepare_dependency_archive(directory: str) -> None:
         archive_file = os.path.join(archives_dir, DEPENDENCIES_ARCHIVE_NAME)
         with tarfile.open(archive_file, "w:gz") as tar:
             for file in os.listdir(temp_dir):
+                # Exclude requirements.txt from the archive
+                if file == "requirements.txt":
+                    continue
                 tar.add(os.path.join(temp_dir, file), arcname=file)
 
         logger.debug(f"Dependencies downloaded and archived to {archive_file}")
 
 
-def zip_and_upload_directory(directory: str, file_upload_url: str) -> None:
-    file_upload_url = unescape(file_upload_url)
+def zip_and_upload_directory(directory: str, name: str) -> None:
+    #   file_upload_url = unescape(file_upload_url)
 
     logger.debug(f"Zipping directory... {directory}")
-    shutil.make_archive(ZIP_FILE_NAME.rstrip(".zip"), "zip", directory)
 
-    logger.debug(f"Uploading deployment to {file_upload_url}")
-    with open(ZIP_FILE_NAME, "rb") as zip_file:
-        response = requests.put(
-            file_upload_url, data=zip_file, headers={"Content-Type": "application/zip"}
-        )
-        response.raise_for_status()
+    # Create a zip file excluding .DS_Store files
+    import zipfile
+
+    zip_filename = f"{name}.zip"
+    with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for root, dirs, files in os.walk(directory):
+            # Skip .DS_Store files when adding to zip
+            for file in files:
+                if file != '.DS_Store':
+                    file_path = os.path.join(root, file)
+                    # Preserve relative path structure in the zip file
+                    arcname = os.path.relpath(file_path, directory)
+                    zipf.write(file_path, arcname)
+
+    logger.debug(f"Created zip file: {zip_filename} (excluding .DS_Store files)")
+
+    # logger.debug(f"Uploading deployment to {file_upload_url}")
+    # with open(ZIP_FILE_NAME, "rb") as zip_file:
+    #     response = requests.put(
+    #         file_upload_url, data=zip_file, headers={"Content-Type": "application/zip"}
+    #     )
+    #     response.raise_for_status()
 
 
 class DeploymentsResponse(BaseModel):
@@ -323,6 +341,60 @@ def create_data_transform(
     url = _join_strip_url(access_token.instance_url, DATA_TRANSFORMS_PATH)
     response = _make_api_call(url, "POST", token=access_token.access_token, json=body)
     return response
+
+def has_nonempty_requirements_file(directory: str) -> bool:
+    """
+    Check if requirements.txt exists in the given directory and has at least one non-comment line.
+    Args:
+        directory (str): The directory to check for requirements.txt.
+    Returns:
+        bool: True if requirements.txt exists and has a non-comment line, False otherwise.
+    """
+    # Look for requirements.txt in the parent directory of the given directory
+    requirements_path = os.path.join(os.path.dirname(directory), "requirements.txt")
+    print(requirements_path)
+
+    try:
+        if os.path.isfile(requirements_path):
+            #print the contents of the file
+            with open(requirements_path, "r", encoding="utf-8") as f:
+                print(f.read())
+            with open(requirements_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    # Consider non-empty if any line is not a comment (ignoring leading whitespace)
+                    if line.strip() and not line.lstrip().startswith('#'):
+                        return True
+    except Exception as e:
+        logger.error(f"Error reading requirements.txt: {e}")
+    return False
+
+
+def zip(
+    directory: str,
+    metadata: TransformationJobMetadata,
+    credentials: Credentials,
+    name: str,
+    callback=None,
+) -> AccessTokenResponse:
+    """Deploy a data transform in the DataCloud."""
+    access_token = _retrieve_access_token(credentials)
+
+    # prepare payload only if requirements.txt is non-empty
+    if has_nonempty_requirements_file(directory):
+        prepare_dependency_archive(directory)
+    else:
+        logger.info(f"Skipping dependency archive: requirements.txt is missing or empty in {directory}")
+ #   create_data_transform_config(directory)
+
+    # create deployment and upload payload
+#    deployment = create_deployment(access_token, metadata)
+    zip_and_upload_directory(directory, name)
+    #, deployment.fileUploadUrl)
+#    wait_for_deployment(access_token, metadata, callback)
+
+    # create data transform
+#   create_data_transform(directory, access_token, metadata)
+    return access_token
 
 
 def deploy_full(

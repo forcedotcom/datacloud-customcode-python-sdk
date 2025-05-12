@@ -68,6 +68,35 @@ def configure(
         login_url=login_url,
     ).update_ini(profile=profile)
 
+@cli.command()
+@click.option("--profile", default="default")
+@click.option("--path", default="payload")
+@click.option("--name", default="test_pkg")
+@click.option("--version", default="0.0.1")
+@click.option("--description", default="Custom Data Transform Code")
+def zip(profile: str, path: str, name: str, version: str, description: str):
+    from datacustomcode.credentials import Credentials
+    from datacustomcode.deploy import TransformationJobMetadata, zip, zip_and_upload_directory
+
+    logger.debug("Zipping project")
+
+    metadata = TransformationJobMetadata(
+        name=name,
+        version=version,
+        description=description,
+    )
+    try:
+        credentials = Credentials.from_ini(profile=profile)
+    except KeyError:
+        click.secho(
+            f"Error: Profile {profile} not found in credentials.ini. "
+            "Run `datacustomcode configure` to create a credentialsprofile.",
+            fg="red",
+        )
+        raise click.Abort() from None
+    zip(path, metadata, credentials, name)
+
+
 
 @cli.command()
 @click.option("--profile", default="default")
