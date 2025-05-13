@@ -243,11 +243,10 @@ def write_requirements_file(file_path: str) -> str:
     """
     imports = scan_file_for_imports(file_path)
 
-    # Use the parent directory rather than same directory as the file
+    # Write requirements.txt in the parent directory of the Python file
     file_dir = os.path.dirname(file_path)
-    output_dir = os.path.dirname(file_dir) if file_dir else "."
-
-    requirements_path = os.path.join(output_dir, "requirements.txt")
+    parent_dir = os.path.dirname(file_dir) if file_dir else "."
+    requirements_path = os.path.join(parent_dir, "requirements.txt")
 
     # If the file exists, read existing requirements and merge with new ones
     existing_requirements = set()
