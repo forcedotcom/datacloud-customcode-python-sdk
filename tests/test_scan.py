@@ -11,6 +11,8 @@ from datacustomcode.scan import (
     DataAccessLayerCalls,
     dc_config_json_from_file,
     scan_file,
+    scan_file_for_imports,
+    write_requirements_file,
 )
 
 
@@ -422,3 +424,158 @@ def test_real_world_example():
         assert config["permissions"]["write"]["dlo"] == ["customer_data_enriched"]
     finally:
         os.unlink(temp_path)
+
+
+class TestRequirementsFile:
+    def test_scan_file_for_imports(self):
+        """Test scanning a file for external package imports."""
+        content = textwrap.dedent(
+            """
+            import pandas as pd
+            import numpy as np
+            from sklearn.linear_model import LinearRegression
+            import os  # Standard library
+            import sys  # Standard library
+            from datacustomcode.client import Client  # Internal package
+            """
+        )
+        temp_path = create_test_script(content)
+        try:
+            imports = scan_file_for_imports(temp_path)
+            assert "pandas" in imports
+            assert "numpy" in imports
+            assert "sklearn" in imports
+            assert "os" not in imports  # Standard library
+            assert "sys" not in imports  # Standard library
+            assert "datacustomcode" not in imports  # Internal package
+        finally:
+            os.unlink(temp_path)
+
+    def test_write_requirements_file_new(self):
+        """Test writing a new requirements.txt file."""
+        # Create a temporary directory structure
+        temp_dir = tempfile.mkdtemp()
+        script_dir = os.path.join(temp_dir, "script_dir")
+        os.makedirs(script_dir)
+
+        content = textwrap.dedent(
+            """
+            import pandas as pd
+            import numpy as np
+            """
+        )
+        temp_path = os.path.join(script_dir, "test_script.py")
+        with open(temp_path, "w") as f:
+            f.write(content)
+
+        requirements_path = None
+        try:
+            requirements_path = write_requirements_file(temp_path)
+            assert os.path.exists(requirements_path)
+            assert (
+                os.path.dirname(requirements_path) == temp_dir
+            )  # Should be in parent directory
+
+            with open(requirements_path, "r") as f:
+                requirements = {line.strip() for line in f}
+
+            assert "pandas" in requirements
+            assert "numpy" in requirements
+        finally:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+            if requirements_path and os.path.exists(requirements_path):
+                os.unlink(requirements_path)
+            os.rmdir(script_dir)
+            os.rmdir(temp_dir)
+
+    def test_write_requirements_file_merge(self):
+        """Test merging with existing requirements.txt file."""
+        # Create a temporary directory structure
+        temp_dir = tempfile.mkdtemp()
+        script_dir = os.path.join(temp_dir, "script_dir")
+        os.makedirs(script_dir)
+
+        # Create existing requirements.txt in parent directory
+        existing_requirements = os.path.join(temp_dir, "requirements.txt")
+        with open(existing_requirements, "w") as f:
+            f.write("pandas\nnumpy\n")
+
+        # Create a new Python file with additional imports
+        content = textwrap.dedent(
+            """
+            import pandas as pd
+            import numpy as np
+            import scipy
+            import matplotlib
+            """
+        )
+        temp_path = os.path.join(script_dir, "test_script.py")
+        with open(temp_path, "w") as f:
+            f.write(content)
+
+        requirements_path = None
+        try:
+            requirements_path = write_requirements_file(temp_path)
+            assert os.path.exists(requirements_path)
+            assert (
+                os.path.dirname(requirements_path) == temp_dir
+            )  # Should be in parent directory
+
+            with open(requirements_path, "r") as f:
+                requirements = {line.strip() for line in f}
+
+            # Check that both existing and new requirements are present
+            assert "pandas" in requirements
+            assert "numpy" in requirements
+            assert "scipy" in requirements
+            assert "matplotlib" in requirements
+        finally:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+            if requirements_path and os.path.exists(requirements_path):
+                os.unlink(requirements_path)
+            if os.path.exists(existing_requirements):
+                os.unlink(existing_requirements)
+            os.rmdir(script_dir)
+            os.rmdir(temp_dir)
+
+    def test_standard_library_exclusion(self):
+        """Test that standard library imports are excluded."""
+        content = textwrap.dedent(
+            """
+            import os
+            import sys
+            import json
+            import datetime
+            import pandas as pd
+            """
+        )
+        temp_path = create_test_script(content)
+        try:
+            imports = scan_file_for_imports(temp_path)
+            assert "pandas" in imports
+            assert "os" not in imports
+            assert "sys" not in imports
+            assert "json" not in imports
+            assert "datetime" not in imports
+        finally:
+            os.unlink(temp_path)
+
+    def test_excluded_packages(self):
+        """Test that excluded packages are not included in requirements."""
+        content = textwrap.dedent(
+            """
+            import datacustomcode
+            import pyspark
+            import pandas as pd
+            """
+        )
+        temp_path = create_test_script(content)
+        try:
+            imports = scan_file_for_imports(temp_path)
+            assert "pandas" in imports
+            assert "datacustomcode" not in imports
+            assert "pyspark" not in imports
+        finally:
+            os.unlink(temp_path)
