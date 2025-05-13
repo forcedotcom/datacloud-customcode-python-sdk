@@ -79,6 +79,8 @@ datacustomcode deploy --path ./payload --name my_custom_script
 > [!TIP]
 > The `deploy` process can take several minutes.  If you'd like more feedback on the underlying process, you can add `--debug` to the command like `datacustomcode --debug deploy --path ./payload --name my_custom_script`
 
+You can now use the Salesforce Data Cloud UI to find the created Data Transform and use the `Run Now` button to run it.
+Once the Data Transform run is successful, check the DLO your script is writing to and verify the correct records were added.
 
 ## API
 
@@ -130,12 +132,6 @@ Options:
 - `--client-secret TEXT`: Connected App Client Secret
 - `--login-url TEXT`: Salesforce login URL
 
-#### `datacustomcode zip`
-Zip a transformation job in preparation to upload to Data Cloud.
-
-Options:
-- `--path TEXT`: Path to the code directory (default: ".")
-
 #### `datacustomcode deploy`
 Deploy a transformation job to Data Cloud.
 
@@ -172,6 +168,12 @@ Options:
 - `--config-file TEXT`: Path to configuration file
 - `--dependencies TEXT`: Additional dependencies (can be specified multiple times)
 
+#### `datacustomcode zip`
+Zip a transformation job in preparation to upload to Data Cloud.
+
+Options:
+- `--path TEXT`: Path to the code directory (default: ".")
+
 ## Prerequisite details
 
 ### Creating a connected app
@@ -189,3 +191,7 @@ Options:
 7. Go back to `Setup`, then `OAuth and OpenID Connect Settings`, and enable the "Allow OAuth Username-Password Flows" option
 
 You now have all fields necessary for the `datacustomcode configure` command.
+
+## Other docs
+
+[Troubleshooting](./docs/troubleshooting.md)
