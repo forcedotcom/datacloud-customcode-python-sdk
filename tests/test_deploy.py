@@ -5,6 +5,7 @@ from unittest.mock import (
     mock_open,
     patch,
 )
+import zipfile
 
 import pytest
 import requests
@@ -28,9 +29,10 @@ with patch("datacustomcode.version.get_version", return_value="1.2.3"):
         get_data_transform_config,
         get_deployments,
         run_data_transform,
+        upload_zip,
         verify_data_transform_config,
         wait_for_deployment,
-        zip_and_upload_directory,
+        zip,
     )
 
 
@@ -134,21 +136,99 @@ class TestCreateDeployment:
             create_deployment(access_token, metadata)
 
 
-class TestZipAndUploadDirectory:
-    @patch("datacustomcode.deploy.shutil.make_archive")
+class TestZip:
+    @patch("datacustomcode.deploy.has_nonempty_requirements_file")
+    @patch("datacustomcode.deploy.prepare_dependency_archive")
+    @patch("zipfile.ZipFile")
+    @patch("os.walk")
+    def test_zip_with_requirements(
+        self, mock_walk, mock_zipfile, mock_prepare, mock_has_requirements
+    ):
+        """Test zipping a directory with requirements.txt."""
+        mock_has_requirements.return_value = True
+        mock_zipfile_instance = MagicMock()
+        mock_zipfile.return_value.__enter__.return_value = mock_zipfile_instance
+        mock_zipfile_instance.write = MagicMock()
+
+        # Mock os.walk to return some test files
+        mock_walk.return_value = [
+            ("/test/dir", ["subdir"], ["file1.py", "file2.py"]),
+            ("/test/dir/subdir", [], ["file3.py"]),
+        ]
+
+        zip("/test/dir")
+
+        mock_has_requirements.assert_called_once_with("/test/dir")
+        mock_prepare.assert_called_once_with("/test/dir")
+        mock_zipfile.assert_called_once_with(
+            "deployment.zip", "w", zipfile.ZIP_DEFLATED
+        )
+        assert mock_zipfile_instance.write.call_count == 3  # One call per file
+
+    @patch("datacustomcode.deploy.has_nonempty_requirements_file")
+    @patch("datacustomcode.deploy.prepare_dependency_archive")
+    @patch("zipfile.ZipFile")
+    @patch("os.walk")
+    def test_zip_without_requirements(
+        self, mock_walk, mock_zipfile, mock_prepare, mock_has_requirements
+    ):
+        """Test zipping a directory without requirements.txt."""
+        mock_has_requirements.return_value = False
+        mock_zipfile_instance = MagicMock()
+        mock_zipfile.return_value.__enter__.return_value = mock_zipfile_instance
+        mock_zipfile_instance.write = MagicMock()
+
+        # Mock os.walk to return some test files
+        mock_walk.return_value = [
+            ("/test/dir", ["subdir"], ["file1.py", "file2.py"]),
+            ("/test/dir/subdir", [], ["file3.py"]),
+        ]
+
+        zip("/test/dir")
+
+        mock_has_requirements.assert_called_once_with("/test/dir")
+        mock_prepare.assert_not_called()
+        mock_zipfile.assert_called_once_with(
+            "deployment.zip", "w", zipfile.ZIP_DEFLATED
+        )
+        assert mock_zipfile_instance.write.call_count == 3  # One call per file
+
+
+class TestUploadZip:
     @patch("datacustomcode.deploy.requests.put")
     @patch("builtins.open", new_callable=mock_open, read_data=b"test data")
-    def test_zip_and_upload_directory(self, mock_file, mock_put, mock_make_archive):
-        """Test zipping and uploading a directory."""
+    def test_upload_zip_success(self, mock_file, mock_put):
+        """Test successful zip upload."""
         mock_response = MagicMock()
         mock_put.return_value = mock_response
 
-        zip_and_upload_directory("/test/dir", "https://upload.example.com")
+        upload_zip("https://upload.example.com")
 
-        mock_make_archive.assert_called_once_with("deployment", "zip", "/test/dir")
         mock_file.assert_called_once_with("deployment.zip", "rb")
-        mock_put.assert_called_once()
+        mock_put.assert_called_once_with(
+            "https://upload.example.com",
+            data=mock_file.return_value,
+            headers={"Content-Type": "application/zip"},
+        )
         mock_response.raise_for_status.assert_called_once()
+
+    @patch("datacustomcode.deploy.requests.put")
+    @patch("builtins.open", new_callable=mock_open, read_data=b"test data")
+    def test_upload_zip_http_error(self, mock_file, mock_put):
+        """Test zip upload with HTTP error."""
+        mock_response = MagicMock()
+        mock_response.raise_for_status.side_effect = requests.HTTPError("Upload failed")
+        mock_put.return_value = mock_response
+
+        with pytest.raises(requests.HTTPError, match="Upload failed"):
+            upload_zip("https://upload.example.com")
+
+        mock_file.assert_called_once_with("deployment.zip", "rb")
+        mock_put.assert_called_once_with(
+            "https://upload.example.com",
+            data=mock_file.return_value,
+            headers={"Content-Type": "application/zip"},
+        )
 
 
 class TestGetDeployments:
@@ -328,14 +408,16 @@ class TestDeployFull:
     @patch("datacustomcode.deploy.prepare_dependency_archive")
     @patch("datacustomcode.deploy.verify_data_transform_config")
     @patch("datacustomcode.deploy.create_deployment")
-    @patch("datacustomcode.deploy.zip_and_upload_directory")
+    @patch("datacustomcode.deploy.zip")
+    @patch("datacustomcode.deploy.upload_zip")
     @patch("datacustomcode.deploy.wait_for_deployment")
     @patch("datacustomcode.deploy.create_data_transform")
     def test_deploy_full(
         self,
         mock_create_transform,
         mock_wait,
-        mock_zip_upload,
+        mock_upload_zip,
+        mock_zip,
         mock_create_deployment,
         mock_verify_config,
         mock_prepare,
@@ -371,9 +453,8 @@ class TestDeployFull:
         mock_prepare.assert_called_once_with("/test/dir")
         mock_verify_config.assert_called_once_with("/test/dir")
         mock_create_deployment.assert_called_once_with(access_token, metadata)
-        mock_zip_upload.assert_called_once_with(
-            "/test/dir", "https://upload.example.com"
-        )
+        mock_zip.assert_called_once_with("/test/dir")
+        mock_upload_zip.assert_called_once_with("https://upload.example.com")
         mock_wait.assert_called_once_with(access_token, metadata, callback)
         mock_create_transform.assert_called_once_with(
             "/test/dir", access_token, metadata
