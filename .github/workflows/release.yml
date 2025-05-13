@@ -5,9 +5,11 @@ on:
     types: [published]
 
 jobs:
-  build:
+  publish:
     runs-on: ubuntu-latest
-
+    environment:
+      name: pypi
+      url: https://pypi.org/project/salesforce-data-customcode/
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -27,38 +29,6 @@ jobs:
 
     - name: Build package
       run: make package
-
-    - name: Store package
-      uses: actions/upload-artifact@v4
-      with:
-        name: dist
-        path: dist/
-
-  publish:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/project/salesforce-data-customcode/
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-
-    - name: Install Poetry
-      run: |
-        python -m pip install --upgrade pip
-        pip install poetry
-
-    - name: Download package
-      uses: actions/download-artifact@v4
-      with:
-        name: dist
-        path: dist/
 
     - name: Publish to PyPI
       env:
