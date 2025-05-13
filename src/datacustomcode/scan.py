@@ -13,13 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from __future__ import annotations
-import os
-from typing import Union, Dict, List, FrozenSet, Set
 
 import ast
+import os
 from typing import (
     Any,
+    ClassVar,
     Dict,
+    Set,
     Union,
 )
 
@@ -137,17 +138,55 @@ class ImportVisitor(ast.NodeVisitor):
     """AST Visitor that extracts external package imports from Python code."""
 
     # Standard library modules that should be excluded from requirements
-    STANDARD_LIBS = {
-        "abc", "argparse", "ast", "asyncio", "base64", "collections", "configparser",
-        "contextlib", "copy", "csv", "datetime", "enum", "functools", "glob", "hashlib",
-        "http", "importlib", "inspect", "io", "itertools", "json", "logging", "math",
-        "os", "pathlib", "pickle", "random", "re", "shutil", "site", "socket", "sqlite3",
-        "string", "subprocess", "sys", "tempfile", "threading", "time", "traceback",
-        "typing", "uuid", "warnings", "xml", "zipfile"
+    STANDARD_LIBS: ClassVar[set[str]] = {
+        "abc",
+        "argparse",
+        "ast",
+        "asyncio",
+        "base64",
+        "collections",
+        "configparser",
+        "contextlib",
+        "copy",
+        "csv",
+        "datetime",
+        "enum",
+        "functools",
+        "glob",
+        "hashlib",
+        "http",
+        "importlib",
+        "inspect",
+        "io",
+        "itertools",
+        "json",
+        "logging",
+        "math",
+        "os",
+        "pathlib",
+        "pickle",
+        "random",
+        "re",
+        "shutil",
+        "site",
+        "socket",
+        "sqlite3",
+        "string",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "threading",
+        "time",
+        "traceback",
+        "typing",
+        "uuid",
+        "warnings",
+        "xml",
+        "zipfile",
     }
 
     # Additional packages to exclude from requirements.txt
-    EXCLUDED_PACKAGES = {
+    EXCLUDED_PACKAGES: ClassVar[set[str]] = {
         "datacustomcode",  # Internal package
         "pyspark",  # Provided by the runtime environment
     }
@@ -159,10 +198,12 @@ class ImportVisitor(ast.NodeVisitor):
         """Visit an import statement (e.g., import os, sys)."""
         for name in node.names:
             # Get the top-level package name
-            package = name.name.split('.')[0]
-            if (package not in self.STANDARD_LIBS and
-                    package not in self.EXCLUDED_PACKAGES and
-                    not package.startswith('_')):
+            package = name.name.split(".")[0]
+            if (
+                package not in self.STANDARD_LIBS
+                and package not in self.EXCLUDED_PACKAGES
+                and not package.startswith("_")
+            ):
                 self.imports.add(package)
         self.generic_visit(node)
 
@@ -170,10 +211,12 @@ class ImportVisitor(ast.NodeVisitor):
         """Visit a from-import statement (e.g., from os import path)."""
         if node.module is not None:
             # Get the top-level package
-            package = node.module.split('.')[0]
-            if (package not in self.STANDARD_LIBS and
-                    package not in self.EXCLUDED_PACKAGES and
-                    not package.startswith('_')):
+            package = node.module.split(".")[0]
+            if (
+                package not in self.STANDARD_LIBS
+                and package not in self.EXCLUDED_PACKAGES
+                and not package.startswith("_")
+            ):
                 self.imports.add(package)
         self.generic_visit(node)
 
@@ -188,23 +231,21 @@ def scan_file_for_imports(file_path: str) -> Set[str]:
         return visitor.imports
 
 
-def write_requirements_file(file_path: str, output_dir: str = None) -> str:
+def write_requirements_file(file_path: str) -> str:
     """
     Scan a Python file for imports and write them to requirements.txt.
 
     Args:
         file_path: Path to the Python file to scan
-        output_dir: Directory where requirements.txt should be created (defaults to parent directory)
 
     Returns:
         Path to the generated requirements.txt file
     """
     imports = scan_file_for_imports(file_path)
 
-    if not output_dir:
-        # Use the parent directory rather than same directory as the file
-        file_dir = os.path.dirname(file_path)
-        output_dir = os.path.dirname(file_dir) if file_dir else "."
+    # Use the parent directory rather than same directory as the file
+    file_dir = os.path.dirname(file_path)
+    output_dir = os.path.dirname(file_dir) if file_dir else "."
 
     requirements_path = os.path.join(output_dir, "requirements.txt")
 

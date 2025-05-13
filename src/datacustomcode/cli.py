@@ -68,34 +68,14 @@ def configure(
         login_url=login_url,
     ).update_ini(profile=profile)
 
+
 @cli.command()
-@click.option("--profile", default="default")
-@click.option("--path", default="payload")
-@click.option("--name", default="test_pkg")
-@click.option("--version", default="0.0.1")
-@click.option("--description", default="Custom Data Transform Code")
-def zip(profile: str, path: str, name: str, version: str, description: str):
-    from datacustomcode.credentials import Credentials
-    from datacustomcode.deploy import TransformationJobMetadata, zip, zip_and_upload_directory
+@click.argument("path", default="payload")
+def zip(path: str):
+    from datacustomcode.deploy import zip
 
     logger.debug("Zipping project")
-
-    metadata = TransformationJobMetadata(
-        name=name,
-        version=version,
-        description=description,
-    )
-    try:
-        credentials = Credentials.from_ini(profile=profile)
-    except KeyError:
-        click.secho(
-            f"Error: Profile {profile} not found in credentials.ini. "
-            "Run `datacustomcode configure` to create a credentialsprofile.",
-            fg="red",
-        )
-        raise click.Abort() from None
-    zip(path, metadata, credentials, name)
-
+    zip(path)
 
 
 @cli.command()
@@ -156,10 +136,11 @@ def init(directory: str):
 @click.argument("filename")
 @click.option("--config")
 @click.option("--dry-run", is_flag=True)
-@click.option("--no-requirements", is_flag=True, help="Skip generating requirements.txt file")
+@click.option(
+    "--no-requirements", is_flag=True, help="Skip generating requirements.txt file"
+)
 def scan(filename: str, config: str, dry_run: bool, no_requirements: bool):
     from datacustomcode.scan import dc_config_json_from_file, write_requirements_file
-
 
     config_location = config or os.path.join(os.path.dirname(filename), "config.json")
     click.echo(
