@@ -82,7 +82,7 @@ Once the Data Transform run is successful, check the DLO your script is writing 
 
 ## API
 
-You entry point script will define logic using the `Client` object which wraps data access layers.
+Your entry point script will define logic using the `Client` object which wraps data access layers.
 
 You should only need the following methods:
 * `read_dlo(name)` – Read from a Data Lake Object by name
@@ -171,6 +171,48 @@ Zip a transformation job in preparation to upload to Data Cloud.
 
 Options:
 - `--path TEXT`: Path to the code directory (default: ".")
+
+## Docker usage
+
+After initializing a project with `datacustomcode init my_package`, you might notice a Dockerfile.  This file isn't used for the
+[Quick Start](#quick-start) approach above, which uses virtual environments, until the `zip` or `deploy` commands are used.  When using dependencies
+that include [native features](https://spark.apache.org/docs/latest/api/python/user_guide/python_packaging.html#using-pyspark-native-features)
+like C++ or C interop, the platform and architecture may be different between your machine and Data Cloud compute.  This is all taken care of
+in the `zip` and `deploy` commands, which utilize the Dockerfile which starts `FROM` an image compatible with Data Cloud.  However, you may
+want to build, run, and test your script on your machine using the same platform and architecture as Data Cloud.  You can use the sections above
+to test your script in this manner.
+
+### VS Code Dev Containers
+
+Within your `init`ed package, you will find a `.devcontainer` folder which allows you to run a docker container while developing inside of it.
+
+Read more about Dev Containers here: https://code.visualstudio.com/docs/devcontainers/containers.
+
+1. Install the VS Code extension "Dev Containers" by microsoft.com.
+1. Open your package folder in VS Code, ensuring that the `.devcontainer` folder is at the root of the File Explorer
+1. Bring up the Command Palette (on mac: Cmd + Shift + P), and select "Dev Containers: Rebuild and Reopen in Container"
+1. Allow the docker image to be built, then you're ready to develop
+1. Now if you open a terminal (within the Dev Container window) and `datacustomcode run ./payload/entrypoint.py`, it will run inside a docker container that more closely resembles Data Cloud compute than your machine
+
+> [!IMPORTANT]
+> Dev Containers get their own tmp file storage, so you'll need to re-run `datacustomcode configure` every time you "Rebuild and Reopen in Container".
+
+### JupyterLab
+
+Within your `init`ed package, you will find a `jupyterlab.sh` file that can open a jupyter notebook for you.  Jupyter notebooks, in
+combination with Data Cloud's [Query Editor](https://help.salesforce.com/s/articleView?id=data.c360_a_add_queries_to_a_query_workspace.htm&type=5)
+and [Data Explorer](https://help.salesforce.com/s/articleView?id=data.c360_a_data_explorer.htm&type=5) can be extremely helpful for data
+exploration.  Instead of running an entire script, one can run one cell at a time as they discover and experiment with the DLO or DMO data.
+
+You can read more about Jupyter Notebooks here: https://jupyter.org/
+
+1. Within the root project of your package folder, run `./jupyterlab.sh start`
+1. Double-click on "account.ipynb" file, which provides a starting point for a notebook
+1. Use shift+enter to execute each cell within the notebook.  Add/edit/delete cells of code as needed for your data exploration.
+1. Don't forget to run `./jupyterlab.sh stop` to stop the docker container
+
+> [!IMPORTANT]
+> JupyterLab uses its own tmp file storage, so you'll need to re-run `datacustomcode configure` each time you `./jupyterlab.sh start`.
 
 ## Prerequisite details
 
