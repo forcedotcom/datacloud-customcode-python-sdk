@@ -179,7 +179,7 @@ After initializing a project with `datacustomcode init my_package`, you might no
 that include [native features](https://spark.apache.org/docs/latest/api/python/user_guide/python_packaging.html#using-pyspark-native-features)
 like C++ or C interop, the platform and architecture may be different between your machine and Data Cloud compute.  This is all taken care of
 in the `zip` and `deploy` commands, which utilize the Dockerfile which starts `FROM` an image compatible with Data Cloud.  However, you may
-want to build, run, and test your script on your machine using the same platform and architecture as Data Cloud.  You can use the sections above
+want to build, run, and test your script on your machine using the same platform and architecture as Data Cloud.  You can use the sections below
 to test your script in this manner.
 
 ### VS Code Dev Containers
@@ -201,8 +201,8 @@ Read more about Dev Containers here: https://code.visualstudio.com/docs/devconta
 
 Within your `init`ed package, you will find a `jupyterlab.sh` file that can open a jupyter notebook for you.  Jupyter notebooks, in
 combination with Data Cloud's [Query Editor](https://help.salesforce.com/s/articleView?id=data.c360_a_add_queries_to_a_query_workspace.htm&type=5)
-and [Data Explorer](https://help.salesforce.com/s/articleView?id=data.c360_a_data_explorer.htm&type=5) can be extremely helpful for data
-exploration.  Instead of running an entire script, one can run one cell at a time as they discover and experiment with the DLO or DMO data.
+and [Data Explorer](https://help.salesforce.com/s/articleView?id=data.c360_a_data_explorer.htm&type=5), can be extremely helpful for data
+exploration.  Instead of running an entire script, one can run one code cell at a time as they discover and experiment with the DLO or DMO data.
 
 You can read more about Jupyter Notebooks here: https://jupyter.org/
 
