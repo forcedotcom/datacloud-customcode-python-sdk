@@ -24,3 +24,16 @@ This error indicates your machine either doesn't have a JDK configured, or an in
 Ensure that:
 - `JAVA_HOME` is setup properly and you can run `java -version` successfully
 - You have openJDK zulu 17 installed: https://www.azul.com/downloads/?package=jdk#zulu
+
+### Docker not running
+
+```zsh
+return code: 1
+stdout:
+stderr:
+    Cannot connect to the Docker daemon at unix:///Users/username/.docker/run/docker.sock. Is the docker daemon running?
+```
+
+This indicates that, even if you have docker installed, it's not running.  [Docker Desktop](https://docs.docker.com/desktop/)
+is an easy way to use docker on your machine.  After installation, make sure to double-click the app in Applications folder
+(if on mac) so that it's running.
