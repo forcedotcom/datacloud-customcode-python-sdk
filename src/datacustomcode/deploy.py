@@ -372,9 +372,7 @@ def zip(
             for file in files:
                 if file != ".DS_Store":
                     file_path = os.path.join(root, file)
-                    # Preserve relative path structure in the zip file
-                    arcname = os.path.relpath(file_path, directory)
-                    zipf.write(file_path, arcname)
+                    zipf.write(file_path)
 
     logger.debug(f"Created zip file: {ZIP_FILE_NAME}")
 
