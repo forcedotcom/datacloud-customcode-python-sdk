@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import ast
 import os
+import sys
 from typing import (
     Any,
     ClassVar,
@@ -39,6 +40,8 @@ DATA_TRANSFORM_CONFIG_TEMPLATE = {
         "write": {},
     },
 }
+
+STANDARD_LIBS = set(sys.stdlib_module_names)
 
 
 class DataAccessLayerCalls(pydantic.BaseModel):
@@ -137,54 +140,6 @@ class ClientMethodVisitor(ast.NodeVisitor):
 class ImportVisitor(ast.NodeVisitor):
     """AST Visitor that extracts external package imports from Python code."""
 
-    # Standard library modules that should be excluded from requirements
-    STANDARD_LIBS: ClassVar[set[str]] = {
-        "abc",
-        "argparse",
-        "ast",
-        "asyncio",
-        "base64",
-        "collections",
-        "configparser",
-        "contextlib",
-        "copy",
-        "csv",
-        "datetime",
-        "enum",
-        "functools",
-        "glob",
-        "hashlib",
-        "http",
-        "importlib",
-        "inspect",
-        "io",
-        "itertools",
-        "json",
-        "logging",
-        "math",
-        "os",
-        "pathlib",
-        "pickle",
-        "random",
-        "re",
-        "shutil",
-        "site",
-        "socket",
-        "sqlite3",
-        "string",
-        "subprocess",
-        "sys",
-        "tempfile",
-        "threading",
-        "time",
-        "traceback",
-        "typing",
-        "uuid",
-        "warnings",
-        "xml",
-        "zipfile",
-    }
-
     # Additional packages to exclude from requirements.txt
     EXCLUDED_PACKAGES: ClassVar[set[str]] = {
         "datacustomcode",  # Internal package
@@ -200,7 +155,7 @@ class ImportVisitor(ast.NodeVisitor):
             # Get the top-level package name
             package = name.name.split(".")[0]
             if (
-                package not in self.STANDARD_LIBS
+                package not in STANDARD_LIBS
                 and package not in self.EXCLUDED_PACKAGES
                 and not package.startswith("_")
             ):
@@ -213,7 +168,7 @@ class ImportVisitor(ast.NodeVisitor):
             # Get the top-level package
             package = node.module.split(".")[0]
             if (
-                package not in self.STANDARD_LIBS
+                package not in STANDARD_LIBS
                 and package not in self.EXCLUDED_PACKAGES
                 and not package.startswith("_")
             ):
