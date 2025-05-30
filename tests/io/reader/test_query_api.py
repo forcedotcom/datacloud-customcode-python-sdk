@@ -143,7 +143,7 @@ class TestQueryAPIDataCloudReader:
 
         # Verify get_pandas_dataframe was called with the right SQL
         mock_connection.get_pandas_dataframe.assert_called_once_with(
-            SQL_QUERY_TEMPLATE.format("test_dlo")
+            SQL_QUERY_TEMPLATE.format("test_dlo", 1000)
         )
 
         # Verify DataFrame was created with auto-inferred schema
@@ -172,7 +172,7 @@ class TestQueryAPIDataCloudReader:
 
         # Verify get_pandas_dataframe was called with the right SQL
         mock_connection.get_pandas_dataframe.assert_called_once_with(
-            SQL_QUERY_TEMPLATE.format("test_dlo")
+            SQL_QUERY_TEMPLATE.format("test_dlo", 1000)
         )
 
         # Verify DataFrame was created with provided schema
@@ -192,7 +192,7 @@ class TestQueryAPIDataCloudReader:
 
         # Verify get_pandas_dataframe was called with the right SQL
         mock_connection.get_pandas_dataframe.assert_called_once_with(
-            SQL_QUERY_TEMPLATE.format("test_dmo")
+            SQL_QUERY_TEMPLATE.format("test_dmo", 1000)
         )
 
         # Verify DataFrame was created
@@ -220,7 +220,7 @@ class TestQueryAPIDataCloudReader:
 
         # Verify get_pandas_dataframe was called with the right SQL
         mock_connection.get_pandas_dataframe.assert_called_once_with(
-            SQL_QUERY_TEMPLATE.format("test_dmo")
+            SQL_QUERY_TEMPLATE.format("test_dmo", 1000)
         )
 
         # Verify DataFrame was created with provided schema

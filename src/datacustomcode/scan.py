@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import ast
 import os
+import sys
 from typing import (
     Any,
     ClassVar,
@@ -25,7 +26,6 @@ from typing import (
 )
 
 import pydantic
-import sys
 
 from datacustomcode.version import get_version
 
@@ -42,6 +42,7 @@ DATA_TRANSFORM_CONFIG_TEMPLATE = {
 }
 
 STANDARD_LIBS = set(sys.stdlib_module_names)
+
 
 class DataAccessLayerCalls(pydantic.BaseModel):
     read_dlo: frozenset[str]

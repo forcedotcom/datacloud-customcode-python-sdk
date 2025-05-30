@@ -85,7 +85,10 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
         )
 
     def read_dlo(
-        self, name: str, schema: Union[AtomicType, StructType, str, None] = None, row_limit: int = 1000
+        self,
+        name: str,
+        schema: Union[AtomicType, StructType, str, None] = None,
+        row_limit: int = 1000,
     ) -> PySparkDataFrame:
         """
         Read a Data Lake Object (DLO) from the Data Cloud, limited to a number of rows.
@@ -98,7 +101,9 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
         Returns:
             PySparkDataFrame: The PySpark DataFrame.
         """
-        pandas_df = self._conn.get_pandas_dataframe(SQL_QUERY_TEMPLATE.format(name, row_limit))
+        pandas_df = self._conn.get_pandas_dataframe(
+            SQL_QUERY_TEMPLATE.format(name, row_limit)
+        )
         if not schema:
             # auto infer schema
             schema = _pandas_to_spark_schema(pandas_df)
@@ -106,9 +111,14 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
         return spark_dataframe
 
     def read_dmo(
-        self, name: str, schema: Union[AtomicType, StructType, str, None] = None, row_limit: int = 1000
+        self,
+        name: str,
+        schema: Union[AtomicType, StructType, str, None] = None,
+        row_limit: int = 1000,
     ) -> PySparkDataFrame:
-        pandas_df = self._conn.get_pandas_dataframe(SQL_QUERY_TEMPLATE.format(name, row_limit))
+        pandas_df = self._conn.get_pandas_dataframe(
+            SQL_QUERY_TEMPLATE.format(name, row_limit)
+        )
         if not schema:
             # auto infer schema
             schema = _pandas_to_spark_schema(pandas_df)
