@@ -23,9 +23,18 @@ class TestPrintDataCloudWriter:
         return df
 
     @pytest.fixture
-    def print_writer(self, mock_spark_session):
+    def mock_reader(self):
+        """Create a mock QueryAPIDataCloudReader."""
+        reader = MagicMock()
+        mock_dlo_df = MagicMock()
+        mock_dlo_df.columns = ["col1", "col2"]
+        reader.read_dlo.return_value = mock_dlo_df
+        return reader
+
+    @pytest.fixture
+    def print_writer(self, mock_spark_session, mock_reader):
         """Create a PrintDataCloudWriter instance."""
-        return PrintDataCloudWriter(mock_spark_session)
+        return PrintDataCloudWriter(mock_spark_session, mock_reader)
 
     def test_write_to_dlo(self, print_writer, mock_dataframe):
         """Test write_to_dlo method calls dataframe.show()."""
@@ -78,10 +87,6 @@ class TestPrintDataCloudWriter:
     def test_validate_dataframe_columns_against_dlo(self, print_writer, mock_dataframe):
         """Test validate_dataframe_columns_against_dlo method."""
         # Mock the QueryAPIDataCloudReader
-        mock_reader = MagicMock()
-        mock_dlo_df = MagicMock()
-        mock_dlo_df.columns = ["col1", "col2"]
-        mock_reader.read_dlo.return_value = mock_dlo_df
 
         # Set up mock dataframe columns
         mock_dataframe.columns = ["col1", "col2", "col3"]
@@ -89,13 +94,11 @@ class TestPrintDataCloudWriter:
         # Test that validation raises ValueError for extra columns
         with pytest.raises(ValueError) as exc_info:
             print_writer.validate_dataframe_columns_against_dlo(
-                mock_dataframe, "test_dlo", mock_reader
+                mock_dataframe, "test_dlo"
             )
 
         assert "col3" in str(exc_info.value)
 
         # Test successful validation with matching columns
         mock_dataframe.columns = ["col1", "col2"]
-        print_writer.validate_dataframe_columns_against_dlo(
-            mock_dataframe, "test_dlo", mock_reader
-        )
+        print_writer.validate_dataframe_columns_against_dlo(mock_dataframe, "test_dlo")

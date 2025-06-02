@@ -14,7 +14,9 @@
 # limitations under the License.
 
 
-from pyspark.sql import DataFrame as PySparkDataFrame
+from typing import Optional
+
+from pyspark.sql import DataFrame as PySparkDataFrame, SparkSession
 
 from datacustomcode.io.reader.query_api import QueryAPIDataCloudReader
 from datacustomcode.io.writer.base import BaseDataCloudWriter, WriteMode
@@ -23,11 +25,16 @@ from datacustomcode.io.writer.base import BaseDataCloudWriter, WriteMode
 class PrintDataCloudWriter(BaseDataCloudWriter):
     CONFIG_NAME = "PrintDataCloudWriter"
 
+    def __init__(
+        self, spark: SparkSession, reader: Optional[QueryAPIDataCloudReader] = None
+    ) -> None:
+        super().__init__(spark)
+        self.reader = QueryAPIDataCloudReader(self.spark) if reader is None else reader
+
     def validate_dataframe_columns_against_dlo(
         self,
         dataframe: PySparkDataFrame,
         dlo_name: str,
-        reader: QueryAPIDataCloudReader,
     ) -> None:
         """
         Validates that all columns in the given dataframe exist in the DLO schema.
@@ -42,7 +49,7 @@ class PrintDataCloudWriter(BaseDataCloudWriter):
             schema.
         """
         # Get DLO schema (no data, just schema)
-        dlo_df = reader.read_dlo(dlo_name, row_limit=0)
+        dlo_df = self.reader.read_dlo(dlo_name, row_limit=0)
         dlo_columns = set(dlo_df.columns)
         df_columns = set(dataframe.columns)
 
@@ -64,11 +71,8 @@ class PrintDataCloudWriter(BaseDataCloudWriter):
         self, name: str, dataframe: PySparkDataFrame, write_mode: WriteMode
     ) -> None:
 
-        # Instantiate the reader
-        reader = QueryAPIDataCloudReader(self.spark)
-
         # Validate columns before proceeding
-        self.validate_dataframe_columns_against_dlo(dataframe, name, reader)
+        self.validate_dataframe_columns_against_dlo(dataframe, name)
 
         dataframe.show()
 
