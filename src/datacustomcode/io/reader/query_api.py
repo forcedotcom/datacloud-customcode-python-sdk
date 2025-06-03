@@ -43,7 +43,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-SQL_QUERY_TEMPLATE: Final = "SELECT * FROM {}"
+SQL_QUERY_TEMPLATE: Final = "SELECT * FROM {} LIMIT {}"
 PANDAS_TYPE_MAPPING = {
     "object": StringType(),
     "int64": LongType(),
@@ -85,19 +85,25 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
         )
 
     def read_dlo(
-        self, name: str, schema: Union[AtomicType, StructType, str, None] = None
+        self,
+        name: str,
+        schema: Union[AtomicType, StructType, str, None] = None,
+        row_limit: int = 1000,
     ) -> PySparkDataFrame:
         """
-        Read a Data Lake Object (DLO) from the Data Cloud.
+        Read a Data Lake Object (DLO) from the Data Cloud, limited to a number of rows.
 
         Args:
             name (str): The name of the DLO.
             schema (Optional[Union[AtomicType, StructType, str]]): Schema of the DLO.
+            row_limit (int): Maximum number of rows to fetch.
 
         Returns:
             PySparkDataFrame: The PySpark DataFrame.
         """
-        pandas_df = self._conn.get_pandas_dataframe(SQL_QUERY_TEMPLATE.format(name))
+        pandas_df = self._conn.get_pandas_dataframe(
+            SQL_QUERY_TEMPLATE.format(name, row_limit)
+        )
         if not schema:
             # auto infer schema
             schema = _pandas_to_spark_schema(pandas_df)
@@ -105,9 +111,14 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
         return spark_dataframe
 
     def read_dmo(
-        self, name: str, schema: Union[AtomicType, StructType, str, None] = None
+        self,
+        name: str,
+        schema: Union[AtomicType, StructType, str, None] = None,
+        row_limit: int = 1000,
     ) -> PySparkDataFrame:
-        pandas_df = self._conn.get_pandas_dataframe(SQL_QUERY_TEMPLATE.format(name))
+        pandas_df = self._conn.get_pandas_dataframe(
+            SQL_QUERY_TEMPLATE.format(name, row_limit)
+        )
         if not schema:
             # auto infer schema
             schema = _pandas_to_spark_schema(pandas_df)
