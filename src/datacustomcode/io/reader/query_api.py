@@ -21,6 +21,7 @@ from typing import (
     Union,
 )
 
+import pandas.api.types as pd_types
 from pyspark.sql.types import (
     BooleanType,
     DoubleType,
@@ -48,8 +49,6 @@ PANDAS_TYPE_MAPPING = {
     "object": StringType(),
     "int64": LongType(),
     "float64": DoubleType(),
-    "datetime64[ns]": TimestampType(),
-    "datetime64[ns, UTC]": TimestampType(),
     "bool": BooleanType(),
 }
 
@@ -59,7 +58,11 @@ def _pandas_to_spark_schema(
 ) -> StructType:
     fields = []
     for column, dtype in pandas_df.dtypes.items():
-        spark_type = PANDAS_TYPE_MAPPING.get(str(dtype), StringType())
+        spark_type: AtomicType
+        if pd_types.is_datetime64_any_dtype(dtype):
+            spark_type = TimestampType()
+        else:
+            spark_type = PANDAS_TYPE_MAPPING.get(str(dtype), StringType())
         fields.append(StructField(column, spark_type, nullable))
     return StructType(fields)
 
