@@ -34,6 +34,7 @@ from salesforcecdpconnector.connection import SalesforceCDPConnection
 
 from datacustomcode.credentials import Credentials
 from datacustomcode.io.reader.base import BaseDataCloudReader
+import pandas.api.types as pd_types
 
 if TYPE_CHECKING:
     import pandas
@@ -48,10 +49,6 @@ PANDAS_TYPE_MAPPING = {
     "object": StringType(),
     "int64": LongType(),
     "float64": DoubleType(),
-    "datetime64[ns]": TimestampType(),
-    "datetime64[ns, UTC]": TimestampType(),
-    "datetime64[ms]": TimestampType(),
-    "datetime64[ms, UTC]": TimestampType(),
     "bool": BooleanType(),
 }
 
@@ -61,7 +58,10 @@ def _pandas_to_spark_schema(
 ) -> StructType:
     fields = []
     for column, dtype in pandas_df.dtypes.items():
-        spark_type = PANDAS_TYPE_MAPPING.get(str(dtype), StringType())
+        if pd_types.is_datetime64_any_dtype(dtype):
+            spark_type = TimestampType()
+        else:
+            spark_type = PANDAS_TYPE_MAPPING.get(str(dtype), StringType())
         fields.append(StructField(column, spark_type, nullable))
     return StructType(fields)
 
