@@ -62,14 +62,23 @@ class TestPandasToSparkSchema:
 
     def test_pandas_to_spark_schema_datetime_types(self):
         """Test conversion of pandas datetime types to Spark TimestampType."""
-        import numpy as np
 
         # Create test data with different datetime types
         data = {
-            "datetime_ns": pd.to_datetime(["2023-01-01 10:00:00", "2023-01-02 11:00:00"]),
-            "datetime_ns_utc": pd.to_datetime(["2023-01-01 10:00:00", "2023-01-02 11:00:00"], utc=True),
-            "datetime_ms": pd.to_datetime(["2023-01-01 10:00:00", "2023-01-02 11:00:00"]).astype("datetime64[ms]"),
-            "datetime_ms_utc": pd.to_datetime(["2023-01-01 10:00:00", "2023-01-02 11:00:00"], utc=True).tz_localize(None).astype("datetime64[ms]"),
+            "datetime_ns": pd.to_datetime(
+                ["2023-01-01 10:00:00", "2023-01-02 11:00:00"]
+            ),
+            "datetime_ns_utc": pd.to_datetime(
+                ["2023-01-01 10:00:00", "2023-01-02 11:00:00"], utc=True
+            ),
+            "datetime_ms": pd.to_datetime(
+                ["2023-01-01 10:00:00", "2023-01-02 11:00:00"]
+            ).astype("datetime64[ms]"),
+            "datetime_ms_utc": pd.to_datetime(
+                ["2023-01-01 10:00:00", "2023-01-02 11:00:00"], utc=True
+            )
+            .tz_localize(None)
+            .astype("datetime64[ms]"),
         }
         df = pd.DataFrame(data)
 
@@ -82,9 +91,16 @@ class TestPandasToSparkSchema:
 
         # Check that all datetime columns map to TimestampType
         field_dict = {field.name: field for field in schema.fields}
-        for field_name in ["datetime_ns", "datetime_ns_utc", "datetime_ms", "datetime_ms_utc"]:
-            assert isinstance(field_dict[field_name].dataType, TimestampType), \
-                f"Field {field_name} should be TimestampType, got {type(field_dict[field_name].dataType)}"
+        for field_name in [
+            "datetime_ns",
+            "datetime_ns_utc",
+            "datetime_ms",
+            "datetime_ms_utc",
+        ]:
+            assert isinstance(field_dict[field_name].dataType, TimestampType), (
+                f"Field {field_name} should be TimestampType, "
+                f"got {type(field_dict[field_name].dataType)}"
+            )
             assert field_dict[field_name].nullable
 
         # Verify the actual pandas dtypes to ensure our test data has the expected types

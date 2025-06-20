@@ -21,6 +21,7 @@ from typing import (
     Union,
 )
 
+import pandas.api.types as pd_types
 from pyspark.sql.types import (
     BooleanType,
     DoubleType,
@@ -34,7 +35,6 @@ from salesforcecdpconnector.connection import SalesforceCDPConnection
 
 from datacustomcode.credentials import Credentials
 from datacustomcode.io.reader.base import BaseDataCloudReader
-import pandas.api.types as pd_types
 
 if TYPE_CHECKING:
     import pandas
@@ -58,6 +58,7 @@ def _pandas_to_spark_schema(
 ) -> StructType:
     fields = []
     for column, dtype in pandas_df.dtypes.items():
+        spark_type: AtomicType
         if pd_types.is_datetime64_any_dtype(dtype):
             spark_type = TimestampType()
         else:
