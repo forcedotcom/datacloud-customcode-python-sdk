@@ -50,6 +50,8 @@ PANDAS_TYPE_MAPPING = {
     "float64": DoubleType(),
     "datetime64[ns]": TimestampType(),
     "datetime64[ns, UTC]": TimestampType(),
+    "datetime64[ms]": TimestampType(),
+    "datetime64[ms, UTC]": TimestampType(),
     "bool": BooleanType(),
 }
 
