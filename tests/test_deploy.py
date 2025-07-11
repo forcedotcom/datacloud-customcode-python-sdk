@@ -2,9 +2,9 @@
 
 from unittest.mock import (
     MagicMock,
+    call,
     mock_open,
     patch,
-    call,
 )
 import zipfile
 
@@ -41,8 +41,13 @@ with patch("datacustomcode.version.get_version", return_value="1.2.3"):
 
 class TestPrepareDependencyArchive:
     # Shared expected commands
-    EXPECTED_DOCKER_IMAGES_CMD = "docker images -q datacloud-custom-code-dependency-builder"
-    EXPECTED_BUILD_CMD = "DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -t datacloud-custom-code-dependency-builder -f Dockerfile.dependencies ."
+    EXPECTED_DOCKER_IMAGES_CMD = (
+        "docker images -q datacloud-custom-code-dependency-builder"
+    )
+    EXPECTED_BUILD_CMD = (
+        "DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build "
+        "-t datacloud-custom-code-dependency-builder -f Dockerfile.dependencies ."
+    )
     EXPECTED_DOCKER_RUN_CMD = (
         "DOCKER_DEFAULT_PLATFORM=linux/amd64 docker run --rm "
         "-v /tmp/test_dir:/workspace "
@@ -89,7 +94,10 @@ class TestPrepareDependencyArchive:
         mock_makedirs.assert_called_once_with("payload/archives", exist_ok=True)
 
         # Verify archive was copied back
-        mock_copy.assert_any_call("/tmp/test_dir/native_dependencies.tar.gz", "payload/archives/native_dependencies.tar.gz")
+        mock_copy.assert_any_call(
+            "/tmp/test_dir/native_dependencies.tar.gz",
+            "payload/archives/native_dependencies.tar.gz",
+        )
 
     @patch("datacustomcode.deploy.cmd_output")
     @patch("datacustomcode.deploy.shutil.copy")
@@ -132,7 +140,10 @@ class TestPrepareDependencyArchive:
         mock_makedirs.assert_called_once_with("payload/archives", exist_ok=True)
 
         # Verify archive was copied back
-        mock_copy.assert_any_call("/tmp/test_dir/native_dependencies.tar.gz", "payload/archives/native_dependencies.tar.gz")
+        mock_copy.assert_any_call(
+            "/tmp/test_dir/native_dependencies.tar.gz",
+            "payload/archives/native_dependencies.tar.gz",
+        )
 
     @patch("datacustomcode.deploy.cmd_output")
     @patch("datacustomcode.deploy.shutil.copy")
@@ -151,9 +162,12 @@ class TestPrepareDependencyArchive:
 
         # Mock cmd_output to return None for image check, then raise exception for build
         from datacustomcode.cmd import CalledProcessError
+
         mock_cmd_output.side_effect = [
             None,  # Image doesn't exist
-            CalledProcessError(1, ("docker", "build"), b"Build failed", b"Error"),  # Build fails
+            CalledProcessError(
+                1, ("docker", "build"), b"Build failed", b"Error"
+            ),  # Build fails
         ]
 
         with pytest.raises(CalledProcessError, match="Build failed"):
@@ -182,9 +196,12 @@ class TestPrepareDependencyArchive:
 
         # Mock cmd_output to return image ID, then raise exception for run
         from datacustomcode.cmd import CalledProcessError
+
         mock_cmd_output.side_effect = [
             "abc123",  # Image exists
-            CalledProcessError(1, ("docker", "run"), b"Run failed", b"Error"),  # Run fails
+            CalledProcessError(
+                1, ("docker", "run"), b"Run failed", b"Error"
+            ),  # Run fails
         ]
 
         with pytest.raises(CalledProcessError, match="Run failed"):
@@ -234,11 +251,17 @@ class TestPrepareDependencyArchive:
 class TestHasNonemptyRequirementsFile:
     @patch("datacustomcode.deploy.os.path.dirname")
     @patch("datacustomcode.deploy.os.path.isfile")
-    @patch("builtins.open", new_callable=mock_open, read_data="numpy==1.21.0\npandas==1.3.0")
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data="numpy==1.21.0\npandas==1.3.0",
+    )
     def test_has_nonempty_requirements_file_with_dependencies(
         self, mock_file, mock_isfile, mock_dirname
     ):
-        """Test has_nonempty_requirements_file when requirements.txt has dependencies."""
+        """
+        Test has_nonempty_requirements_file when requirements.txt has dependencies.
+        """
         mock_dirname.return_value = "/parent/dir"
         mock_isfile.return_value = True
 
@@ -246,15 +269,23 @@ class TestHasNonemptyRequirementsFile:
 
         assert result is True
         mock_isfile.assert_called_once_with("/parent/dir/requirements.txt")
-        mock_file.assert_called_once_with("/parent/dir/requirements.txt", "r", encoding="utf-8")
+        mock_file.assert_called_once_with(
+            "/parent/dir/requirements.txt", "r", encoding="utf-8"
+        )
 
     @patch("datacustomcode.deploy.os.path.dirname")
     @patch("datacustomcode.deploy.os.path.isfile")
-    @patch("builtins.open", new_callable=mock_open, read_data="# This is a comment\n\n  # Another comment")
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data="# This is a comment\n\n  # Another comment",
+    )
     def test_has_nonempty_requirements_file_only_comments(
         self, mock_file, mock_isfile, mock_dirname
     ):
-        """Test has_nonempty_requirements_file when requirements.txt has only comments."""
+        """
+        Test has_nonempty_requirements_file when requirements.txt has only comments.
+        """
         mock_dirname.return_value = "/parent/dir"
         mock_isfile.return_value = True
 
@@ -262,7 +293,9 @@ class TestHasNonemptyRequirementsFile:
 
         assert result is False
         mock_isfile.assert_called_once_with("/parent/dir/requirements.txt")
-        mock_file.assert_called_once_with("/parent/dir/requirements.txt", "r", encoding="utf-8")
+        mock_file.assert_called_once_with(
+            "/parent/dir/requirements.txt", "r", encoding="utf-8"
+        )
 
     @patch("datacustomcode.deploy.os.path.dirname")
     @patch("datacustomcode.deploy.os.path.isfile")
@@ -278,13 +311,13 @@ class TestHasNonemptyRequirementsFile:
 
         assert result is False
         mock_isfile.assert_called_once_with("/parent/dir/requirements.txt")
-        mock_file.assert_called_once_with("/parent/dir/requirements.txt", "r", encoding="utf-8")
+        mock_file.assert_called_once_with(
+            "/parent/dir/requirements.txt", "r", encoding="utf-8"
+        )
 
     @patch("datacustomcode.deploy.os.path.dirname")
     @patch("datacustomcode.deploy.os.path.isfile")
-    def test_has_nonempty_requirements_file_not_exists(
-        self, mock_isfile, mock_dirname
-    ):
+    def test_has_nonempty_requirements_file_not_exists(self, mock_isfile, mock_dirname):
         """Test has_nonempty_requirements_file when requirements.txt doesn't exist."""
         mock_dirname.return_value = "/parent/dir"
         mock_isfile.return_value = False
@@ -308,11 +341,17 @@ class TestHasNonemptyRequirementsFile:
 
         assert result is False
         mock_isfile.assert_called_once_with("/parent/dir/requirements.txt")
-        mock_file.assert_called_once_with("/parent/dir/requirements.txt", "r", encoding="utf-8")
+        mock_file.assert_called_once_with(
+            "/parent/dir/requirements.txt", "r", encoding="utf-8"
+        )
 
     @patch("datacustomcode.deploy.os.path.dirname")
     @patch("datacustomcode.deploy.os.path.isfile")
-    @patch("builtins.open", new_callable=mock_open, read_data="numpy==1.21.0\n# Comment\npandas==1.3.0")
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data="numpy==1.21.0\n# Comment\npandas==1.3.0",
+    )
     def test_has_nonempty_requirements_file_mixed_content(
         self, mock_file, mock_isfile, mock_dirname
     ):
@@ -324,7 +363,9 @@ class TestHasNonemptyRequirementsFile:
 
         assert result is True
         mock_isfile.assert_called_once_with("/parent/dir/requirements.txt")
-        mock_file.assert_called_once_with("/parent/dir/requirements.txt", "r", encoding="utf-8")
+        mock_file.assert_called_once_with(
+            "/parent/dir/requirements.txt", "r", encoding="utf-8"
+        )
 
 
 class TestMakeApiCall:

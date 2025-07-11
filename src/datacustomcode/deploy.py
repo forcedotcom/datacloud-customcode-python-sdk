@@ -18,7 +18,6 @@ from html import unescape
 import json
 import os
 import shutil
-import tarfile
 import tempfile
 import time
 from typing import (
@@ -144,7 +143,9 @@ PLATFORM_ENV_VAR = "DOCKER_DEFAULT_PLATFORM=linux/amd64"
 DOCKER_IMAGE_NAME = "datacloud-custom-code-dependency-builder"
 DEPENDENCIES_ARCHIVE_NAME = "native_dependencies"
 DEPENDENCIES_ARCHIVE_FULL_NAME = f"{DEPENDENCIES_ARCHIVE_NAME}.tar.gz"
-DEPENDENCIES_ARCHIVE_PATH = os.path.join("payload", "archives", DEPENDENCIES_ARCHIVE_FULL_NAME)
+DEPENDENCIES_ARCHIVE_PATH = os.path.join(
+    "payload", "archives", DEPENDENCIES_ARCHIVE_FULL_NAME
+)
 ZIP_FILE_NAME = "deployment.zip"
 
 
@@ -154,7 +155,10 @@ def prepare_dependency_archive(directory: str) -> None:
 
     if not image_exists:
         logger.info("Building docker image...")
-        cmd = f"{PLATFORM_ENV_VAR} docker build -t {DOCKER_IMAGE_NAME} -f Dockerfile.dependencies ."
+        cmd = (
+            f"{PLATFORM_ENV_VAR} docker build -t {DOCKER_IMAGE_NAME} "
+            f"-f Dockerfile.dependencies ."
+        )
         cmd_output(cmd)
 
     with tempfile.TemporaryDirectory() as temp_dir:
