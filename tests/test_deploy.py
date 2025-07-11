@@ -4,6 +4,7 @@ from unittest.mock import (
     MagicMock,
     mock_open,
     patch,
+    call,
 )
 import zipfile
 
@@ -28,12 +29,292 @@ with patch("datacustomcode.version.get_version", return_value="1.2.3"):
         deploy_full,
         get_data_transform_config,
         get_deployments,
+        has_nonempty_requirements_file,
+        prepare_dependency_archive,
         run_data_transform,
         upload_zip,
         verify_data_transform_config,
         wait_for_deployment,
         zip,
     )
+
+
+class TestPrepareDependencyArchive:
+    # Shared expected commands
+    EXPECTED_DOCKER_IMAGES_CMD = "docker images -q datacloud-custom-code-dependency-builder"
+    EXPECTED_BUILD_CMD = "DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -t datacloud-custom-code-dependency-builder -f Dockerfile.dependencies ."
+    EXPECTED_DOCKER_RUN_CMD = (
+        "DOCKER_DEFAULT_PLATFORM=linux/amd64 docker run --rm "
+        "-v /tmp/test_dir:/workspace "
+        "datacloud-custom-code-dependency-builder "
+        '/bin/bash -c "./build_native_dependencies.sh"'
+    )
+
+    @patch("datacustomcode.deploy.cmd_output")
+    @patch("datacustomcode.deploy.shutil.copy")
+    @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
+    @patch("datacustomcode.deploy.os.path.join")
+    def test_prepare_dependency_archive_image_exists(
+        self, mock_join, mock_temp_dir, mock_copy, mock_cmd_output
+    ):
+        """Test prepare_dependency_archive when Docker image already exists."""
+        # Mock the temporary directory context manager
+        mock_temp_dir_instance = MagicMock()
+        mock_temp_dir_instance.__enter__.return_value = "/tmp/test_dir"
+        mock_temp_dir_instance.__exit__.return_value = None
+        mock_temp_dir.return_value = mock_temp_dir_instance
+
+        # Mock cmd_output to return image ID (indicating image exists)
+        mock_cmd_output.return_value = "abc123"
+
+        # Mock os.path.join for archive path
+        mock_join.return_value = "/tmp/test_dir/native_dependencies.tar.gz"
+
+        prepare_dependency_archive("/test/dir")
+
+        # Verify docker images command was called
+        mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_IMAGES_CMD)
+
+        # Verify docker build command was not called (since image already exists)
+        assert call(self.EXPECTED_BUILD_CMD) not in mock_cmd_output.call_args_list
+
+        # Verify files were copied to temp directory
+        mock_copy.assert_any_call("requirements.txt", "/tmp/test_dir")
+        mock_copy.assert_any_call("build_native_dependencies.sh", "/tmp/test_dir")
+
+        # Verify docker run command was called
+        mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_RUN_CMD)
+
+        # Verify archive was copied back
+        mock_copy.assert_any_call("/tmp/test_dir/native_dependencies.tar.gz", "payload/archives/native_dependencies.tar.gz")
+
+    @patch("datacustomcode.deploy.cmd_output")
+    @patch("datacustomcode.deploy.shutil.copy")
+    @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
+    @patch("datacustomcode.deploy.os.path.join")
+    def test_prepare_dependency_archive_build_image(
+        self, mock_join, mock_temp_dir, mock_copy, mock_cmd_output
+    ):
+        """Test prepare_dependency_archive when Docker image needs to be built."""
+        # Mock the temporary directory context manager
+        mock_temp_dir_instance = MagicMock()
+        mock_temp_dir_instance.__enter__.return_value = "/tmp/test_dir"
+        mock_temp_dir_instance.__exit__.return_value = None
+        mock_temp_dir.return_value = mock_temp_dir_instance
+
+        # Mock cmd_output to return None for image check (image doesn't exist)
+        # and then return some value for subsequent calls
+        mock_cmd_output.side_effect = [None, None, None, None]
+
+        # Mock os.path.join for archive path
+        mock_join.return_value = "/tmp/test_dir/native_dependencies.tar.gz"
+
+        prepare_dependency_archive("/test/dir")
+
+        # Verify docker images command was called
+        mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_IMAGES_CMD)
+
+        # Verify docker build command was called
+        mock_cmd_output.assert_any_call(self.EXPECTED_BUILD_CMD)
+
+        # Verify files were copied to temp directory
+        mock_copy.assert_any_call("requirements.txt", "/tmp/test_dir")
+        mock_copy.assert_any_call("build_native_dependencies.sh", "/tmp/test_dir")
+
+        # Verify docker run command was called
+        mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_RUN_CMD)
+
+        # Verify archive was copied back
+        mock_copy.assert_any_call("/tmp/test_dir/native_dependencies.tar.gz", "payload/archives/native_dependencies.tar.gz")
+
+    @patch("datacustomcode.deploy.cmd_output")
+    @patch("datacustomcode.deploy.shutil.copy")
+    @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
+    @patch("datacustomcode.deploy.os.path.join")
+    def test_prepare_dependency_archive_docker_build_failure(
+        self, mock_join, mock_temp_dir, mock_copy, mock_cmd_output
+    ):
+        """Test prepare_dependency_archive when Docker build fails."""
+        # Mock the temporary directory context manager
+        mock_temp_dir_instance = MagicMock()
+        mock_temp_dir_instance.__enter__.return_value = "/tmp/test_dir"
+        mock_temp_dir_instance.__exit__.return_value = None
+        mock_temp_dir.return_value = mock_temp_dir_instance
+
+        # Mock cmd_output to return None for image check, then raise exception for build
+        from datacustomcode.cmd import CalledProcessError
+        mock_cmd_output.side_effect = [
+            None,  # Image doesn't exist
+            CalledProcessError(1, ("docker", "build"), b"Build failed", b"Error"),  # Build fails
+        ]
+
+        with pytest.raises(CalledProcessError, match="Build failed"):
+            prepare_dependency_archive("/test/dir")
+
+        # Verify docker images command was called
+        mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_IMAGES_CMD)
+
+        # Verify docker build command was called
+        mock_cmd_output.assert_any_call(self.EXPECTED_BUILD_CMD)
+
+    @patch("datacustomcode.deploy.cmd_output")
+    @patch("datacustomcode.deploy.shutil.copy")
+    @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
+    @patch("datacustomcode.deploy.os.path.join")
+    def test_prepare_dependency_archive_docker_run_failure(
+        self, mock_join, mock_temp_dir, mock_copy, mock_cmd_output
+    ):
+        """Test prepare_dependency_archive when Docker run fails."""
+        # Mock the temporary directory context manager
+        mock_temp_dir_instance = MagicMock()
+        mock_temp_dir_instance.__enter__.return_value = "/tmp/test_dir"
+        mock_temp_dir_instance.__exit__.return_value = None
+        mock_temp_dir.return_value = mock_temp_dir_instance
+
+        # Mock cmd_output to return image ID, then raise exception for run
+        from datacustomcode.cmd import CalledProcessError
+        mock_cmd_output.side_effect = [
+            "abc123",  # Image exists
+            CalledProcessError(1, ("docker", "run"), b"Run failed", b"Error"),  # Run fails
+        ]
+
+        with pytest.raises(CalledProcessError, match="Run failed"):
+            prepare_dependency_archive("/test/dir")
+
+        # Verify docker images command was called
+        mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_IMAGES_CMD)
+
+        # Verify files were copied to temp directory
+        mock_copy.assert_any_call("requirements.txt", "/tmp/test_dir")
+        mock_copy.assert_any_call("build_native_dependencies.sh", "/tmp/test_dir")
+
+        # Verify docker run command was called
+        mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_RUN_CMD)
+
+    @patch("datacustomcode.deploy.cmd_output")
+    @patch("datacustomcode.deploy.shutil.copy")
+    @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
+    @patch("datacustomcode.deploy.os.path.join")
+    def test_prepare_dependency_archive_file_copy_failure(
+        self, mock_join, mock_temp_dir, mock_copy, mock_cmd_output
+    ):
+        """Test prepare_dependency_archive when file copy fails."""
+        # Mock the temporary directory context manager
+        mock_temp_dir_instance = MagicMock()
+        mock_temp_dir_instance.__enter__.return_value = "/tmp/test_dir"
+        mock_temp_dir_instance.__exit__.return_value = None
+        mock_temp_dir.return_value = mock_temp_dir_instance
+
+        # Mock cmd_output to return image ID
+        mock_cmd_output.return_value = "abc123"
+
+        # Mock shutil.copy to raise exception
+        mock_copy.side_effect = FileNotFoundError("File not found")
+
+        with pytest.raises(FileNotFoundError, match="File not found"):
+            prepare_dependency_archive("/test/dir")
+
+        # Verify docker images command was called
+        mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_IMAGES_CMD)
+
+        # Verify files were attempted to be copied
+        mock_copy.assert_any_call("requirements.txt", "/tmp/test_dir")
+
+
+class TestHasNonemptyRequirementsFile:
+    @patch("datacustomcode.deploy.os.path.dirname")
+    @patch("datacustomcode.deploy.os.path.isfile")
+    @patch("builtins.open", new_callable=mock_open, read_data="numpy==1.21.0\npandas==1.3.0")
+    def test_has_nonempty_requirements_file_with_dependencies(
+        self, mock_file, mock_isfile, mock_dirname
+    ):
+        """Test has_nonempty_requirements_file when requirements.txt has dependencies."""
+        mock_dirname.return_value = "/parent/dir"
+        mock_isfile.return_value = True
+
+        result = has_nonempty_requirements_file("/test/dir")
+
+        assert result is True
+        mock_isfile.assert_called_once_with("/parent/dir/requirements.txt")
+        mock_file.assert_called_once_with("/parent/dir/requirements.txt", "r", encoding="utf-8")
+
+    @patch("datacustomcode.deploy.os.path.dirname")
+    @patch("datacustomcode.deploy.os.path.isfile")
+    @patch("builtins.open", new_callable=mock_open, read_data="# This is a comment\n\n  # Another comment")
+    def test_has_nonempty_requirements_file_only_comments(
+        self, mock_file, mock_isfile, mock_dirname
+    ):
+        """Test has_nonempty_requirements_file when requirements.txt has only comments."""
+        mock_dirname.return_value = "/parent/dir"
+        mock_isfile.return_value = True
+
+        result = has_nonempty_requirements_file("/test/dir")
+
+        assert result is False
+        mock_isfile.assert_called_once_with("/parent/dir/requirements.txt")
+        mock_file.assert_called_once_with("/parent/dir/requirements.txt", "r", encoding="utf-8")
+
+    @patch("datacustomcode.deploy.os.path.dirname")
+    @patch("datacustomcode.deploy.os.path.isfile")
+    @patch("builtins.open", new_callable=mock_open, read_data="")
+    def test_has_nonempty_requirements_file_empty_file(
+        self, mock_file, mock_isfile, mock_dirname
+    ):
+        """Test has_nonempty_requirements_file when requirements.txt is empty."""
+        mock_dirname.return_value = "/parent/dir"
+        mock_isfile.return_value = True
+
+        result = has_nonempty_requirements_file("/test/dir")
+
+        assert result is False
+        mock_isfile.assert_called_once_with("/parent/dir/requirements.txt")
+        mock_file.assert_called_once_with("/parent/dir/requirements.txt", "r", encoding="utf-8")
+
+    @patch("datacustomcode.deploy.os.path.dirname")
+    @patch("datacustomcode.deploy.os.path.isfile")
+    def test_has_nonempty_requirements_file_not_exists(
+        self, mock_isfile, mock_dirname
+    ):
+        """Test has_nonempty_requirements_file when requirements.txt doesn't exist."""
+        mock_dirname.return_value = "/parent/dir"
+        mock_isfile.return_value = False
+
+        result = has_nonempty_requirements_file("/test/dir")
+
+        assert result is False
+        mock_isfile.assert_called_once_with("/parent/dir/requirements.txt")
+
+    @patch("datacustomcode.deploy.os.path.dirname")
+    @patch("datacustomcode.deploy.os.path.isfile")
+    @patch("builtins.open", side_effect=PermissionError("Permission denied"))
+    def test_has_nonempty_requirements_file_permission_error(
+        self, mock_file, mock_isfile, mock_dirname
+    ):
+        """Test has_nonempty_requirements_file when file access fails."""
+        mock_dirname.return_value = "/parent/dir"
+        mock_isfile.return_value = True
+
+        result = has_nonempty_requirements_file("/test/dir")
+
+        assert result is False
+        mock_isfile.assert_called_once_with("/parent/dir/requirements.txt")
+        mock_file.assert_called_once_with("/parent/dir/requirements.txt", "r", encoding="utf-8")
+
+    @patch("datacustomcode.deploy.os.path.dirname")
+    @patch("datacustomcode.deploy.os.path.isfile")
+    @patch("builtins.open", new_callable=mock_open, read_data="numpy==1.21.0\n# Comment\npandas==1.3.0")
+    def test_has_nonempty_requirements_file_mixed_content(
+        self, mock_file, mock_isfile, mock_dirname
+    ):
+        """Test has_nonempty_requirements_file with mixed dependencies and comments."""
+        mock_dirname.return_value = "/parent/dir"
+        mock_isfile.return_value = True
+
+        result = has_nonempty_requirements_file("/test/dir")
+
+        assert result is True
+        mock_isfile.assert_called_once_with("/parent/dir/requirements.txt")
+        mock_file.assert_called_once_with("/parent/dir/requirements.txt", "r", encoding="utf-8")
 
 
 class TestMakeApiCall:
@@ -479,3 +760,67 @@ class TestRunDataTransform:
 
         mock_make_api_call.assert_called_once()
         assert result == {"status": "Running"}
+
+
+class TestDeployFullWithDockerIntegration:
+    @patch("datacustomcode.deploy._retrieve_access_token")
+    @patch("datacustomcode.deploy.prepare_dependency_archive")
+    @patch("datacustomcode.deploy.verify_data_transform_config")
+    @patch("datacustomcode.deploy.create_deployment")
+    @patch("datacustomcode.deploy.zip")
+    @patch("datacustomcode.deploy.upload_zip")
+    @patch("datacustomcode.deploy.wait_for_deployment")
+    @patch("datacustomcode.deploy.create_data_transform")
+    @patch("datacustomcode.deploy.has_nonempty_requirements_file")
+    def test_deploy_full_happy_path(
+        self,
+        mock_has_requirements,
+        mock_create_transform,
+        mock_wait,
+        mock_upload_zip,
+        mock_zip,
+        mock_create_deployment,
+        mock_verify_config,
+        mock_prepare,
+        mock_retrieve_token,
+    ):
+        """Test full deployment process with Docker dependency building."""
+        credentials = Credentials(
+            username="user",
+            password="pass",
+            client_id="id",
+            client_secret="secret",
+            login_url="https://example.com",
+        )
+        metadata = TransformationJobMetadata(
+            name="test_job", version="1.0.0", description="Test job"
+        )
+        callback = MagicMock()
+
+        # Setup mocks
+        access_token = AccessTokenResponse(
+            access_token="test_token", instance_url="https://instance.example.com"
+        )
+        mock_retrieve_token.return_value = access_token
+        mock_create_deployment.return_value = CreateDeploymentResponse(
+            fileUploadUrl="https://upload.example.com"
+        )
+
+        # Mock that requirements.txt exists and has dependencies
+        mock_has_requirements.return_value = True
+
+        # Call function
+        result = deploy_full("/test/dir", metadata, credentials, callback)
+
+        # Assertions
+        mock_retrieve_token.assert_called_once_with(credentials)
+        mock_prepare.assert_called_once_with("/test/dir")  # Docker dependency building
+        mock_verify_config.assert_called_once_with("/test/dir")
+        mock_create_deployment.assert_called_once_with(access_token, metadata)
+        mock_zip.assert_called_once_with("/test/dir")
+        mock_upload_zip.assert_called_once_with("https://upload.example.com")
+        mock_wait.assert_called_once_with(access_token, metadata, callback)
+        mock_create_transform.assert_called_once_with(
+            "/test/dir", access_token, metadata
+        )
+        assert result == access_token
