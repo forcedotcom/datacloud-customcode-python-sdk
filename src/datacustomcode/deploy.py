@@ -164,11 +164,11 @@ def prepare_dependency_archive(directory: str) -> None:
         cmd = (
             f"{PLATFORM_ENV_VAR} docker run --rm "
             f"-v {temp_dir}:/workspace "
-            f"{DOCKER_IMAGE_NAME} "
-            f'/bin/bash -c "./build_native_dependencies.sh"'
+            f"{DOCKER_IMAGE_NAME}"
         )
         cmd_output(cmd)
         archives_temp_path = os.path.join(temp_dir, DEPENDENCIES_ARCHIVE_FULL_NAME)
+        os.makedirs(os.path.dirname(DEPENDENCIES_ARCHIVE_PATH), exist_ok=True)
         shutil.copy(archives_temp_path, DEPENDENCIES_ARCHIVE_PATH)
 
         logger.info(f"Dependencies archived to {DEPENDENCIES_ARCHIVE_PATH}")

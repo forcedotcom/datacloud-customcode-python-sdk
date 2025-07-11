@@ -46,16 +46,16 @@ class TestPrepareDependencyArchive:
     EXPECTED_DOCKER_RUN_CMD = (
         "DOCKER_DEFAULT_PLATFORM=linux/amd64 docker run --rm "
         "-v /tmp/test_dir:/workspace "
-        "datacloud-custom-code-dependency-builder "
-        '/bin/bash -c "./build_native_dependencies.sh"'
+        "datacloud-custom-code-dependency-builder"
     )
 
     @patch("datacustomcode.deploy.cmd_output")
     @patch("datacustomcode.deploy.shutil.copy")
     @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
     @patch("datacustomcode.deploy.os.path.join")
+    @patch("datacustomcode.deploy.os.makedirs")
     def test_prepare_dependency_archive_image_exists(
-        self, mock_join, mock_temp_dir, mock_copy, mock_cmd_output
+        self, mock_makedirs, mock_join, mock_temp_dir, mock_copy, mock_cmd_output
     ):
         """Test prepare_dependency_archive when Docker image already exists."""
         # Mock the temporary directory context manager
@@ -85,6 +85,9 @@ class TestPrepareDependencyArchive:
         # Verify docker run command was called
         mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_RUN_CMD)
 
+        # Verify archives directory was created
+        mock_makedirs.assert_called_once_with("payload/archives", exist_ok=True)
+
         # Verify archive was copied back
         mock_copy.assert_any_call("/tmp/test_dir/native_dependencies.tar.gz", "payload/archives/native_dependencies.tar.gz")
 
@@ -92,8 +95,9 @@ class TestPrepareDependencyArchive:
     @patch("datacustomcode.deploy.shutil.copy")
     @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
     @patch("datacustomcode.deploy.os.path.join")
+    @patch("datacustomcode.deploy.os.makedirs")
     def test_prepare_dependency_archive_build_image(
-        self, mock_join, mock_temp_dir, mock_copy, mock_cmd_output
+        self, mock_makedirs, mock_join, mock_temp_dir, mock_copy, mock_cmd_output
     ):
         """Test prepare_dependency_archive when Docker image needs to be built."""
         # Mock the temporary directory context manager
@@ -124,6 +128,9 @@ class TestPrepareDependencyArchive:
         # Verify docker run command was called
         mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_RUN_CMD)
 
+        # Verify archives directory was created
+        mock_makedirs.assert_called_once_with("payload/archives", exist_ok=True)
+
         # Verify archive was copied back
         mock_copy.assert_any_call("/tmp/test_dir/native_dependencies.tar.gz", "payload/archives/native_dependencies.tar.gz")
 
@@ -131,8 +138,9 @@ class TestPrepareDependencyArchive:
     @patch("datacustomcode.deploy.shutil.copy")
     @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
     @patch("datacustomcode.deploy.os.path.join")
+    @patch("datacustomcode.deploy.os.makedirs")
     def test_prepare_dependency_archive_docker_build_failure(
-        self, mock_join, mock_temp_dir, mock_copy, mock_cmd_output
+        self, mock_makedirs, mock_join, mock_temp_dir, mock_copy, mock_cmd_output
     ):
         """Test prepare_dependency_archive when Docker build fails."""
         # Mock the temporary directory context manager
@@ -161,8 +169,9 @@ class TestPrepareDependencyArchive:
     @patch("datacustomcode.deploy.shutil.copy")
     @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
     @patch("datacustomcode.deploy.os.path.join")
+    @patch("datacustomcode.deploy.os.makedirs")
     def test_prepare_dependency_archive_docker_run_failure(
-        self, mock_join, mock_temp_dir, mock_copy, mock_cmd_output
+        self, mock_makedirs, mock_join, mock_temp_dir, mock_copy, mock_cmd_output
     ):
         """Test prepare_dependency_archive when Docker run fails."""
         # Mock the temporary directory context manager
@@ -195,8 +204,9 @@ class TestPrepareDependencyArchive:
     @patch("datacustomcode.deploy.shutil.copy")
     @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
     @patch("datacustomcode.deploy.os.path.join")
+    @patch("datacustomcode.deploy.os.makedirs")
     def test_prepare_dependency_archive_file_copy_failure(
-        self, mock_join, mock_temp_dir, mock_copy, mock_cmd_output
+        self, mock_makedirs, mock_join, mock_temp_dir, mock_copy, mock_cmd_output
     ):
         """Test prepare_dependency_archive when file copy fails."""
         # Mock the temporary directory context manager
