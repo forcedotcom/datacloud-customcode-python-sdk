@@ -18,7 +18,6 @@ from html import unescape
 import json
 import os
 import shutil
-import tarfile
 import tempfile
 import time
 from typing import (
@@ -140,8 +139,13 @@ def create_deployment(
         raise
 
 
-DOCKER_IMAGE_NAME = "datacloud-custom-code"
-DEPENDENCIES_ARCHIVE_NAME = "dependencies.tar.gz"
+PLATFORM_ENV_VAR = "DOCKER_DEFAULT_PLATFORM=linux/amd64"
+DOCKER_IMAGE_NAME = "datacloud-custom-code-dependency-builder"
+DEPENDENCIES_ARCHIVE_NAME = "native_dependencies"
+DEPENDENCIES_ARCHIVE_FULL_NAME = f"{DEPENDENCIES_ARCHIVE_NAME}.tar.gz"
+DEPENDENCIES_ARCHIVE_PATH = os.path.join(
+    "payload", "archives", DEPENDENCIES_ARCHIVE_FULL_NAME
+)
 ZIP_FILE_NAME = "deployment.zip"
 
 
@@ -150,31 +154,28 @@ def prepare_dependency_archive(directory: str) -> None:
     image_exists = cmd_output(cmd)
 
     if not image_exists:
-        logger.debug("Building docker image...")
-        cmd = f"docker build -t {DOCKER_IMAGE_NAME} ."
-        cmd_output(cmd)
-
-    with tempfile.TemporaryDirectory() as temp_dir:
-        shutil.copy("requirements.txt", temp_dir)
+        logger.info("Building docker image...")
         cmd = (
-            f"docker run --rm "
-            f"-v {temp_dir}:/dependencies "
-            f"{DOCKER_IMAGE_NAME} "
-            f'/bin/bash -c "cd /dependencies && pip download -r requirements.txt"'
+            f"{PLATFORM_ENV_VAR} docker build -t {DOCKER_IMAGE_NAME} "
+            f"-f Dockerfile.dependencies ."
         )
         cmd_output(cmd)
 
-        archives_dir = os.path.join(directory, "archives")
-        os.makedirs(archives_dir, exist_ok=True)
-        archive_file = os.path.join(archives_dir, DEPENDENCIES_ARCHIVE_NAME)
-        with tarfile.open(archive_file, "w:gz") as tar:
-            for file in os.listdir(temp_dir):
-                # Exclude requirements.txt from the archive
-                if file == "requirements.txt":
-                    continue
-                tar.add(os.path.join(temp_dir, file), arcname=file)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        logger.info("Building dependencies archive")
+        shutil.copy("requirements.txt", temp_dir)
+        shutil.copy("build_native_dependencies.sh", temp_dir)
+        cmd = (
+            f"{PLATFORM_ENV_VAR} docker run --rm "
+            f"-v {temp_dir}:/workspace "
+            f"{DOCKER_IMAGE_NAME}"
+        )
+        cmd_output(cmd)
+        archives_temp_path = os.path.join(temp_dir, DEPENDENCIES_ARCHIVE_FULL_NAME)
+        os.makedirs(os.path.dirname(DEPENDENCIES_ARCHIVE_PATH), exist_ok=True)
+        shutil.copy(archives_temp_path, DEPENDENCIES_ARCHIVE_PATH)
 
-        logger.debug(f"Dependencies downloaded and archived to {archive_file}")
+        logger.info(f"Dependencies archived to {DEPENDENCIES_ARCHIVE_PATH}")
 
 
 class DeploymentsResponse(BaseModel):
