@@ -4,7 +4,7 @@ from unittest.mock import mock_open, patch
 
 from click.testing import CliRunner
 
-from datacustomcode.cli import init, deploy
+from datacustomcode.cli import deploy, init
 
 
 class TestInit:
@@ -80,7 +80,10 @@ class TestDeploy:
     def test_deploy_command_credentials_error(self, mock_credentials):
         """Test deploy command when credentials are not available."""
         # Mock credentials to raise ValueError
-        mock_credentials.side_effect = ValueError("Credentials not found in env or ini file. Run `datacustomcode configure` to create a credentials file.")
+        mock_credentials.side_effect = ValueError(
+            "Credentials not found in env or ini file. "
+            "Run `datacustomcode configure` to create a credentials file."
+        )
 
         runner = CliRunner()
         with runner.isolated_filesystem():
@@ -101,7 +104,9 @@ class TestDeploy:
             # Create test directory
             os.makedirs("custom_path", exist_ok=True)
 
-            result = runner.invoke(deploy, ["--path", "custom_path", "--name", "test-job"])
+            result = runner.invoke(
+                deploy, ["--path", "custom_path", "--name", "test-job"]
+            )
 
             assert result.exit_code == 0
             mock_deploy_full.assert_called_once()
@@ -112,14 +117,18 @@ class TestDeploy:
 
     @patch("datacustomcode.deploy.deploy_full")
     @patch("datacustomcode.credentials.Credentials.from_available")
-    def test_deploy_command_custom_description(self, mock_credentials, mock_deploy_full):
+    def test_deploy_command_custom_description(
+        self, mock_credentials, mock_deploy_full
+    ):
         """Test deploy command with custom description."""
         runner = CliRunner()
         with runner.isolated_filesystem():
             # Create test payload directory
             os.makedirs("payload", exist_ok=True)
 
-            result = runner.invoke(deploy, ["--name", "test-job", "--description", "Custom description"])
+            result = runner.invoke(
+                deploy, ["--name", "test-job", "--description", "Custom description"]
+            )
 
             assert result.exit_code == 0
             mock_deploy_full.assert_called_once()
