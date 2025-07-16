@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # Description: build native dependencies
 
