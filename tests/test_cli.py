@@ -4,7 +4,7 @@ from unittest.mock import mock_open, patch
 
 from click.testing import CliRunner
 
-from datacustomcode.cli import init
+from datacustomcode.cli import init, deploy
 
 
 class TestInit:
@@ -47,3 +47,83 @@ class TestInit:
             )
             expected_content = json.dumps(mock_scan.return_value, indent=2)
             assert written_content == expected_content
+
+
+class TestDeploy:
+    @patch("datacustomcode.deploy.deploy_full")
+    @patch("datacustomcode.credentials.Credentials.from_available")
+    def test_deploy_command_success(self, mock_credentials, mock_deploy_full):
+        """Test successful deploy command."""
+        # Mock credentials
+        mock_creds = mock_credentials.return_value
+
+        runner = CliRunner()
+        with runner.isolated_filesystem():
+            # Create test payload directory
+            os.makedirs("payload", exist_ok=True)
+
+            result = runner.invoke(deploy, ["--name", "test-job", "--version", "1.0.0"])
+
+            assert result.exit_code == 0
+            mock_credentials.assert_called_once()
+            mock_deploy_full.assert_called_once()
+
+            # Check that deploy_full was called with correct arguments
+            call_args = mock_deploy_full.call_args
+            assert call_args[0][0] == "payload"  # path
+            assert call_args[0][1].name == "test-job"  # metadata
+            assert call_args[0][1].version == "1.0.0"
+            assert call_args[0][1].description == "Custom Data Transform Code"
+            assert call_args[0][2] == mock_creds  # credentials
+
+    @patch("datacustomcode.credentials.Credentials.from_available")
+    def test_deploy_command_credentials_error(self, mock_credentials):
+        """Test deploy command when credentials are not available."""
+        # Mock credentials to raise ValueError
+        mock_credentials.side_effect = ValueError("Credentials not found in env or ini file. Run `datacustomcode configure` to create a credentials file.")
+
+        runner = CliRunner()
+        with runner.isolated_filesystem():
+            # Create test payload directory
+            os.makedirs("payload", exist_ok=True)
+
+            result = runner.invoke(deploy, ["--name", "test-job"])
+
+            assert result.exit_code == 1
+            assert "Error: Credentials not found in env or ini file" in result.output
+
+    @patch("datacustomcode.deploy.deploy_full")
+    @patch("datacustomcode.credentials.Credentials.from_available")
+    def test_deploy_command_custom_path(self, mock_credentials, mock_deploy_full):
+        """Test deploy command with custom path."""
+        runner = CliRunner()
+        with runner.isolated_filesystem():
+            # Create test directory
+            os.makedirs("custom_path", exist_ok=True)
+
+            result = runner.invoke(deploy, ["--path", "custom_path", "--name", "test-job"])
+
+            assert result.exit_code == 0
+            mock_deploy_full.assert_called_once()
+
+            # Check that deploy_full was called with custom path
+            call_args = mock_deploy_full.call_args
+            assert call_args[0][0] == "custom_path"  # path
+
+    @patch("datacustomcode.deploy.deploy_full")
+    @patch("datacustomcode.credentials.Credentials.from_available")
+    def test_deploy_command_custom_description(self, mock_credentials, mock_deploy_full):
+        """Test deploy command with custom description."""
+        runner = CliRunner()
+        with runner.isolated_filesystem():
+            # Create test payload directory
+            os.makedirs("payload", exist_ok=True)
+
+            result = runner.invoke(deploy, ["--name", "test-job", "--description", "Custom description"])
+
+            assert result.exit_code == 0
+            mock_deploy_full.assert_called_once()
+
+            # Check that deploy_full was called with custom description
+            call_args = mock_deploy_full.call_args
+            assert call_args[0][1].description == "Custom description"

@@ -79,12 +79,11 @@ def zip(path: str):
 
 
 @cli.command()
-@click.option("--profile", default="default")
 @click.option("--path", default="payload")
 @click.option("--name", required=True)
 @click.option("--version", default="0.0.1")
 @click.option("--description", default="Custom Data Transform Code")
-def deploy(profile: str, path: str, name: str, version: str, description: str):
+def deploy(path: str, name: str, version: str, description: str):
     from datacustomcode.credentials import Credentials
     from datacustomcode.deploy import TransformationJobMetadata, deploy_full
 
@@ -96,11 +95,10 @@ def deploy(profile: str, path: str, name: str, version: str, description: str):
         description=description,
     )
     try:
-        credentials = Credentials.from_ini(profile=profile)
-    except KeyError:
+        credentials = Credentials.from_available()
+    except ValueError as e:
         click.secho(
-            f"Error: Profile {profile} not found in credentials.ini. "
-            "Run `datacustomcode configure` to create a credentialsprofile.",
+            f"Error: {e}",
             fg="red",
         )
         raise click.Abort() from None
