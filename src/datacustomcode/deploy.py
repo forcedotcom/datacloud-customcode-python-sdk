@@ -388,7 +388,6 @@ def deploy_full(
     access_token = _retrieve_access_token(credentials)
 
     # prepare payload
-    prepare_dependency_archive(directory)
     verify_data_transform_config(directory)
 
     # create deployment and upload payload

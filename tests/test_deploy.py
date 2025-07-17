@@ -737,7 +737,6 @@ class TestCreateDataTransform:
 
 class TestDeployFull:
     @patch("datacustomcode.deploy._retrieve_access_token")
-    @patch("datacustomcode.deploy.prepare_dependency_archive")
     @patch("datacustomcode.deploy.verify_data_transform_config")
     @patch("datacustomcode.deploy.create_deployment")
     @patch("datacustomcode.deploy.zip")
@@ -752,7 +751,6 @@ class TestDeployFull:
         mock_zip,
         mock_create_deployment,
         mock_verify_config,
-        mock_prepare,
         mock_retrieve_token,
     ):
         """Test full deployment process."""
@@ -782,7 +780,6 @@ class TestDeployFull:
 
         # Assertions
         mock_retrieve_token.assert_called_once_with(credentials)
-        mock_prepare.assert_called_once_with("/test/dir")
         mock_verify_config.assert_called_once_with("/test/dir")
         mock_create_deployment.assert_called_once_with(access_token, metadata)
         mock_zip.assert_called_once_with("/test/dir")
@@ -815,7 +812,6 @@ class TestRunDataTransform:
 
 class TestDeployFullWithDockerIntegration:
     @patch("datacustomcode.deploy._retrieve_access_token")
-    @patch("datacustomcode.deploy.prepare_dependency_archive")
     @patch("datacustomcode.deploy.verify_data_transform_config")
     @patch("datacustomcode.deploy.create_deployment")
     @patch("datacustomcode.deploy.zip")
@@ -832,7 +828,6 @@ class TestDeployFullWithDockerIntegration:
         mock_zip,
         mock_create_deployment,
         mock_verify_config,
-        mock_prepare,
         mock_retrieve_token,
     ):
         """Test full deployment process with Docker dependency building."""
@@ -865,7 +860,6 @@ class TestDeployFullWithDockerIntegration:
 
         # Assertions
         mock_retrieve_token.assert_called_once_with(credentials)
-        mock_prepare.assert_called_once_with("/test/dir")  # Docker dependency building
         mock_verify_config.assert_called_once_with("/test/dir")
         mock_create_deployment.assert_called_once_with(access_token, metadata)
         mock_zip.assert_called_once_with("/test/dir")
