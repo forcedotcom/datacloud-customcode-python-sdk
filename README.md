@@ -1,4 +1,4 @@
-# Data Cloud Custom Code SDK
+# Data Cloud Custom Code SDK (BETA)
 
 This package provides a development kit for creating custom data transformations in [Data Cloud](https://www.salesforce.com/data/). It allows you to write your own data processing logic in Python while leveraging Data Cloud's infrastructure for data access and running data transformations, mapping execution into Data Cloud data structures like [Data Model Objects](https://help.salesforce.com/s/articleView?id=data.c360_a_data_model_objects.htm&type=5) and [Data Lake Objects](https://help.salesforce.com/s/articleView?id=sf.c360_a_data_lake_objects.htm&language=en_US&type=5).
 
@@ -11,7 +11,7 @@ Use of this project with Salesforce is subject to the [TERMS OF USE](./TERMS_OF_
 - Python 3.11 (If your system version is different, we recommend using [pyenv](https://github.com/pyenv/pyenv) to configure 3.11)
 - [Azul Zulu OpenJDK 17.x](https://www.azul.com/downloads/?version=java-17-lts&package=jdk#zulu)
 - Docker support like [Docker Desktop](https://docs.docker.com/desktop/)
-- A salesforce org, with some DLOs or DMOs with data
+- A salesforce org with some DLOs or DMOs with data and this feature enabled (it is not GA)
 - A [connected app](#creating-a-connected-app)
 
 ## Installation
