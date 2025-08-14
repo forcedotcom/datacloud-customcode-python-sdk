@@ -44,11 +44,25 @@ DATA_TRANSFORMS_PATH = "services/data/v63.0/ssot/data-transforms"
 AUTH_PATH = "services/oauth2/token"
 WAIT_FOR_DEPLOYMENT_TIMEOUT = 3000
 
+# Available compute types for Data Cloud deployments
+COMPUTE_TYPES = {
+    "CPU_XS": "CPU_XS",      # Extra Small CPU instance
+    "CPU_S": "CPU_S",      # Small CPU instance
+    "CPU_M": "CPU_M",     # Medium CPU instance (default)
+    "CPU_L": "CPU_L"      # Large CPU instance
+}
+
 
 class TransformationJobMetadata(BaseModel):
     name: str
     version: str
     description: str
+    computeType: str = "CPU_M"  # Default to CPU_M for backward compatibility
+    
+    def __init__(self, **data):
+        super().__init__(**data)
+        if self.computeType not in COMPUTE_TYPES:
+            raise ValueError(f"Invalid compute type '{self.computeType}'. Available options: {', '.join(COMPUTE_TYPES.keys())}")
 
 
 def _join_strip_url(*args: str) -> str:
@@ -123,7 +137,7 @@ def create_deployment(
         "name": metadata.name,
         "description": metadata.description,
         "version": metadata.version,
-        "computeType": "CPU_M",
+        "computeType": metadata.computeType,
     }
     logger.debug(f"Creating deployment {metadata.name}...")
     try:

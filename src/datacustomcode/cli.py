@@ -83,16 +83,30 @@ def zip(path: str):
 @click.option("--name", required=True)
 @click.option("--version", default="0.0.1")
 @click.option("--description", default="Custom Data Transform Code")
-def deploy(path: str, name: str, version: str, description: str):
+@click.option("--compute-type", default="CPU_M")
+def deploy(path: str, name: str, version: str, description: str, compute_type: str):
     from datacustomcode.credentials import Credentials
     from datacustomcode.deploy import TransformationJobMetadata, deploy_full
 
     logger.debug("Deploying project")
+    
+    # Validate compute type
+    from datacustomcode.deploy import COMPUTE_TYPES
+    if compute_type not in COMPUTE_TYPES:
+        click.secho(
+            f"Error: Invalid compute type '{compute_type}'. "
+            f"Available options: {', '.join(COMPUTE_TYPES.keys())}",
+            fg="red",
+        )
+        raise click.Abort()
 
+    logger.info(f"Deploying with compute type: {compute_type}")
+    
     metadata = TransformationJobMetadata(
         name=name,
         version=version,
         description=description,
+        computeType=compute_type,
     )
     try:
         credentials = Credentials.from_available()
