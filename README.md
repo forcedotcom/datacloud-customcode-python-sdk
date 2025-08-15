@@ -144,7 +144,7 @@ Options:
 - `--name TEXT`: Name of the transformation job [required]
 - `--version TEXT`: Version of the transformation job (default: "0.0.1")
 - `--description TEXT`: Description of the transformation job (default: "")
-- `--compute-type TEXT`: Compute type for the deployment (default: "CPU_M"). Available options: CPU_XS (extra-small), CPU_S (small), CPU_M (medium), CPU_L (large)
+- `--compute-type TEXT`: Compute type for the deployment (default: "CPU_XL"). Available options: CPU_L(Large), CPU_XL (Extra Large), CPU_2XL (2X Large), CPU_4XL (4X Large)
 
 #### `datacustomcode init`
 Initialize a new development environment with a template.

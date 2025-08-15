@@ -44,12 +44,12 @@ DATA_TRANSFORMS_PATH = "services/data/v63.0/ssot/data-transforms"
 AUTH_PATH = "services/oauth2/token"
 WAIT_FOR_DEPLOYMENT_TIMEOUT = 3000
 
-# Available compute types for Data Cloud deployments
+# Available compute types for Data Cloud deployments.
 COMPUTE_TYPES = {
-    "CPU_XS": "CPU_XS",      # Extra Small CPU instance
-    "CPU_S": "CPU_S",      # Small CPU instance
-    "CPU_M": "CPU_M",     # Medium CPU instance (default)
-    "CPU_L": "CPU_L"      # Large CPU instance
+    "CPU_L": "CPU_XS",      # Large CPU instance
+    "CPU_XL": "CPU_S",      # X-Large CPU instance
+    "CPU_2XL": "CPU_M",     # 2X-Large CPU instance (default)
+    "CPU_4XL": "CPU_L"      # 4X-Large CPU instance
 }
 
 
@@ -57,7 +57,7 @@ class TransformationJobMetadata(BaseModel):
     name: str
     version: str
     description: str
-    computeType: str = "CPU_M"  # Default to CPU_M for backward compatibility
+    computeType: str
     
     def __init__(self, **data):
         super().__init__(**data)

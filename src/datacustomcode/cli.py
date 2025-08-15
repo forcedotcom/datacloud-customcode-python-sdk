@@ -83,7 +83,7 @@ def zip(path: str):
 @click.option("--name", required=True)
 @click.option("--version", default="0.0.1")
 @click.option("--description", default="Custom Data Transform Code")
-@click.option("--compute-type", default="CPU_M")
+@click.option("--compute-type", default="CPU_XL")
 def deploy(path: str, name: str, version: str, description: str, compute_type: str):
     from datacustomcode.credentials import Credentials
     from datacustomcode.deploy import TransformationJobMetadata, deploy_full
@@ -106,7 +106,7 @@ def deploy(path: str, name: str, version: str, description: str, compute_type: s
         name=name,
         version=version,
         description=description,
-        computeType=compute_type,
+        computeType=COMPUTE_TYPES[compute_type],
     )
     try:
         credentials = Credentials.from_available()
