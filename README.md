@@ -8,7 +8,7 @@ Use of this project with Salesforce is subject to the [TERMS OF USE](./TERMS_OF_
 
 ## Prerequisites
 
-- Python 3.11 (If your system version is different, we recommend using [pyenv](https://github.com/pyenv/pyenv) to configure 3.11)
+- **Python 3.11 only** (currently supported version - if your system version is different, we recommend using [pyenv](https://github.com/pyenv/pyenv) to configure 3.11)
 - [Azul Zulu OpenJDK 17.x](https://www.azul.com/downloads/?version=java-17-lts&package=jdk#zulu)
 - Docker support like [Docker Desktop](https://docs.docker.com/desktop/)
 - A salesforce org with some DLOs or DMOs with data and this feature enabled (it is not GA)
@@ -69,6 +69,13 @@ datacustomcode run ./payload/entrypoint.py
 > The example entrypoint.py requires a `Account_Home__dll` DLO to be present.  And in order to deploy the script (next step), the output DLO (which is `Account_Home_copy__dll` in the example entrypoint.py) also needs to exist and be in the same dataspace as `Account_Home__dll`.
 
 After modifying the `entrypoint.py` as needed, using any dependencies you add in the `.venv` virtual environment, you can run this script in Data Cloud:
+
+**Adding Dependencies**: To add new dependencies:
+1. Make sure your virtual environment is activated
+2. Add dependencies to `requirements.txt`
+3. Run `pip install -r requirements.txt`
+4. The SDK automatically packages all dependencies when you run `datacustomcode zip`
+
 ```zsh
 datacustomcode scan ./payload/entrypoint.py
 datacustomcode deploy --path ./payload --name my_custom_script
@@ -79,6 +86,18 @@ datacustomcode deploy --path ./payload --name my_custom_script
 
 You can now use the Salesforce Data Cloud UI to find the created Data Transform and use the `Run Now` button to run it.
 Once the Data Transform run is successful, check the DLO your script is writing to and verify the correct records were added.
+
+## Dependency Management
+
+The SDK automatically handles all dependency packaging for Data Cloud deployment. Here's how it works:
+
+1. **Add dependencies to `requirements.txt`** - List any Python packages your script needs
+2. **Install locally** - Use `pip install -r requirements.txt` in your virtual environment
+3. **Automatic packaging** - When you run `datacustomcode zip`, the SDK automatically:
+   - Packages all dependencies from `requirements.txt`
+   - Uses the correct platform and architecture for Data Cloud
+
+**No need to worry about platform compatibility** - the SDK handles this automatically through the Docker-based packaging process.
 
 ## API
 
@@ -174,25 +193,40 @@ Options:
 
 ## Docker usage
 
-After initializing a project with `datacustomcode init my_package`, you might notice a Dockerfile.  This file isn't used for the
-[Quick Start](#quick-start) approach above, which uses virtual environments, until the `zip` or `deploy` commands are used.  When using dependencies
-that include [native features](https://spark.apache.org/docs/latest/api/python/user_guide/python_packaging.html#using-pyspark-native-features)
-like C++ or C interop, the platform and architecture may be different between your machine and Data Cloud compute.  This is all taken care of
-in the `zip` and `deploy` commands, which utilize the Dockerfile which starts `FROM` an image compatible with Data Cloud.  However, you may
-want to build, run, and test your script on your machine using the same platform and architecture as Data Cloud.  You can use the sections below
-to test your script in this manner.
+The SDK provides Docker-based development options that allow you to test your code in an environment that closely resembles Data Cloud's execution environment.
+
+### How Docker Works with the SDK
+
+When you initialize a project with `datacustomcode init my_package`, a `Dockerfile` is created automatically. This Dockerfile:
+
+- **Isn't used during local development** with virtual environments
+- **Becomes active during packaging** when you run `datacustomcode zip` or `deploy`
+- **Ensures compatibility** by using the same base image as Data Cloud
+- **Handles dependencies automatically** regardless of platform differences
 
 ### VS Code Dev Containers
 
 Within your `init`ed package, you will find a `.devcontainer` folder which allows you to run a docker container while developing inside of it.
 
 Read more about Dev Containers here: https://code.visualstudio.com/docs/devcontainers/containers.
+#### Setup Instructions
 
 1. Install the VS Code extension "Dev Containers" by microsoft.com.
-1. Open your package folder in VS Code, ensuring that the `.devcontainer` folder is at the root of the File Explorer
-1. Bring up the Command Palette (on mac: Cmd + Shift + P), and select "Dev Containers: Rebuild and Reopen in Container"
-1. Allow the docker image to be built, then you're ready to develop
-1. Now if you open a terminal (within the Dev Container window) and `datacustomcode run ./payload/entrypoint.py`, it will run inside a docker container that more closely resembles Data Cloud compute than your machine
+2. Open your package folder in VS Code, ensuring that the `.devcontainer` folder is
+at the root of the File Explorer
+3. Bring up the Command Palette (on mac: Cmd + Shift + P), and select "Dev
+Containers: Rebuild and Reopen in Container"
+4. Allow the docker image to be built, then you're ready to develop
+
+#### Development Workflow
+
+Once inside the Dev Container:
+- **Terminal access**: Open a terminal within the container
+- **Run your code**: Execute `datacustomcode run ./payload/entrypoint.py`
+- **Environment consistency**: Your code will run inside a docker container that more closely resembles Data Cloud compute than your machine
+
+> [!TIP]
+> **IDE Configuration**: Use `CMD+Shift+P` (or `Ctrl+Shift+P` on Windows/Linux), then select "Python: Select Interpreter" to configure the correct Python Interpreter
 
 > [!IMPORTANT]
 > Dev Containers get their own tmp file storage, so you'll need to re-run `datacustomcode configure` every time you "Rebuild and Reopen in Container".
