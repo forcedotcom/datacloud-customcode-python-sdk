@@ -45,11 +45,13 @@ AUTH_PATH = "services/oauth2/token"
 WAIT_FOR_DEPLOYMENT_TIMEOUT = 3000
 
 # Available compute types for Data Cloud deployments.
+# Nomenclature used by COMPUTE_TYPES keys align with
+# compute instances provisioned by Data Cloud.
 COMPUTE_TYPES = {
-    "CPU_L": "CPU_XS",      # Large CPU instance
-    "CPU_XL": "CPU_S",      # X-Large CPU instance
-    "CPU_2XL": "CPU_M",     # 2X-Large CPU instance (default)
-    "CPU_4XL": "CPU_L"      # 4X-Large CPU instance
+    "CPU_L": "CPU_XS",  # Large CPU instance
+    "CPU_XL": "CPU_S",  # X-Large CPU instance
+    "CPU_2XL": "CPU_M",  # 2X-Large CPU instance (default)
+    "CPU_4XL": "CPU_L",  # 4X-Large CPU instance
 }
 
 
@@ -58,11 +60,9 @@ class TransformationJobMetadata(BaseModel):
     version: str
     description: str
     computeType: str
-    
+
     def __init__(self, **data):
         super().__init__(**data)
-        if self.computeType not in COMPUTE_TYPES:
-            raise ValueError(f"Invalid compute type '{self.computeType}'. Available options: {', '.join(COMPUTE_TYPES.keys())}")
 
 
 def _join_strip_url(*args: str) -> str:

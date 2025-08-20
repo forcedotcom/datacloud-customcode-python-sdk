@@ -434,7 +434,10 @@ class TestCreateDeployment:
             access_token="test_token", instance_url="https://instance.example.com"
         )
         metadata = TransformationJobMetadata(
-            name="test_job", version="1.0.0", description="Test job"
+            name="test_job",
+            version="1.0.0",
+            description="Test job",
+            computeType="CPU_M",
         )
 
         mock_make_api_call.return_value = {
@@ -454,7 +457,10 @@ class TestCreateDeployment:
             access_token="test_token", instance_url="https://instance.example.com"
         )
         metadata = TransformationJobMetadata(
-            name="test_job", version="1.0.0", description="Test job"
+            name="test_job",
+            version="1.0.0",
+            description="Test job",
+            computeType="CPU_M",
         )
 
         # Mock HTTP error with 409 Conflict
@@ -571,7 +577,10 @@ class TestGetDeployments:
             access_token="test_token", instance_url="https://instance.example.com"
         )
         metadata = TransformationJobMetadata(
-            name="test_job", version="1.0.0", description="Test job"
+            name="test_job",
+            version="1.0.0",
+            description="Test job",
+            computeType="CPU_M",
         )
 
         mock_make_api_call.return_value = {"deploymentStatus": "Deployed"}
@@ -595,7 +604,10 @@ class TestWaitForDeployment:
             access_token="test_token", instance_url="https://instance.example.com"
         )
         metadata = TransformationJobMetadata(
-            name="test_job", version="1.0.0", description="Test job"
+            name="test_job",
+            version="1.0.0",
+            description="Test job",
+            computeType="CPU_M",
         )
         callback = MagicMock()
 
@@ -622,7 +634,10 @@ class TestWaitForDeployment:
             access_token="test_token", instance_url="https://instance.example.com"
         )
         metadata = TransformationJobMetadata(
-            name="test_job", version="1.0.0", description="Test job"
+            name="test_job",
+            version="1.0.0",
+            description="Test job",
+            computeType="CPU_M",
         )
 
         # Mock time to simulate timeout
@@ -699,7 +714,10 @@ class TestCreateDataTransform:
             access_token="test_token", instance_url="https://instance.example.com"
         )
         metadata = TransformationJobMetadata(
-            name="test_job", version="1.0.0", description="Test job"
+            name="test_job",
+            version="1.0.0",
+            description="Test job",
+            computeType="CPU_M",
         )
 
         mock_get_config.return_value = DataTransformConfig(
@@ -762,7 +780,10 @@ class TestDeployFull:
             login_url="https://example.com",
         )
         metadata = TransformationJobMetadata(
-            name="test_job", version="1.0.0", description="Test job"
+            name="test_job",
+            version="1.0.0",
+            description="Test job",
+            computeType="CPU_M",
         )
         callback = MagicMock()
 
@@ -799,7 +820,10 @@ class TestRunDataTransform:
             access_token="test_token", instance_url="https://instance.example.com"
         )
         metadata = TransformationJobMetadata(
-            name="test_job", version="1.0.0", description="Test job"
+            name="test_job",
+            version="1.0.0",
+            description="Test job",
+            computeType="CPU_M",
         )
 
         mock_make_api_call.return_value = {"status": "Running"}
@@ -839,7 +863,10 @@ class TestDeployFullWithDockerIntegration:
             login_url="https://example.com",
         )
         metadata = TransformationJobMetadata(
-            name="test_job", version="1.0.0", description="Test job"
+            name="test_job",
+            version="1.0.0",
+            description="Test job",
+            computeType="CPU_M",
         )
         callback = MagicMock()
 
