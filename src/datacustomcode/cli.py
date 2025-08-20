@@ -83,8 +83,19 @@ def zip(path: str):
 @click.option("--name", required=True)
 @click.option("--version", default="0.0.1")
 @click.option("--description", default="Custom Data Transform Code")
-@click.option("--compute-type", default="CPU_2XL")
-def deploy(path: str, name: str, version: str, description: str, compute_type: str):
+@click.option(
+    "--cpu-size",
+    default="CPU_2XL",
+    help="""CPU size for deployment. Available options:
+
+    CPU_L     - Large CPU instance
+    CPU_XL    - X-Large CPU instance
+    CPU_2XL   - 2X-Large CPU instance [DEFAULT]
+    CPU_4XL   - 4X-Large CPU instance
+
+    Choose based on your workload requirements.""",
+)
+def deploy(path: str, name: str, version: str, description: str, cpu_size: str):
     from datacustomcode.credentials import Credentials
     from datacustomcode.deploy import TransformationJobMetadata, deploy_full
 
@@ -93,21 +104,21 @@ def deploy(path: str, name: str, version: str, description: str, compute_type: s
     # Validate compute type
     from datacustomcode.deploy import COMPUTE_TYPES
 
-    if compute_type not in COMPUTE_TYPES.keys():
+    if cpu_size not in COMPUTE_TYPES.keys():
         click.secho(
-            f"Error: Invalid compute type '{compute_type}'. "
+            f"Error: Invalid CPU size '{cpu_size}'. "
             f"Available options: {', '.join(COMPUTE_TYPES.keys())}",
             fg="red",
         )
         raise click.Abort()
 
-    logger.info(f"Deploying with compute type: {compute_type}")
+    logger.debug(f"Deploying with CPU size: {cpu_size}")
 
     metadata = TransformationJobMetadata(
         name=name,
         version=version,
         description=description,
-        computeType=COMPUTE_TYPES[compute_type],
+        computeType=COMPUTE_TYPES[cpu_size],
     )
     try:
         credentials = Credentials.from_available()
