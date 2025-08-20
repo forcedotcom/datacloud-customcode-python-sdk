@@ -18,6 +18,7 @@ from html import unescape
 import json
 import os
 import shutil
+import sys
 import tempfile
 import time
 from typing import (
@@ -163,8 +164,12 @@ def prepare_dependency_archive(directory: str) -> None:
 
     with tempfile.TemporaryDirectory() as temp_dir:
         logger.info("Building dependencies archive")
-        shutil.copy("requirements.txt", temp_dir)
-        shutil.copy("build_native_dependencies.sh", temp_dir)
+        try:
+            shutil.copy("requirements.txt", temp_dir)
+            shutil.copy("build_native_dependencies.sh", temp_dir)
+        except FileNotFoundError as e:
+            logger.error(f"Error copying files: {e}")
+            sys.exit(1)
         cmd = (
             f"{PLATFORM_ENV_VAR} docker run --rm "
             f"-v {temp_dir}:/workspace "
