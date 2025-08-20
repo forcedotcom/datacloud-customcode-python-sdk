@@ -88,6 +88,7 @@ def zip(path: str):
     default="CPU_2XL",
     help="""CPU size for deployment. Available options:
 
+    \b
     CPU_L     - Large CPU instance
     CPU_XL    - X-Large CPU instance
     CPU_2XL   - 2X-Large CPU instance [DEFAULT]
