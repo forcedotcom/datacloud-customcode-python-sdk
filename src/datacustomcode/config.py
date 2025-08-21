@@ -36,14 +36,14 @@ import yaml
 # This lets all readers and writers to be findable via config
 from datacustomcode.io import *  # noqa: F403
 from datacustomcode.io.base import BaseDataAccessLayer
-from datacustomcode.io.reader.base import BaseDataCloudReader  # noqa: TCH001
-from datacustomcode.io.writer.base import BaseDataCloudWriter  # noqa: TCH001
 
 DEFAULT_CONFIG_NAME = "config.yaml"
 
 
 if TYPE_CHECKING:
     from pyspark.sql import SparkSession
+    from datacustomcode.io.reader.base import BaseDataCloudReader
+    from datacustomcode.io.writer.base import BaseDataCloudWriter
 
 
 class ForceableConfig(BaseModel):
@@ -72,7 +72,7 @@ class AccessLayerObjectConfig(ForceableConfig, Generic[_T]):
 
     def to_object(self, spark: SparkSession) -> _T:
         type_ = self.type_base.subclass_from_config_name(self.type_config_name)
-        return cast(_T, type_(spark=spark, **self.options))
+        return cast("_T", type_(spark=spark, **self.options))
 
 
 class SparkConfig(ForceableConfig):
@@ -90,8 +90,8 @@ class SparkConfig(ForceableConfig):
 
 
 class ClientConfig(BaseModel):
-    reader_config: Union[AccessLayerObjectConfig[BaseDataCloudReader], None] = None
-    writer_config: Union[AccessLayerObjectConfig[BaseDataCloudWriter], None] = None
+    reader_config: Union[AccessLayerObjectConfig["BaseDataCloudReader"], None] = None
+    writer_config: Union[AccessLayerObjectConfig["BaseDataCloudWriter"], None] = None
     spark_config: Union[SparkConfig, None] = None
 
     def update(self, other: ClientConfig) -> ClientConfig:

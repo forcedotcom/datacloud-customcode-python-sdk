@@ -1,7 +1,6 @@
 """Tests for the deploy module."""
 
 import shutil
-import sys
 from unittest.mock import (
     MagicMock,
     call,
@@ -242,18 +241,18 @@ class TestPrepareDependencyArchive:
         # Create a custom mock for shutil.copy that raises FileNotFoundError
         # only for the specific calls we want to test
         original_copy = shutil.copy
-        
+
         def mock_copy(src, dst):
             if src == "requirements.txt" or src == "build_native_dependencies.sh":
                 raise FileNotFoundError("File not found")
             return original_copy(src, dst)
-        
+
         with patch("datacustomcode.deploy.shutil.copy", side_effect=mock_copy):
             # Call the function - it should catch the FileNotFoundError and call sys.exit(1)
             # We expect it to raise SystemExit (which is what sys.exit(1) does)
             with pytest.raises(SystemExit) as exc_info:
                 prepare_dependency_archive("/test/dir")
-            
+
             # Verify the exit code is 1
             assert exc_info.value.code == 1
 
