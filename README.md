@@ -71,11 +71,16 @@ datacustomcode run ./payload/entrypoint.py
 After modifying the `entrypoint.py` as needed, using any dependencies you add in the `.venv` virtual environment, you can run this script in Data Cloud:
 ```zsh
 datacustomcode scan ./payload/entrypoint.py
-datacustomcode deploy --path ./payload --name my_custom_script
+datacustomcode deploy --path ./payload --name my_custom_script --compute-type CPU_L
 ```
 
 > [!TIP]
 > The `deploy` process can take several minutes.  If you'd like more feedback on the underlying process, you can add `--debug` to the command like `datacustomcode --debug deploy --path ./payload --name my_custom_script`
+>
+> [!NOTE]
+> **Compute Types**: Choose the appropriate compute type based on your workload requirements:
+> - **CPU_L/CPU_XL/CPU_2XL/CPU_4XL**: Large, X-Large, 2X-Large and 4X-Large CPU instances for data processing
+> - Default is `CPU_2XL` which provides a good balance of performance and cost for most use cases
 
 You can now use the Salesforce Data Cloud UI to find the created Data Transform and use the `Run Now` button to run it.
 Once the Data Transform run is successful, check the DLO your script is writing to and verify the correct records were added.
@@ -139,6 +144,7 @@ Options:
 - `--name TEXT`: Name of the transformation job [required]
 - `--version TEXT`: Version of the transformation job (default: "0.0.1")
 - `--description TEXT`: Description of the transformation job (default: "")
+- `--compute-type TEXT`: Compute type for the deployment (default: "CPU_XL"). Available options: CPU_L(Large), CPU_XL (Extra Large), CPU_2XL (2X Large), CPU_4XL (4X Large)
 
 #### `datacustomcode init`
 Initialize a new development environment with a template.
