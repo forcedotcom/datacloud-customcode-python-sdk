@@ -247,7 +247,7 @@ class TestScanFile:
         finally:
             os.unlink(temp_path)
 
-    def test_invalid_multiple_writes(self):
+    def test_multiple_writes(self):
         """Test scanning a file with multiple write operations."""
         content = textwrap.dedent(
             """
@@ -258,15 +258,25 @@ class TestScanFile:
             # Read from DLO
             df = client.read_dlo("input_dlo")
 
-            # Write to multiple DLOs - invalid
-            client.write_to_dlo("output_dlo_1", df, "overwrite")
-            client.write_to_dlo("output_dlo_2", df, "overwrite")
+            # Transform data for different outputs
+            df_filtered = df.filter(df.col > 10)
+            df_aggregated = df.groupBy("category").agg({"value": "sum"})
+
+            # Write to multiple DLOs
+            client.write_to_dlo("output_filtered", df_filtered, "overwrite")
+            client.write_to_dlo("output_aggregated", df_aggregated, "overwrite")
         """
         )
         temp_path = create_test_script(content)
         try:
-            with pytest.raises(ValueError, match="Cannot write to more than one DLO"):
-                scan_file(temp_path)
+            result = scan_file(temp_path)
+            assert "input_dlo" in result.read_dlo
+            assert "output_filtered" in result.write_to_dlo
+            assert "output_aggregated" in result.write_to_dlo
+            assert len(result.read_dlo) == 1
+            assert len(result.write_to_dlo) == 2
+            assert len(result.read_dmo) == 0
+            assert len(result.write_to_dmo) == 0
         finally:
             os.unlink(temp_path)
 

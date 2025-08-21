@@ -54,10 +54,6 @@ class DataAccessLayerCalls(pydantic.BaseModel):
     def validate_access_layer(self) -> DataAccessLayerCalls:
         if self.read_dlo and self.read_dmo:
             raise ValueError("Cannot read from DLO and DMO in the same file.")
-        if len(self.write_to_dlo) > 1 or len(self.write_to_dmo) > 1:
-            raise ValueError(
-                "Cannot write to more than one DLO or DMO in the same file."
-            )
         if not self.read_dlo and not self.read_dmo:
             raise ValueError("Must read from at least one DLO or DMO.")
         if self.read_dlo and self.write_to_dmo:
