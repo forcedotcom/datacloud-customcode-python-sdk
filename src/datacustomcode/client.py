@@ -14,17 +14,18 @@
 # limitations under the License.
 from __future__ import annotations
 
+import io
+
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
     ClassVar,
     Optional,
 )
-
 from pyspark.sql import SparkSession
-
 from datacustomcode.config import SparkConfig, config
 from datacustomcode.io.reader.base import BaseDataCloudReader
+from datacustomcode.file.reader.base import BaseFileReader
 
 if TYPE_CHECKING:
     from pyspark.sql import DataFrame as PySparkDataFrame
@@ -112,6 +113,7 @@ class Client:
     _instance: ClassVar[Optional[Client]] = None
     _reader: BaseDataCloudReader
     _writer: BaseDataCloudWriter
+    _file: BaseFileReader
     _data_layer_history: dict[DataCloudObjectType, set[str]]
 
     def __new__(
@@ -154,6 +156,7 @@ class Client:
                 writer_init = writer
             cls._instance._reader = reader_init
             cls._instance._writer = writer_init
+            cls._instance._file = BaseFileReader()
             cls._instance._data_layer_history = {
                 DataCloudObjectType.DLO: set(),
                 DataCloudObjectType.DMO: set(),
@@ -211,6 +214,12 @@ class Client:
         """
         self._validate_data_layer_history_does_not_contain(DataCloudObjectType.DLO)
         return self._writer.write_to_dmo(name, dataframe, write_mode, **kwargs)
+
+    def file_open(self, file_name: str) -> io.TextIOWrapper:
+        """Read a file from the local file system.
+        """
+
+        return self._file.file_open(file_name)
 
     def _validate_data_layer_history_does_not_contain(
         self, data_cloud_object_type: DataCloudObjectType
