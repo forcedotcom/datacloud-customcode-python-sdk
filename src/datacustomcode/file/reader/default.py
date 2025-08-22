@@ -14,12 +14,14 @@
 # limitations under the License.
 from __future__ import annotations
 
-import io
 import os
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from datacustomcode.file.base import BaseDataAccessLayer
+
+if TYPE_CHECKING:
+    import io
 
 
 class FileReaderError(Exception):
@@ -63,7 +65,7 @@ class DefaultFileReader(BaseDataAccessLayer):
         self.file_folder = file_folder or self.DEFAULT_FILE_FOLDER
         self.config_file = config_file or self.DEFAULT_CONFIG_FILE
 
-    def file_open(self, file_name: str) -> io.TextIOWrapper:
+    def file_open(self, file_name: str) -> "io.TextIOWrapper":
         """Open a file for reading.
 
         Args:
@@ -170,7 +172,7 @@ class DefaultFileReader(BaseDataAccessLayer):
             return file_path
         return None
 
-    def _open_file(self, file_path: Path) -> io.TextIOWrapper:
+    def _open_file(self, file_path: Path) -> "io.TextIOWrapper":
         """Open a file at the given path.
 
         Args:
@@ -199,11 +201,3 @@ class DefaultFileReader(BaseDataAccessLayer):
             locations.append(config_path.parent.joinpath(self.file_folder))
 
         return locations
-
-
-class BaseDataAccessLayer:
-    """Default implementation of the file reader.
-
-    This class provides the standard file reading behavior and can be
-    easily mocked or subclassed for testing.
-    """
