@@ -15,7 +15,6 @@
 from __future__ import annotations
 
 from enum import Enum
-import io
 from typing import (
     TYPE_CHECKING,
     ClassVar,
@@ -29,6 +28,8 @@ from datacustomcode.file.reader.default import DefaultFileReader
 from datacustomcode.io.reader.base import BaseDataCloudReader
 
 if TYPE_CHECKING:
+    import io
+
     from pyspark.sql import DataFrame as PySparkDataFrame
 
     from datacustomcode.io.reader.base import BaseDataCloudReader

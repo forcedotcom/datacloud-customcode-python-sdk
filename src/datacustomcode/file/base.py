@@ -14,8 +14,6 @@
 # limitations under the License.
 from __future__ import annotations
 
-from abc import ABC
 
-
-class BaseDataAccessLayer(ABC):
-    pass
+class BaseDataAccessLayer:
+    """Base class for data access layer implementations."""
