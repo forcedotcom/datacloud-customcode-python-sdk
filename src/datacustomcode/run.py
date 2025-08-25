@@ -15,6 +15,8 @@
 import importlib
 import runpy
 from typing import List, Union
+from pathlib import Path
+import sys
 
 from datacustomcode.config import config
 
@@ -44,4 +46,12 @@ def run_entrypoint(
                     raise exc
             except (ModuleNotFoundError, AttributeError) as inner_exc:
                 raise inner_exc from exc
+    fooBar(entrypoint)
     runpy.run_path(entrypoint, init_globals=globals(), run_name="__main__")
+
+def fooBar(entrypoint: str):
+    default_py_folder = "pyFiles" # Hardcoded folder name
+    cwd = Path.cwd().joinpath(entrypoint)
+    py_folder = cwd.parent.joinpath(default_py_folder)
+    
+    sys.path.append(py_folder)
