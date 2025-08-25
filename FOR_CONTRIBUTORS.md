@@ -16,24 +16,18 @@ See the [Prerequisites section in README.md](./README.md#prerequisites) for comp
    cd datacloud-customcode-python-sdk
    ```
 
-2. **Set up virtual environment and install Poetry**
+2. **Set up virtual environment and install dependencies**
+   
+   **Note**: If you need to set a specific Python version, use `pyenv local 3.11.x` in the project directory.
+   
    ```bash
-   python3 -m venv .venv
+   python3.11 -m venv .venv
    source .venv/bin/activate
    pip install poetry
-   poetry build
+   make develop
    ```
 
-3. **Install dependencies**
-   ```bash
-   # Install main dependencies
-   poetry install --only main
-   
-   # Install development dependencies
-   poetry install --with dev
-   ```
-
-4. **Verify installation**
+3. **Verify installation**
    ```bash
    poetry run datacustomcode version
    ```
