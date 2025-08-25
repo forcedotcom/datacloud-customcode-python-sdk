@@ -386,8 +386,9 @@ def zip(
             # Skip .DS_Store files when adding to zip
             for file in files:
                 if file != ".DS_Store":
-                    file_path = os.path.join(root, file)
-                    zipf.write(file_path, arcname=file)
+                    abs_path = os.path.join(root, file)
+                    arcname = os.path.relpath(abs_path, directory)
+                    zipf.write(abs_path, arcname)
     logger.debug(f"Created zip file: {ZIP_FILE_NAME}")
 
 
