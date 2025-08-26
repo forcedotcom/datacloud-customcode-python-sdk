@@ -17,9 +17,9 @@ See the [Prerequisites section in README.md](./README.md#prerequisites) for comp
    ```
 
 2. **Set up virtual environment and install dependencies**
-   
+
    **Note**: If you need to set a specific Python version, use `pyenv local 3.11.x` in the project directory.
-   
+
    ```bash
    python3.11 -m venv .venv
    source .venv/bin/activate
@@ -33,21 +33,21 @@ See the [Prerequisites section in README.md](./README.md#prerequisites) for comp
    ```
 
 4. **Initialize a project for development work**
-   
+
    **Note**: To test your changes and develop new features, initialize a sample project:
-   
+
    ```bash
    # Create a new directory for your test project
    mkdir my-test-project
    cd my-test-project
-   
+
    # Initialize a new Data Cloud custom code project
    datacustomcode init .
-   
-   # Test your SDK modifications against the sample project with: 
+
+   # Test your SDK modifications against the sample project with:
    datacustomcode run ./payload/entrypoint.py
    ```
-   
+
    **Tip**: See the [README.md](./README.md) for additional `datacustomcode` commands (`scan`, `deploy`, `zip`) to test specific code paths and validate your SDK changes thoroughly.
 
 ## 🔧 Makefile Commands
