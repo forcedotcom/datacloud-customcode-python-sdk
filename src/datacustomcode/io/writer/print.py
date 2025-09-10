@@ -26,10 +26,17 @@ class PrintDataCloudWriter(BaseDataCloudWriter):
     CONFIG_NAME = "PrintDataCloudWriter"
 
     def __init__(
-        self, spark: SparkSession, reader: Optional[QueryAPIDataCloudReader] = None
+        self,
+        spark: SparkSession,
+        reader: Optional[QueryAPIDataCloudReader] = None,
+        credentials_profile: str = "default",
     ) -> None:
         super().__init__(spark)
-        self.reader = QueryAPIDataCloudReader(self.spark) if reader is None else reader
+        self.reader = (
+            QueryAPIDataCloudReader(self.spark, credentials_profile)
+            if reader is None
+            else reader
+        )
 
     def validate_dataframe_columns_against_dlo(
         self,
