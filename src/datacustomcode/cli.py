@@ -83,6 +83,7 @@ def zip(path: str):
 @click.option("--name", required=True)
 @click.option("--version", default="0.0.1")
 @click.option("--description", default="Custom Data Transform Code")
+@click.option("--profile", default="default")
 @click.option(
     "--cpu-size",
     default="CPU_2XL",
@@ -96,7 +97,7 @@ def zip(path: str):
 
     Choose based on your workload requirements.""",
 )
-def deploy(path: str, name: str, version: str, description: str, cpu_size: str):
+def deploy(path: str, name: str, version: str, description: str, cpu_size: str, profile: str):
     from datacustomcode.credentials import Credentials
     from datacustomcode.deploy import TransformationJobMetadata, deploy_full
 
@@ -122,7 +123,7 @@ def deploy(path: str, name: str, version: str, description: str, cpu_size: str):
         computeType=COMPUTE_TYPES[cpu_size],
     )
     try:
-        credentials = Credentials.from_available()
+        credentials = Credentials.from_available(profile=profile)
     except ValueError as e:
         click.secho(
             f"Error: {e}",
