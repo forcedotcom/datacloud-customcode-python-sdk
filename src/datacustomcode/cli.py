@@ -97,7 +97,9 @@ def zip(path: str):
 
     Choose based on your workload requirements.""",
 )
-def deploy(path: str, name: str, version: str, description: str, cpu_size: str, profile: str):
+def deploy(
+    path: str, name: str, version: str, description: str, cpu_size: str, profile: str
+):
     from datacustomcode.credentials import Credentials
     from datacustomcode.deploy import TransformationJobMetadata, deploy_full
 
@@ -194,7 +196,12 @@ def scan(filename: str, config: str, dry_run: bool, no_requirements: bool):
 @click.option("--config-file", default=None)
 @click.option("--dependencies", default=[], multiple=True)
 @click.option("--profile", default="default")
-def run(entrypoint: str, config_file: Union[str, None], dependencies: List[str], profile: str):
+def run(
+    entrypoint: str,
+    config_file: Union[str, None],
+    dependencies: List[str],
+    profile: str,
+):
     from datacustomcode.run import run_entrypoint
 
     run_entrypoint(entrypoint, config_file, dependencies, profile)
