@@ -193,7 +193,8 @@ def scan(filename: str, config: str, dry_run: bool, no_requirements: bool):
 @click.argument("entrypoint")
 @click.option("--config-file", default=None)
 @click.option("--dependencies", default=[], multiple=True)
-def run(entrypoint: str, config_file: Union[str, None], dependencies: List[str]):
+@click.option("--profile", default="default")
+def run(entrypoint: str, config_file: Union[str, None], dependencies: List[str], profile: str):
     from datacustomcode.run import run_entrypoint
 
-    run_entrypoint(entrypoint, config_file, dependencies)
+    run_entrypoint(entrypoint, config_file, dependencies, profile)

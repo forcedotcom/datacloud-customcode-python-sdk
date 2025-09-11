@@ -20,7 +20,7 @@ from datacustomcode.config import config
 
 
 def run_entrypoint(
-    entrypoint: str, config_file: Union[str, None], dependencies: List[str]
+    entrypoint: str, config_file: Union[str, None], dependencies: List[str], profile: str
 ) -> None:
     """Run the entrypoint script with the given config and dependencies.
 
@@ -28,7 +28,14 @@ def run_entrypoint(
         entrypoint: The entrypoint script to run.
         config_file: The config file to use.
         dependencies: The dependencies to import.
+        profile: The profile to use.
     """
+    if profile != "default":
+        if config.reader_config and hasattr(config.reader_config, 'options'):
+            config.reader_config.options["credentials_profile"] = profile
+        if config.writer_config and hasattr(config.writer_config, 'options'):
+            config.writer_config.options["credentials_profile"] = profile
+    
     if config_file:
         config.load(config_file)
     for dependency in dependencies:
