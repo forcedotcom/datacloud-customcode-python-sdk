@@ -35,6 +35,7 @@ def run_entrypoint(
         dependencies: The dependencies to import.
         profile: The credentials profile to use.
     """
+    add_py_folder(entrypoint)
     if profile != "default":
         if config.reader_config and hasattr(config.reader_config, "options"):
             config.reader_config.options["credentials_profile"] = profile
@@ -56,7 +57,6 @@ def run_entrypoint(
                     raise exc
             except (ModuleNotFoundError, AttributeError) as inner_exc:
                 raise inner_exc from exc
-    add_py_folder(entrypoint)
     runpy.run_path(entrypoint, init_globals=globals(), run_name="__main__")
 
 
