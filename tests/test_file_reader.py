@@ -50,16 +50,16 @@ class TestDefaultFileReader:
         assert reader.config_file == "custom_config.json"
 
     def test_file_open_with_empty_filename(self):
-        """Test that file_open raises ValueError for empty filename."""
+        """Test that read_file raises ValueError for empty filename."""
         reader = DefaultFileReader()
         with pytest.raises(ValueError, match="file_name cannot be empty"):
-            reader.file_open("")
+            reader.read_file("")
 
     def test_file_open_with_none_filename(self):
-        """Test that file_open raises ValueError for None filename."""
+        """Test that read_file raises ValueError for None filename."""
         reader = DefaultFileReader()
         with pytest.raises(ValueError, match="file_name cannot be empty"):
-            reader.file_open(None)
+            reader.read_file(None)
 
     @patch("datacustomcode.file.reader.default.DefaultFileReader._resolve_file_path")
     @patch("datacustomcode.file.reader.default.DefaultFileReader._open_file")
@@ -72,7 +72,7 @@ class TestDefaultFileReader:
         mock_open_file.return_value = mock_file_handle
 
         reader = DefaultFileReader()
-        result = reader.file_open("test.txt")
+        result = reader.read_file("test.txt")
 
         assert result == mock_file_handle
         mock_resolve_path.assert_called_once_with("test.txt")
@@ -80,24 +80,24 @@ class TestDefaultFileReader:
 
     @patch("datacustomcode.file.reader.default.DefaultFileReader._resolve_file_path")
     def test_file_open_file_not_found(self, mock_resolve_path):
-        """Test file_open when file is not found."""
+        """Test read_file when file is not found."""
         mock_resolve_path.return_value = None
 
         reader = DefaultFileReader()
         with pytest.raises(FileNotFoundError, match="File 'test.txt' not found"):
-            reader.file_open("test.txt")
+            reader.read_file("test.txt")
 
     @patch("datacustomcode.file.reader.default.DefaultFileReader._resolve_file_path")
     @patch("datacustomcode.file.reader.default.DefaultFileReader._open_file")
     def test_file_open_access_error(self, mock_open_file, mock_resolve_path):
-        """Test file_open when there's an access error."""
+        """Test read_file when there's an access error."""
         mock_path = Path("/test/path/file.txt")
         mock_resolve_path.return_value = mock_path
         mock_open_file.side_effect = PermissionError("Permission denied")
 
         reader = DefaultFileReader()
         with pytest.raises(FileAccessError, match="Error opening file"):
-            reader.file_open("test.txt")
+            reader.read_file("test.txt")
 
     def test_code_package_exists_true(self):
         """Test _code_package_exists when directory exists."""
@@ -239,7 +239,7 @@ class TestFileReaderIntegration:
                 os.chdir(temp_path)
 
                 reader = DefaultFileReader()
-                with reader.file_open("test.txt") as f:
+                with reader.read_file("test.txt") as f:
                     content = f.read()
                     assert content == "test content"
             finally:
@@ -266,7 +266,7 @@ class TestFileReaderIntegration:
                 os.chdir(temp_path)
 
                 reader = DefaultFileReader()
-                with reader.file_open("test.txt") as f:
+                with reader.read_file("test.txt") as f:
                     content = f.read()
                     assert content == "test content"
             finally:

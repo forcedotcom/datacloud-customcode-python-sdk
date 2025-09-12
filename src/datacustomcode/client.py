@@ -217,10 +217,10 @@ class Client:
         self._validate_data_layer_history_does_not_contain(DataCloudObjectType.DLO)
         return self._writer.write_to_dmo(name, dataframe, write_mode, **kwargs)
 
-    def file_open(self, file_name: str) -> io.TextIOWrapper:
+    def read_file(self, file_name: str) -> io.TextIOWrapper:
         """Read a file from the local file system."""
 
-        return self._file.file_open(file_name)
+        return self._file.read_file(file_name)
 
     def _validate_data_layer_history_does_not_contain(
         self, data_cloud_object_type: DataCloudObjectType

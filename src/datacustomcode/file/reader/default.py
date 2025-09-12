@@ -65,7 +65,7 @@ class DefaultFileReader(BaseDataAccessLayer):
         self.file_folder = file_folder or self.DEFAULT_FILE_FOLDER
         self.config_file = config_file or self.DEFAULT_CONFIG_FILE
 
-    def file_open(self, file_name: str) -> "io.TextIOWrapper":
+    def read_file(self, file_name: str) -> "io.TextIOWrapper":
         """Open a file for reading.
 
         Args:
