@@ -65,11 +65,11 @@ class Credentials:
             ) from exc
 
     @classmethod
-    def from_available(cls) -> Credentials:
+    def from_available(cls, profile: str = "default") -> Credentials:
         if os.environ.get("SFDC_USERNAME"):
             return cls.from_env()
         if os.path.exists(INI_FILE):
-            return cls.from_ini()
+            return cls.from_ini(profile=profile)
         raise ValueError(
             "Credentials not found in env or ini file. "
             "Run `datacustomcode configure` to create a credentials file."

@@ -244,3 +244,70 @@ class TestCredentials:
 
                 # Check that existing profile was not modified
                 assert mock_config["existing"]["username"] == "existing_user"
+
+    def test_from_available_with_custom_profile(self):
+        """Test that from_available uses custom profile when specified."""
+        ini_content = """
+        [default]
+        username = default_user
+        password = default_pass
+        client_id = default_client_id
+        client_secret = default_secret
+        login_url = https://default.login.url
+
+        [custom_profile]
+        username = custom_user
+        password = custom_pass
+        client_id = custom_client_id
+        client_secret = custom_secret
+        login_url = https://custom.login.url
+        """
+
+        with (
+            patch("datacustomcode.credentials.INI_FILE", "fake_path"),
+            patch("os.path.exists", return_value=True),
+            patch("builtins.open", mock_open(read_data=ini_content)),
+        ):
+            # Mock the configparser behavior for reading the file
+            mock_config = configparser.ConfigParser()
+            mock_config.read_string(ini_content)
+
+            with patch.object(configparser, "ConfigParser", return_value=mock_config):
+                # Test default profile
+                creds_default = Credentials.from_available()
+                assert creds_default.username == "default_user"
+                assert creds_default.login_url == "https://default.login.url"
+
+                # Test custom profile
+                creds_custom = Credentials.from_available(profile="custom_profile")
+                assert creds_custom.username == "custom_user"
+                assert creds_custom.password == "custom_pass"
+                assert creds_custom.client_id == "custom_client_id"
+                assert creds_custom.client_secret == "custom_secret"
+                assert creds_custom.login_url == "https://custom.login.url"
+
+    def test_from_available_fallback_to_default(self):
+        """Test that from_available falls back to default when no profile specified."""
+        ini_content = """
+        [default]
+        username = default_user
+        password = default_pass
+        client_id = default_client_id
+        client_secret = default_secret
+        login_url = https://default.login.url
+        """
+
+        with (
+            patch("datacustomcode.credentials.INI_FILE", "fake_path"),
+            patch("os.path.exists", return_value=True),
+            patch("builtins.open", mock_open(read_data=ini_content)),
+        ):
+            # Mock the configparser behavior for reading the file
+            mock_config = configparser.ConfigParser()
+            mock_config.read_string(ini_content)
+
+            with patch.object(configparser, "ConfigParser", return_value=mock_config):
+                # Test that no profile parameter defaults to "default"
+                creds = Credentials.from_available()
+                assert creds.username == "default_user"
+                assert creds.login_url == "https://default.login.url"

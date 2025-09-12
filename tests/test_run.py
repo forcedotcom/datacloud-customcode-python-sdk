@@ -96,6 +96,7 @@ def test_run_entrypoint_preserves_config(test_config_file, test_entrypoint_file)
             entrypoint=test_entrypoint_file,
             config_file=test_config_file,
             dependencies=[],
+            profile="default",
         )
 
         # Check that config was maintained
@@ -180,6 +181,7 @@ def test_run_entrypoint_with_dependencies():
             entrypoint=entrypoint_file,
             config_file=config_file,
             dependencies=[module_name],
+            profile="default",
         )
 
         # Verify dependency was imported and used

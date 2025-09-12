@@ -75,9 +75,11 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
 
     CONFIG_NAME = "QueryAPIDataCloudReader"
 
-    def __init__(self, spark: SparkSession) -> None:
+    def __init__(
+        self, spark: SparkSession, credentials_profile: str = "default"
+    ) -> None:
         self.spark = spark
-        credentials = Credentials.from_available()
+        credentials = Credentials.from_available(profile=credentials_profile)
 
         self._conn = SalesforceCDPConnection(
             credentials.login_url,

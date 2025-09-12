@@ -83,6 +83,7 @@ def zip(path: str):
 @click.option("--name", required=True)
 @click.option("--version", default="0.0.1")
 @click.option("--description", default="Custom Data Transform Code")
+@click.option("--profile", default="default")
 @click.option(
     "--cpu-size",
     default="CPU_2XL",
@@ -96,7 +97,9 @@ def zip(path: str):
 
     Choose based on your workload requirements.""",
 )
-def deploy(path: str, name: str, version: str, description: str, cpu_size: str):
+def deploy(
+    path: str, name: str, version: str, description: str, cpu_size: str, profile: str
+):
     from datacustomcode.credentials import Credentials
     from datacustomcode.deploy import TransformationJobMetadata, deploy_full
 
@@ -122,7 +125,7 @@ def deploy(path: str, name: str, version: str, description: str, cpu_size: str):
         computeType=COMPUTE_TYPES[cpu_size],
     )
     try:
-        credentials = Credentials.from_available()
+        credentials = Credentials.from_available(profile=profile)
     except ValueError as e:
         click.secho(
             f"Error: {e}",
@@ -192,7 +195,13 @@ def scan(filename: str, config: str, dry_run: bool, no_requirements: bool):
 @click.argument("entrypoint")
 @click.option("--config-file", default=None)
 @click.option("--dependencies", default=[], multiple=True)
-def run(entrypoint: str, config_file: Union[str, None], dependencies: List[str]):
+@click.option("--profile", default="default")
+def run(
+    entrypoint: str,
+    config_file: Union[str, None],
+    dependencies: List[str],
+    profile: str,
+):
     from datacustomcode.run import run_entrypoint
 
-    run_entrypoint(entrypoint, config_file, dependencies)
+    run_entrypoint(entrypoint, config_file, dependencies, profile)
