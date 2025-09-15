@@ -115,7 +115,7 @@ class DefaultFileReader(BaseDataAccessLayer):
             if file_path.exists():
                 return file_path
 
-        return None
+        return Path(file_name)
 
     def _code_package_exists(self) -> bool:
         """Check if the default code package directory exists.
