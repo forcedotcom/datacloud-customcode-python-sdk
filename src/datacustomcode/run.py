@@ -13,7 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import importlib
+from pathlib import Path
 import runpy
+import sys
 from typing import List, Union
 
 from datacustomcode.config import config
@@ -31,8 +33,9 @@ def run_entrypoint(
         entrypoint: The entrypoint script to run.
         config_file: The config file to use.
         dependencies: The dependencies to import.
-        profile: The profile to use.
+        profile: The credentials profile to use.
     """
+    add_py_folder(entrypoint)
     if profile != "default":
         if config.reader_config and hasattr(config.reader_config, "options"):
             config.reader_config.options["credentials_profile"] = profile
@@ -55,3 +58,11 @@ def run_entrypoint(
             except (ModuleNotFoundError, AttributeError) as inner_exc:
                 raise inner_exc from exc
     runpy.run_path(entrypoint, init_globals=globals(), run_name="__main__")
+
+
+def add_py_folder(entrypoint: str):
+    default_py_folder = "py-files"  # Hardcoded folder name
+    cwd = Path.cwd().joinpath(entrypoint)
+    py_folder = cwd.parent.joinpath(default_py_folder)
+
+    sys.path.append(str(py_folder))
