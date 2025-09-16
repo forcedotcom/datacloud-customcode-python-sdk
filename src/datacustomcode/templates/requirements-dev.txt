@@ -1,6 +1,6 @@
 # Required packages for the project - Do not modify
 salesforce-cdp-connector>=1.0.16
-pyspark
+pyspark==3.5.1
 pandas
 numpy
 pydantic
