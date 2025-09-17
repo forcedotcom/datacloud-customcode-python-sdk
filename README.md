@@ -209,6 +209,7 @@ Argument:
 Options:
 - `--config-file TEXT`: Path to configuration file
 - `--dependencies TEXT`: Additional dependencies (can be specified multiple times)
+- `--profile TEXT`: Credential profile name (default: "default")
 
 
 #### `datacustomcode zip`
