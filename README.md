@@ -104,6 +104,17 @@ The SDK automatically handles all dependency packaging for Data Cloud deployment
 
 **No need to worry about platform compatibility** - the SDK handles this automatically through the Docker-based packaging process.
 
+## files directory
+
+```
+.
+├── payload
+│   ├── config.json
+│   ├── entrypoint.py
+├── files
+│   ├── data.csv
+```
+
 ## py-files directory
 
 Your Python dependencies can be packaged as .py files, .zip archives (containing multiple .py files or a Python package structure), or .egg files.
