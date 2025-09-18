@@ -16,31 +16,30 @@
 import os
 from pathlib import Path
 import tempfile
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
-from datacustomcode.file.reader.default import (
-    DefaultFileReader,
-    FileAccessError,
+from datacustomcode.file.path.default import (
+    DefaultFindFilePath,
     FileNotFoundError,
     FileReaderError,
 )
 
 
-class TestDefaultFileReader:
-    """Test cases for the DefaultFileReader class."""
+class TestDefaultFindFilePath:
+    """Test cases for the DefaultFindFilePath class."""
 
     def test_init_with_defaults(self):
         """Test initialization with default values."""
-        reader = DefaultFileReader()
+        reader = DefaultFindFilePath()
         assert reader.code_package == "payload"
         assert reader.file_folder == "files"
         assert reader.config_file == "config.json"
 
     def test_init_with_custom_values(self):
         """Test initialization with custom values."""
-        reader = DefaultFileReader(
+        reader = DefaultFindFilePath(
             code_package="custom_package",
             file_folder="custom_files",
             config_file="custom_config.json",
@@ -51,79 +50,63 @@ class TestDefaultFileReader:
 
     def test_file_open_with_empty_filename(self):
         """Test that read_file raises ValueError for empty filename."""
-        reader = DefaultFileReader()
+        reader = DefaultFindFilePath()
         with pytest.raises(ValueError, match="file_name cannot be empty"):
-            reader.read_file("")
+            reader.find_file_path("")
 
     def test_file_open_with_none_filename(self):
         """Test that read_file raises ValueError for None filename."""
-        reader = DefaultFileReader()
+        reader = DefaultFindFilePath()
         with pytest.raises(ValueError, match="file_name cannot be empty"):
-            reader.read_file(None)
+            reader.find_file_path(None)
 
-    @patch("datacustomcode.file.reader.default.DefaultFileReader._resolve_file_path")
-    @patch("datacustomcode.file.reader.default.DefaultFileReader._open_file")
-    def test_file_open_success(self, mock_open_file, mock_resolve_path):
-        """Test successful file opening."""
+    @patch("datacustomcode.file.path.default.DefaultFindFilePath._resolve_file_path")
+    def test_file_open_success(self, mock_resolve_path):
+        """Test successful file path finding."""
         mock_path = Path("/test/path/file.txt")
-        mock_file_handle = Mock()
 
         mock_resolve_path.return_value = mock_path
-        mock_open_file.return_value = mock_file_handle
 
-        reader = DefaultFileReader()
-        result = reader.read_file("test.txt")
+        reader = DefaultFindFilePath()
+        result = reader.find_file_path("test.txt")
 
-        assert result == mock_file_handle
+        assert result == mock_path
         mock_resolve_path.assert_called_once_with("test.txt")
-        mock_open_file.assert_called_once_with(mock_path)
 
-    @patch("datacustomcode.file.reader.default.DefaultFileReader._resolve_file_path")
+    @patch("datacustomcode.file.path.default.DefaultFindFilePath._resolve_file_path")
     def test_file_open_file_not_found(self, mock_resolve_path):
-        """Test read_file when file is not found."""
+        """Test find_file_path when file is not found."""
         mock_resolve_path.return_value = None
 
-        reader = DefaultFileReader()
+        reader = DefaultFindFilePath()
         with pytest.raises(FileNotFoundError, match="File 'test.txt' not found"):
-            reader.read_file("test.txt")
-
-    @patch("datacustomcode.file.reader.default.DefaultFileReader._resolve_file_path")
-    @patch("datacustomcode.file.reader.default.DefaultFileReader._open_file")
-    def test_file_open_access_error(self, mock_open_file, mock_resolve_path):
-        """Test read_file when there's an access error."""
-        mock_path = Path("/test/path/file.txt")
-        mock_resolve_path.return_value = mock_path
-        mock_open_file.side_effect = PermissionError("Permission denied")
-
-        reader = DefaultFileReader()
-        with pytest.raises(FileAccessError, match="Error opening file"):
-            reader.read_file("test.txt")
+            reader.find_file_path("test.txt")
 
     def test_code_package_exists_true(self):
         """Test _code_package_exists when directory exists."""
         with patch("os.path.exists", return_value=True):
-            reader = DefaultFileReader()
+            reader = DefaultFindFilePath()
             assert reader._code_package_exists() is True
 
     def test_code_package_exists_false(self):
         """Test _code_package_exists when directory doesn't exist."""
         with patch("os.path.exists", return_value=False):
-            reader = DefaultFileReader()
+            reader = DefaultFindFilePath()
             assert reader._code_package_exists() is False
 
     def test_get_code_package_file_path(self):
         """Test _get_code_package_file_path."""
-        reader = DefaultFileReader()
+        reader = DefaultFindFilePath()
         result = reader._get_code_package_file_path("test.txt")
-        expected = Path.cwd().joinpath("payload", "files", "test.txt")
+        expected = Path("payload/files/test.txt")
         assert result == expected
 
     def test_get_config_based_file_path(self):
         """Test _get_config_based_file_path."""
-        reader = DefaultFileReader()
+        reader = DefaultFindFilePath()
         config_path = Path("/test/config.json")
         result = reader._get_config_based_file_path("test.txt", config_path)
-        expected = Path("/test/files/test.txt")
+        expected = Path("files/test.txt")
         assert result == expected
 
     def test_find_file_in_tree_found(self):
@@ -133,7 +116,7 @@ class TestDefaultFileReader:
             test_file = temp_path / "test.txt"
             test_file.write_text("test content")
 
-            reader = DefaultFileReader()
+            reader = DefaultFindFilePath()
             result = reader._find_file_in_tree("test.txt", temp_path)
 
             assert result == test_file
@@ -143,83 +126,15 @@ class TestDefaultFileReader:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
-            reader = DefaultFileReader()
+            reader = DefaultFindFilePath()
             result = reader._find_file_in_tree("nonexistent.txt", temp_path)
 
             assert result is None
 
-    def test_open_file(self):
-        """Test _open_file method."""
-        reader = DefaultFileReader()
-
-        with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
-            temp_file.write("test content")
-            temp_file_path = Path(temp_file.name)
-
-        try:
-            with reader._open_file(temp_file_path) as f:
-                content = f.read()
-                assert content == "test content"
-        finally:
-            os.unlink(temp_file_path)
-
-    def test_get_search_locations_with_code_package(self):
-        """Test get_search_locations when code package exists."""
-        with patch(
-            "datacustomcode.file.reader.default.DefaultFileReader._code_package_exists",
-            return_value=True,
-        ):
-            with patch(
-                "datacustomcode.file.reader.default.DefaultFileReader._find_config_file",
-                return_value=None,
-            ):
-                reader = DefaultFileReader()
-                locations = reader.get_search_locations()
-
-                assert len(locations) == 1
-                expected = Path.cwd().joinpath("payload", "files")
-                assert locations[0] == expected
-
-    def test_get_search_locations_with_config(self):
-        """Test get_search_locations when config file exists."""
-        with patch(
-            "datacustomcode.file.reader.default.DefaultFileReader._code_package_exists",
-            return_value=False,
-        ):
-            with patch(
-                "datacustomcode.file.reader.default.DefaultFileReader._find_config_file",
-                return_value=Path("/test/config.json"),
-            ):
-                reader = DefaultFileReader()
-                locations = reader.get_search_locations()
-
-                assert len(locations) == 1
-                expected = Path("/test/files")
-                assert locations[0] == expected
-
-    def test_get_search_locations_both(self):
-        """Test get_search_locations when both locations exist."""
-        with patch(
-            "datacustomcode.file.reader.default.DefaultFileReader._code_package_exists",
-            return_value=True,
-        ):
-            with patch(
-                "datacustomcode.file.reader.default.DefaultFileReader._find_config_file",
-                return_value=Path("/test/config.json"),
-            ):
-                reader = DefaultFileReader()
-                locations = reader.get_search_locations()
-
-                assert len(locations) == 2
-                expected_code_package = Path.cwd().joinpath("payload", "files")
-                expected_config = Path("/test/files")
-                assert locations[0] == expected_code_package
-                assert locations[1] == expected_config
-
     def test_resolve_file_path_returns_filename_when_not_found(self):
-        """Test _resolve_file_path returns Path(file_name)
+        """Test _resolve_file_path returns relative path with file folder
         when file not found in any location."""
-        reader = DefaultFileReader()
+        reader = DefaultFindFilePath()
 
         # Mock both code package and config file to not exist or not contain the file
         with (
@@ -236,9 +151,9 @@ class TestDefaultFileReader:
     def test_file_path_returns_filename_when_code_package_exists_file_not_found(
         self,
     ):
-        """Test _resolve_file_path returns Path(file_name)
+        """Test _resolve_file_path returns relative path with file folder
         when code package exists but file not found."""
-        reader = DefaultFileReader()
+        reader = DefaultFindFilePath()
 
         # Mock code package exists but file doesn't exist in it
         with (
@@ -260,9 +175,9 @@ class TestDefaultFileReader:
     def test_file_path_returns_filename_when_config_file_exists_file_not_found(
         self,
     ):
-        """Test _resolve_file_path returns Path(file_name)
+        """Test _resolve_file_path returns relative path with file folder
         when config file exists but file not found."""
-        reader = DefaultFileReader()
+        reader = DefaultFindFilePath()
 
         # Mock code package doesn't exist but config file exists
         with (
@@ -308,10 +223,10 @@ class TestFileReaderIntegration:
             try:
                 os.chdir(temp_path)
 
-                reader = DefaultFileReader()
-                with reader.read_file("test.txt") as f:
-                    content = f.read()
-                    assert content == "test content"
+                reader = DefaultFindFilePath()
+                file_path = reader.find_file_path("test.txt")
+                content = file_path.read_text()
+                assert content == "test content"
             finally:
                 os.chdir(original_cwd)
 
@@ -335,10 +250,10 @@ class TestFileReaderIntegration:
             try:
                 os.chdir(temp_path)
 
-                reader = DefaultFileReader()
-                with reader.read_file("test.txt") as f:
-                    content = f.read()
-                    assert content == "test content"
+                reader = DefaultFindFilePath()
+                file_path = reader.find_file_path("test.txt")
+                content = file_path.read_text()
+                assert content == "test content"
             finally:
                 os.chdir(original_cwd)
 
@@ -349,15 +264,8 @@ class TestFileReaderErrorHandling:
     def test_file_reader_error_inheritance(self):
         """Test that FileReaderError is the base exception."""
         assert issubclass(FileNotFoundError, FileReaderError)
-        assert issubclass(FileAccessError, FileReaderError)
 
     def test_file_not_found_error_message(self):
         """Test FileNotFoundError message formatting."""
         error = FileNotFoundError("test.txt")
         assert "test.txt" in str(error)
-
-    def test_file_access_error_message(self):
-        """Test FileAccessError message formatting."""
-        error = FileAccessError("test.txt", "Permission denied")
-        assert "test.txt" in str(error)
-        assert "Permission denied" in str(error)

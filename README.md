@@ -135,7 +135,7 @@ Your Python dependencies can be packaged as .py files, .zip archives (containing
 Your entry point script will define logic using the `Client` object which wraps data access layers.
 
 You should only need the following methods:
-* `read_file(file_name)` - Returns a file handle of the provided file_name
+* `find_file_path(file_name)` - Returns a file path
 * `read_dlo(name)` – Read from a Data Lake Object by name
 * `read_dmo(name)` – Read from a Data Model Object by name
 * `write_to_dlo(name, spark_dataframe, write_mode)` – Write to a Data Model Object by name with a Spark dataframe
