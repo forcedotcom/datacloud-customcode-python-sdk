@@ -104,6 +104,17 @@ The SDK automatically handles all dependency packaging for Data Cloud deployment
 
 **No need to worry about platform compatibility** - the SDK handles this automatically through the Docker-based packaging process.
 
+## files directory
+
+```
+.
+├── payload
+│   ├── config.json
+│   ├── entrypoint.py
+├── files
+│   ├── data.csv
+```
+
 ## py-files directory
 
 Your Python dependencies can be packaged as .py files, .zip archives (containing multiple .py files or a Python package structure), or .egg files.
@@ -124,6 +135,7 @@ Your Python dependencies can be packaged as .py files, .zip archives (containing
 Your entry point script will define logic using the `Client` object which wraps data access layers.
 
 You should only need the following methods:
+* `find_file_path(file_name)` - Returns a file path
 * `read_dlo(name)` – Read from a Data Lake Object by name
 * `read_dmo(name)` – Read from a Data Model Object by name
 * `write_to_dlo(name, spark_dataframe, write_mode)` – Write to a Data Model Object by name with a Spark dataframe
@@ -197,6 +209,7 @@ Argument:
 Options:
 - `--config-file TEXT`: Path to configuration file
 - `--dependencies TEXT`: Additional dependencies (can be specified multiple times)
+- `--profile TEXT`: Credential profile name (default: "default")
 
 
 #### `datacustomcode zip`

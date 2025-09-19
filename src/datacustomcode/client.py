@@ -24,9 +24,12 @@ from typing import (
 from pyspark.sql import SparkSession
 
 from datacustomcode.config import SparkConfig, config
+from datacustomcode.file.path.default import DefaultFindFilePath
 from datacustomcode.io.reader.base import BaseDataCloudReader
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from pyspark.sql import DataFrame as PySparkDataFrame
 
     from datacustomcode.io.reader.base import BaseDataCloudReader
@@ -100,11 +103,13 @@ class Client:
     writing, we print to the console instead of writing to Data Cloud.
 
     Args:
+        finder: Find a file path
         reader: A custom reader to use for reading Data Cloud objects.
         writer: A custom writer to use for writing Data Cloud objects.
 
     Example:
     >>> client = Client()
+    >>> file_path = client.find_file_path("data.csv")
     >>> dlo = client.read_dlo("my_dlo")
     >>> client.write_to_dmo("my_dmo", dlo)
     """
@@ -112,6 +117,7 @@ class Client:
     _instance: ClassVar[Optional[Client]] = None
     _reader: BaseDataCloudReader
     _writer: BaseDataCloudWriter
+    _file: DefaultFindFilePath
     _data_layer_history: dict[DataCloudObjectType, set[str]]
 
     def __new__(
@@ -154,6 +160,7 @@ class Client:
                 writer_init = writer
             cls._instance._reader = reader_init
             cls._instance._writer = writer_init
+            cls._instance._file = DefaultFindFilePath()
             cls._instance._data_layer_history = {
                 DataCloudObjectType.DLO: set(),
                 DataCloudObjectType.DMO: set(),
@@ -211,6 +218,11 @@ class Client:
         """
         self._validate_data_layer_history_does_not_contain(DataCloudObjectType.DLO)
         return self._writer.write_to_dmo(name, dataframe, write_mode, **kwargs)
+
+    def find_file_path(self, file_name: str) -> Path:
+        """Return a file path"""
+
+        return self._file.find_file_path(file_name)
 
     def _validate_data_layer_history_does_not_contain(
         self, data_cloud_object_type: DataCloudObjectType
