@@ -148,7 +148,6 @@ class DefaultFindFilePath(BaseDataAccessLayer):
         """
         relative_path = f"{self.file_folder}/{file_name}"
         return Path(relative_path)
-        # return config_path.parent.joinpath(relative_path)
 
     def _find_file_in_tree(self, filename: str, search_path: Path) -> Optional[Path]:
         """Find a file within a directory tree.

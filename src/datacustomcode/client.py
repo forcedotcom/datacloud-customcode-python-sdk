@@ -220,7 +220,7 @@ class Client:
         return self._writer.write_to_dmo(name, dataframe, write_mode, **kwargs)
 
     def find_file_path(self, file_name: str) -> Path:
-        """Read a file from the local file system."""
+        """Return a file path"""
 
         return self._file.find_file_path(file_name)
 
