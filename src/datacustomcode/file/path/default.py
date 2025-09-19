@@ -75,7 +75,7 @@ class DefaultFindFilePath(BaseDataAccessLayer):
 
         file_path = self._resolve_file_path(file_name)
 
-        if not file_path:
+        if not file_path.exists():
             raise FileNotFoundError(
                 f"File '{file_name}' not found in any search location"
             )
@@ -126,7 +126,6 @@ class DefaultFindFilePath(BaseDataAccessLayer):
         """
         relative_path = f"{self.code_package}/{self.file_folder}/{file_name}"
         return Path(relative_path)
-        # return Path.cwd().joinpath(relative_path)
 
     def _find_config_file(self) -> Optional[Path]:
         """Find the configuration file in the current directory tree.
