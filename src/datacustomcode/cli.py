@@ -71,11 +71,12 @@ def configure(
 
 @cli.command()
 @click.argument("path", default="payload")
-def zip(path: str):
+@click.option("--network", default="default")
+def zip(path: str, network: str):
     from datacustomcode.deploy import zip
 
     logger.debug("Zipping project")
-    zip(path)
+    zip(path, network)
 
 
 @cli.command()
@@ -84,6 +85,7 @@ def zip(path: str):
 @click.option("--version", default="0.0.1")
 @click.option("--description", default="Custom Data Transform Code")
 @click.option("--profile", default="default")
+@click.option("--network", default="default")
 @click.option(
     "--cpu-size",
     default="CPU_2XL",
@@ -98,7 +100,13 @@ def zip(path: str):
     Choose based on your workload requirements.""",
 )
 def deploy(
-    path: str, name: str, version: str, description: str, cpu_size: str, profile: str
+    path: str,
+    name: str,
+    version: str,
+    description: str,
+    cpu_size: str,
+    profile: str,
+    network: str
 ):
     from datacustomcode.credentials import Credentials
     from datacustomcode.deploy import TransformationJobMetadata, deploy_full
@@ -132,7 +140,7 @@ def deploy(
             fg="red",
         )
         raise click.Abort() from None
-    deploy_full(path, metadata, credentials)
+    deploy_full(path, metadata, credentials, network)
 
 
 @cli.command()

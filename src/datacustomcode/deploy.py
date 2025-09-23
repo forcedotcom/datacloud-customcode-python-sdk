@@ -163,27 +163,20 @@ DEPENDENCIES_ARCHIVE_PATH = os.path.join(
 ZIP_FILE_NAME = "deployment.zip"
 
 
-def prepare_dependency_archive(directory: str) -> None:
+def prepare_dependency_archive(directory: str, docker_network: str) -> None:
     cmd = f"docker images -q {DOCKER_IMAGE_NAME}"
     image_exists = cmd_output(cmd)
 
     if not image_exists:
-        logger.info("Building docker image...")
-        cmd = (
-            f"{PLATFORM_ENV_VAR} docker build -t {DOCKER_IMAGE_NAME} "
-            f"-f Dockerfile.dependencies ."
-        )
+        logger.info(f"Building docker image with docker network: {docker_network}...")
+        cmd = docker_build_cmd(docker_network)
         cmd_output(cmd)
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        logger.info("Building dependencies archive")
+        logger.info(f"Building dependencies archive with docker network: {docker_network}")
         shutil.copy("requirements.txt", temp_dir)
         shutil.copy("build_native_dependencies.sh", temp_dir)
-        cmd = (
-            f"{PLATFORM_ENV_VAR} docker run --rm "
-            f"-v {temp_dir}:/workspace "
-            f"{DOCKER_IMAGE_NAME}"
-        )
+        cmd = docker_run_cmd(docker_network, temp_dir)
         cmd_output(cmd)
         archives_temp_path = os.path.join(temp_dir, DEPENDENCIES_ARCHIVE_FULL_NAME)
         os.makedirs(os.path.dirname(DEPENDENCIES_ARCHIVE_PATH), exist_ok=True)
@@ -191,6 +184,28 @@ def prepare_dependency_archive(directory: str) -> None:
 
         logger.info(f"Dependencies archived to {DEPENDENCIES_ARCHIVE_PATH}")
 
+def docker_build_cmd(network: str) -> str:
+    cmd = (
+            f"{PLATFORM_ENV_VAR} docker build -t {DOCKER_IMAGE_NAME} "
+            f"--file Dockerfile.dependencies . "
+        )
+
+    if network != "default":
+        cmd = cmd + f"--network {network}"
+    logger.debug(f"Docker build command: {cmd}")
+    return cmd
+        
+def docker_run_cmd(network: str, temp_dir) -> str:
+    cmd = (
+            f"{PLATFORM_ENV_VAR} docker run --rm "
+            f"-v {temp_dir}:/workspace "
+            f"{DOCKER_IMAGE_NAME} "
+        )
+    
+    if network != "default":
+        cmd = cmd + f"--network {network} "
+    logger.debug(f"Docker run command: {cmd}")
+    return cmd
 
 class DeploymentsResponse(BaseModel):
     deploymentStatus: str
@@ -366,13 +381,14 @@ def upload_zip(file_upload_url: str) -> None:
 
 def zip(
     directory: str,
+    docker_network: str,
 ):
     # Create a zip file excluding .DS_Store files
     import zipfile
 
     # prepare payload only if requirements.txt is non-empty
     if has_nonempty_requirements_file(directory):
-        prepare_dependency_archive(directory)
+        prepare_dependency_archive(directory, docker_network)
     else:
         logger.info(
             f"Skipping dependency archive: requirements.txt is missing or empty "
@@ -396,6 +412,7 @@ def deploy_full(
     directory: str,
     metadata: TransformationJobMetadata,
     credentials: Credentials,
+    docker_network: str,
     callback=None,
 ) -> AccessTokenResponse:
     """Deploy a data transform in the DataCloud."""
@@ -406,7 +423,7 @@ def deploy_full(
 
     # create deployment and upload payload
     deployment = create_deployment(access_token, metadata)
-    zip(directory)
+    zip(directory, docker_network)
     upload_zip(deployment.fileUploadUrl)
     wait_for_deployment(access_token, metadata, callback)
 
