@@ -217,6 +217,7 @@ Zip a transformation job in preparation to upload to Data Cloud.
 
 Options:
 - `--path TEXT`: Path to the code directory (default: ".")
+- `--network TEXT`: docker network (default: "default")
 
 
 #### `datacustomcode deploy`
@@ -228,6 +229,7 @@ Options:
 - `--name TEXT`: Name of the transformation job [required]
 - `--version TEXT`: Version of the transformation job (default: "0.0.1")
 - `--description TEXT`: Description of the transformation job (default: "")
+- `--network TEXT`: docker network (default: "default")
 - `--cpu-size TEXT`: CPU size for the deployment (default: "CPU_XL"). Available options: CPU_L(Large), CPU_XL(Extra Large), CPU_2XL(2X Large), CPU_4XL(4X Large)
 
 
