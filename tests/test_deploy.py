@@ -2,7 +2,6 @@
 
 from unittest.mock import (
     MagicMock,
-    call,
     mock_open,
     patch,
 )
@@ -46,12 +45,12 @@ class TestPrepareDependencyArchive:
     )
     EXPECTED_BUILD_CMD = (
         "DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build "
-        "-t datacloud-custom-code-dependency-builder -f Dockerfile.dependencies ."
+        "-t datacloud-custom-code-dependency-builder -f Dockerfile.dependencies . "
     )
     EXPECTED_DOCKER_RUN_CMD = (
         "DOCKER_DEFAULT_PLATFORM=linux/amd64 docker run --rm "
         "-v /tmp/test_dir:/workspace "
-        "datacloud-custom-code-dependency-builder"
+        "datacloud-custom-code-dependency-builder "
     )
 
     @patch("datacustomcode.deploy.cmd_output")
@@ -59,8 +58,17 @@ class TestPrepareDependencyArchive:
     @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
     @patch("datacustomcode.deploy.os.path.join")
     @patch("datacustomcode.deploy.os.makedirs")
+    @patch("datacustomcode.deploy.docker_build_cmd")
+    @patch("datacustomcode.deploy.docker_run_cmd")
     def test_prepare_dependency_archive_image_exists(
-        self, mock_makedirs, mock_join, mock_temp_dir, mock_copy, mock_cmd_output
+        self,
+        mock_docker_run_cmd,
+        mock_docker_build_cmd,
+        mock_makedirs,
+        mock_join,
+        mock_temp_dir,
+        mock_copy,
+        mock_cmd_output,
     ):
         """Test prepare_dependency_archive when Docker image already exists."""
         # Mock the temporary directory context manager
@@ -75,20 +83,25 @@ class TestPrepareDependencyArchive:
         # Mock os.path.join for archive path
         mock_join.return_value = "/tmp/test_dir/native_dependencies.tar.gz"
 
-        prepare_dependency_archive("/test/dir")
+        # Mock the docker command functions
+        mock_docker_build_cmd.return_value = "mock build command"
+        mock_docker_run_cmd.return_value = "mock run command"
+
+        prepare_dependency_archive("/test/dir", "default")
 
         # Verify docker images command was called
         mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_IMAGES_CMD)
 
         # Verify docker build command was not called (since image already exists)
-        assert call(self.EXPECTED_BUILD_CMD) not in mock_cmd_output.call_args_list
+        mock_docker_build_cmd.assert_not_called()
 
         # Verify files were copied to temp directory
         mock_copy.assert_any_call("requirements.txt", "/tmp/test_dir")
         mock_copy.assert_any_call("build_native_dependencies.sh", "/tmp/test_dir")
 
         # Verify docker run command was called
-        mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_RUN_CMD)
+        mock_docker_run_cmd.assert_called_once_with("default", "/tmp/test_dir")
+        mock_cmd_output.assert_any_call("mock run command")
 
         # Verify archives directory was created
         mock_makedirs.assert_called_once_with("payload/archives", exist_ok=True)
@@ -104,8 +117,17 @@ class TestPrepareDependencyArchive:
     @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
     @patch("datacustomcode.deploy.os.path.join")
     @patch("datacustomcode.deploy.os.makedirs")
+    @patch("datacustomcode.deploy.docker_build_cmd")
+    @patch("datacustomcode.deploy.docker_run_cmd")
     def test_prepare_dependency_archive_build_image(
-        self, mock_makedirs, mock_join, mock_temp_dir, mock_copy, mock_cmd_output
+        self,
+        mock_docker_run_cmd,
+        mock_docker_build_cmd,
+        mock_makedirs,
+        mock_join,
+        mock_temp_dir,
+        mock_copy,
+        mock_cmd_output,
     ):
         """Test prepare_dependency_archive when Docker image needs to be built."""
         # Mock the temporary directory context manager
@@ -121,20 +143,26 @@ class TestPrepareDependencyArchive:
         # Mock os.path.join for archive path
         mock_join.return_value = "/tmp/test_dir/native_dependencies.tar.gz"
 
-        prepare_dependency_archive("/test/dir")
+        # Mock the docker command functions
+        mock_docker_build_cmd.return_value = "mock build command"
+        mock_docker_run_cmd.return_value = "mock run command"
+
+        prepare_dependency_archive("/test/dir", "default")
 
         # Verify docker images command was called
         mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_IMAGES_CMD)
 
         # Verify docker build command was called
-        mock_cmd_output.assert_any_call(self.EXPECTED_BUILD_CMD)
+        mock_docker_build_cmd.assert_called_once_with("default")
+        mock_cmd_output.assert_any_call("mock build command")
 
         # Verify files were copied to temp directory
         mock_copy.assert_any_call("requirements.txt", "/tmp/test_dir")
         mock_copy.assert_any_call("build_native_dependencies.sh", "/tmp/test_dir")
 
         # Verify docker run command was called
-        mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_RUN_CMD)
+        mock_docker_run_cmd.assert_called_once_with("default", "/tmp/test_dir")
+        mock_cmd_output.assert_any_call("mock run command")
 
         # Verify archives directory was created
         mock_makedirs.assert_called_once_with("payload/archives", exist_ok=True)
@@ -150,8 +178,17 @@ class TestPrepareDependencyArchive:
     @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
     @patch("datacustomcode.deploy.os.path.join")
     @patch("datacustomcode.deploy.os.makedirs")
+    @patch("datacustomcode.deploy.docker_build_cmd")
+    @patch("datacustomcode.deploy.docker_run_cmd")
     def test_prepare_dependency_archive_docker_build_failure(
-        self, mock_makedirs, mock_join, mock_temp_dir, mock_copy, mock_cmd_output
+        self,
+        mock_docker_run_cmd,
+        mock_docker_build_cmd,
+        mock_makedirs,
+        mock_join,
+        mock_temp_dir,
+        mock_copy,
+        mock_cmd_output,
     ):
         """Test prepare_dependency_archive when Docker build fails."""
         # Mock the temporary directory context manager
@@ -171,21 +208,30 @@ class TestPrepareDependencyArchive:
         ]
 
         with pytest.raises(CalledProcessError, match="Build failed"):
-            prepare_dependency_archive("/test/dir")
+            prepare_dependency_archive("/test/dir", "default")
 
         # Verify docker images command was called
         mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_IMAGES_CMD)
 
         # Verify docker build command was called
-        mock_cmd_output.assert_any_call(self.EXPECTED_BUILD_CMD)
+        mock_docker_build_cmd.assert_called_once_with("default")
 
     @patch("datacustomcode.deploy.cmd_output")
     @patch("datacustomcode.deploy.shutil.copy")
     @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
     @patch("datacustomcode.deploy.os.path.join")
     @patch("datacustomcode.deploy.os.makedirs")
+    @patch("datacustomcode.deploy.docker_build_cmd")
+    @patch("datacustomcode.deploy.docker_run_cmd")
     def test_prepare_dependency_archive_docker_run_failure(
-        self, mock_makedirs, mock_join, mock_temp_dir, mock_copy, mock_cmd_output
+        self,
+        mock_docker_run_cmd,
+        mock_docker_build_cmd,
+        mock_makedirs,
+        mock_join,
+        mock_temp_dir,
+        mock_copy,
+        mock_cmd_output,
     ):
         """Test prepare_dependency_archive when Docker run fails."""
         # Mock the temporary directory context manager
@@ -205,7 +251,7 @@ class TestPrepareDependencyArchive:
         ]
 
         with pytest.raises(CalledProcessError, match="Run failed"):
-            prepare_dependency_archive("/test/dir")
+            prepare_dependency_archive("/test/dir", "default")
 
         # Verify docker images command was called
         mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_IMAGES_CMD)
@@ -215,15 +261,24 @@ class TestPrepareDependencyArchive:
         mock_copy.assert_any_call("build_native_dependencies.sh", "/tmp/test_dir")
 
         # Verify docker run command was called
-        mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_RUN_CMD)
+        mock_docker_run_cmd.assert_called_once_with("default", "/tmp/test_dir")
 
     @patch("datacustomcode.deploy.cmd_output")
     @patch("datacustomcode.deploy.shutil.copy")
     @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
     @patch("datacustomcode.deploy.os.path.join")
     @patch("datacustomcode.deploy.os.makedirs")
+    @patch("datacustomcode.deploy.docker_build_cmd")
+    @patch("datacustomcode.deploy.docker_run_cmd")
     def test_prepare_dependency_archive_file_copy_failure(
-        self, mock_makedirs, mock_join, mock_temp_dir, mock_copy, mock_cmd_output
+        self,
+        mock_docker_run_cmd,
+        mock_docker_build_cmd,
+        mock_makedirs,
+        mock_join,
+        mock_temp_dir,
+        mock_copy,
+        mock_cmd_output,
     ):
         """Test prepare_dependency_archive when file copy fails."""
         # Mock the temporary directory context manager
@@ -239,7 +294,7 @@ class TestPrepareDependencyArchive:
         mock_copy.side_effect = FileNotFoundError("File not found")
 
         with pytest.raises(FileNotFoundError, match="File not found"):
-            prepare_dependency_archive("/test/dir")
+            prepare_dependency_archive("/test/dir", "default")
 
         # Verify docker images command was called
         mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_IMAGES_CMD)
@@ -494,10 +549,10 @@ class TestZip:
             ("/test/dir/subdir", [], ["file3.py"]),
         ]
 
-        zip("/test/dir")
+        zip("/test/dir", "default")
 
         mock_has_requirements.assert_called_once_with("/test/dir")
-        mock_prepare.assert_called_once_with("/test/dir")
+        mock_prepare.assert_called_once_with("/test/dir", "default")
         mock_zipfile.assert_called_once_with(
             "deployment.zip", "w", zipfile.ZIP_DEFLATED
         )
@@ -522,7 +577,7 @@ class TestZip:
             ("/test/dir/subdir", [], ["file3.py"]),
         ]
 
-        zip("/test/dir")
+        zip("/test/dir", "default")
 
         mock_has_requirements.assert_called_once_with("/test/dir")
         mock_prepare.assert_not_called()
@@ -797,13 +852,13 @@ class TestDeployFull:
         )
 
         # Call function
-        result = deploy_full("/test/dir", metadata, credentials, callback)
+        result = deploy_full("/test/dir", metadata, credentials, "default", callback)
 
         # Assertions
         mock_retrieve_token.assert_called_once_with(credentials)
         mock_verify_config.assert_called_once_with("/test/dir")
         mock_create_deployment.assert_called_once_with(access_token, metadata)
-        mock_zip.assert_called_once_with("/test/dir")
+        mock_zip.assert_called_once_with("/test/dir", "default")
         mock_upload_zip.assert_called_once_with("https://upload.example.com")
         mock_wait.assert_called_once_with(access_token, metadata, callback)
         mock_create_transform.assert_called_once_with(
@@ -883,13 +938,13 @@ class TestDeployFullWithDockerIntegration:
         mock_has_requirements.return_value = True
 
         # Call function
-        result = deploy_full("/test/dir", metadata, credentials, callback)
+        result = deploy_full("/test/dir", metadata, credentials, "default", callback)
 
         # Assertions
         mock_retrieve_token.assert_called_once_with(credentials)
         mock_verify_config.assert_called_once_with("/test/dir")
         mock_create_deployment.assert_called_once_with(access_token, metadata)
-        mock_zip.assert_called_once_with("/test/dir")
+        mock_zip.assert_called_once_with("/test/dir", "default")
         mock_upload_zip.assert_called_once_with("https://upload.example.com")
         mock_wait.assert_called_once_with(access_token, metadata, callback)
         mock_create_transform.assert_called_once_with(
