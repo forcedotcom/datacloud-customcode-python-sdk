@@ -173,7 +173,9 @@ def prepare_dependency_archive(directory: str, docker_network: str) -> None:
         cmd_output(cmd)
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        logger.info(f"Building dependencies archive with docker network: {docker_network}")
+        logger.info(
+            f"Building dependencies archive with docker network: {docker_network}"
+        )
         shutil.copy("requirements.txt", temp_dir)
         shutil.copy("build_native_dependencies.sh", temp_dir)
         cmd = docker_run_cmd(docker_network, temp_dir)
@@ -184,28 +186,31 @@ def prepare_dependency_archive(directory: str, docker_network: str) -> None:
 
         logger.info(f"Dependencies archived to {DEPENDENCIES_ARCHIVE_PATH}")
 
+
 def docker_build_cmd(network: str) -> str:
     cmd = (
-            f"{PLATFORM_ENV_VAR} docker build -t {DOCKER_IMAGE_NAME} "
-            f"--file Dockerfile.dependencies . "
-        )
+        f"{PLATFORM_ENV_VAR} docker build -t {DOCKER_IMAGE_NAME} "
+        f"--file Dockerfile.dependencies . "
+    )
 
     if network != "default":
         cmd = cmd + f"--network {network}"
     logger.debug(f"Docker build command: {cmd}")
     return cmd
-        
+
+
 def docker_run_cmd(network: str, temp_dir) -> str:
     cmd = (
-            f"{PLATFORM_ENV_VAR} docker run --rm "
-            f"-v {temp_dir}:/workspace "
-            f"{DOCKER_IMAGE_NAME} "
-        )
-    
+        f"{PLATFORM_ENV_VAR} docker run --rm "
+        f"-v {temp_dir}:/workspace "
+        f"{DOCKER_IMAGE_NAME} "
+    )
+
     if network != "default":
         cmd = cmd + f"--network {network} "
     logger.debug(f"Docker run command: {cmd}")
     return cmd
+
 
 class DeploymentsResponse(BaseModel):
     deploymentStatus: str

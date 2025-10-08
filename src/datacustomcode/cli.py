@@ -106,7 +106,7 @@ def deploy(
     description: str,
     cpu_size: str,
     profile: str,
-    network: str
+    network: str,
 ):
     from datacustomcode.credentials import Credentials
     from datacustomcode.deploy import TransformationJobMetadata, deploy_full
