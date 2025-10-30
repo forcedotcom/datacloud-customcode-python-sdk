@@ -99,14 +99,15 @@ class TestClient:
             Client(reader=MagicMock(spec=BaseDataCloudReader))
 
     @patch("datacustomcode.client.config")
-    def test_initialization_with_config(
-        self, mock_config, reset_client, mock_spark
-    ):
+    def test_initialization_with_config(self, mock_config, reset_client, mock_spark):
         """Test client initialization using configuration."""
-        from datacustomcode.spark.default import DefaultSparkSessionProvider
         from unittest.mock import patch as mock_patch
 
-        with mock_patch.object(DefaultSparkSessionProvider, "get_session") as mock_get_session:
+        from datacustomcode.spark.default import DefaultSparkSessionProvider
+
+        with mock_patch.object(
+            DefaultSparkSessionProvider, "get_session"
+        ) as mock_get_session:
             mock_get_session.return_value = mock_spark
 
             mock_reader = MagicMock(spec=BaseDataCloudReader)
@@ -277,6 +278,7 @@ class TestDefaultSparkSessionProvider:
         )
 
         from datacustomcode.spark.default import DefaultSparkSessionProvider
+
         provider = DefaultSparkSessionProvider()
         result = provider.get_session(spark_config)
 
@@ -316,6 +318,7 @@ class TestDefaultSparkSessionProvider:
         )
 
         from datacustomcode.spark.default import DefaultSparkSessionProvider
+
         provider = DefaultSparkSessionProvider()
         result = provider.get_session(spark_config)
 

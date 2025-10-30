@@ -24,7 +24,6 @@ from typing import (
 from pyspark.sql import SparkSession
 
 from datacustomcode.config import SparkConfig, config
-from datacustomcode.spark.base import BaseSparkSessionProvider
 from datacustomcode.spark.default import DefaultSparkSessionProvider
 from datacustomcode.file.path.default import DefaultFindFilePath
 from datacustomcode.io.reader.base import BaseDataCloudReader
@@ -36,6 +35,7 @@ if TYPE_CHECKING:
 
     from datacustomcode.io.reader.base import BaseDataCloudReader
     from datacustomcode.io.writer.base import BaseDataCloudWriter, WriteMode
+    from datacustomcode.spark.base import BaseSparkSessionProvider
 
 
 class DataCloudObjectType(Enum):
@@ -113,8 +113,8 @@ class Client:
     def __new__(
         cls,
         reader: Optional[BaseDataCloudReader] = None,
-        writer: Optional[BaseDataCloudWriter] = None,
-        spark_provider: Optional[BaseSparkSessionProvider] = None,
+        writer: Optional["BaseDataCloudWriter"] = None,
+        spark_provider: Optional["BaseSparkSessionProvider"] = None,
     ) -> Client:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
@@ -127,6 +127,8 @@ class Client:
                     raise ValueError(
                         "Spark config is required when reader/writer is not provided"
                     )
+                from datacustomcode.spark.base import BaseSparkSessionProvider
+
                 provider: BaseSparkSessionProvider
                 if spark_provider is not None:
                     provider = spark_provider
