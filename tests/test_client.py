@@ -9,7 +9,6 @@ from datacustomcode.client import (
     Client,
     DataCloudAccessLayerException,
     DataCloudObjectType,
-    _setup_spark,
 )
 from datacustomcode.config import (
     AccessLayerObjectConfig,
@@ -100,37 +99,41 @@ class TestClient:
             Client(reader=MagicMock(spec=BaseDataCloudReader))
 
     @patch("datacustomcode.client.config")
-    @patch("datacustomcode.client._setup_spark")
     def test_initialization_with_config(
-        self, mock_setup_spark, mock_config, reset_client, mock_spark
+        self, mock_config, reset_client, mock_spark
     ):
         """Test client initialization using configuration."""
-        mock_setup_spark.return_value = mock_spark
+        from datacustomcode.spark.default import DefaultSparkSessionProvider
+        from unittest.mock import patch as mock_patch
 
-        mock_reader = MagicMock(spec=BaseDataCloudReader)
-        mock_reader_config = MagicMock()
-        mock_reader_config.to_object.return_value = mock_reader
-        mock_reader_config.force = False
+        with mock_patch.object(DefaultSparkSessionProvider, "get_session") as mock_get_session:
+            mock_get_session.return_value = mock_spark
 
-        mock_writer = MagicMock(spec=BaseDataCloudWriter)
-        mock_writer_config = MagicMock()
-        mock_writer_config.to_object.return_value = mock_writer
-        mock_writer_config.force = False
+            mock_reader = MagicMock(spec=BaseDataCloudReader)
+            mock_reader_config = MagicMock()
+            mock_reader_config.to_object.return_value = mock_reader
+            mock_reader_config.force = False
 
-        mock_spark_config = MagicMock(spec=SparkConfig)
+            mock_writer = MagicMock(spec=BaseDataCloudWriter)
+            mock_writer_config = MagicMock()
+            mock_writer_config.to_object.return_value = mock_writer
+            mock_writer_config.force = False
 
-        mock_config.reader_config = mock_reader_config
-        mock_config.writer_config = mock_writer_config
-        mock_config.spark_config = mock_spark_config
+            mock_spark_config = MagicMock(spec=SparkConfig)
+            mock_config.spark_provider_config = None
 
-        client = Client()
+            mock_config.reader_config = mock_reader_config
+            mock_config.writer_config = mock_writer_config
+            mock_config.spark_config = mock_spark_config
 
-        mock_setup_spark.assert_called_once_with(mock_spark_config)
-        mock_reader_config.to_object.assert_called_once_with(mock_spark)
-        mock_writer_config.to_object.assert_called_once_with(mock_spark)
+            client = Client()
 
-        assert client._reader is mock_reader
-        assert client._writer is mock_writer
+            mock_get_session.assert_called_once_with(mock_spark_config)
+            mock_reader_config.to_object.assert_called_once_with(mock_spark)
+            mock_writer_config.to_object.assert_called_once_with(mock_spark)
+
+            assert client._reader is mock_reader
+            assert client._writer is mock_writer
 
     def test_read_dlo(self, reset_client, mock_spark):
         reader = MagicMock(spec=BaseDataCloudReader)
@@ -249,12 +252,12 @@ class TestClient:
         assert "source_dmo" in client._data_layer_history[DataCloudObjectType.DMO]
 
 
-# Add tests for _setup_spark function
-class TestSetupSpark:
+# Add tests for DefaultSparkSessionProvider
+class TestDefaultSparkSessionProvider:
 
-    @patch("datacustomcode.client.SparkSession")
-    def test_setup_spark_with_master(self, mock_spark_session):
-        """Test _setup_spark with master specified"""
+    @patch("pyspark.sql.SparkSession")
+    def test_get_session_with_master(self, mock_spark_session):
+        """Test DefaultSparkSessionProvider with master specified"""
         mock_builder = MagicMock()
         mock_master_builder = MagicMock()
         mock_app_name_builder = MagicMock()
@@ -273,7 +276,9 @@ class TestSetupSpark:
             options={"spark.executor.memory": "1g"},
         )
 
-        result = _setup_spark(spark_config)
+        from datacustomcode.spark.default import DefaultSparkSessionProvider
+        provider = DefaultSparkSessionProvider()
+        result = provider.get_session(spark_config)
 
         mock_builder.master.assert_called_once_with("local[1]")
         mock_master_builder.appName.assert_called_once_with("test-app")
@@ -283,9 +288,9 @@ class TestSetupSpark:
         mock_config_builder.getOrCreate.assert_called_once()
         assert result is mock_session
 
-    @patch("datacustomcode.client.SparkSession")
-    def test_setup_spark_with_multiple_options(self, mock_spark_session):
-        """Test _setup_spark with multiple config options"""
+    @patch("pyspark.sql.SparkSession")
+    def test_get_session_with_multiple_options(self, mock_spark_session):
+        """Test DefaultSparkSessionProvider with multiple config options"""
         mock_builder = MagicMock()
         mock_app_name_builder = MagicMock()
         mock_config_builder1 = MagicMock()
@@ -310,7 +315,9 @@ class TestSetupSpark:
             },
         )
 
-        result = _setup_spark(spark_config)
+        from datacustomcode.spark.default import DefaultSparkSessionProvider
+        provider = DefaultSparkSessionProvider()
+        result = provider.get_session(spark_config)
 
         mock_builder.appName.assert_called_once_with("test-app")
 

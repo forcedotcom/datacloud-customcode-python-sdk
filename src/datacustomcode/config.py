@@ -36,6 +36,8 @@ import yaml
 # This lets all readers and writers to be findable via config
 from datacustomcode.io import *  # noqa: F403
 from datacustomcode.io.base import BaseDataAccessLayer
+from datacustomcode.spark.base import BaseSparkSessionProvider
+from datacustomcode.spark.default import DefaultSparkSessionProvider
 from datacustomcode.io.reader.base import BaseDataCloudReader  # noqa: TCH001
 from datacustomcode.io.writer.base import BaseDataCloudWriter  # noqa: TCH001
 
@@ -89,10 +91,25 @@ class SparkConfig(ForceableConfig):
     )
 
 
+_P = TypeVar("_P", bound=BaseSparkSessionProvider)
+
+
+class SparkProviderConfig(ForceableConfig, Generic[_P]):
+    model_config = ConfigDict(validate_default=True, extra="forbid")
+    type_base: ClassVar[Type[BaseSparkSessionProvider]] = BaseSparkSessionProvider
+    type_config_name: str = Field(description="CONFIG_NAME of the Spark session provider.")
+    options: dict[str, Any] = Field(default_factory=dict)
+
+    def to_object(self) -> _P:
+        type_ = self.type_base.subclass_from_config_name(self.type_config_name)
+        return cast(_P, type_(**self.options))
+
+
 class ClientConfig(BaseModel):
     reader_config: Union[AccessLayerObjectConfig[BaseDataCloudReader], None] = None
     writer_config: Union[AccessLayerObjectConfig[BaseDataCloudWriter], None] = None
     spark_config: Union[SparkConfig, None] = None
+    spark_provider_config: Union[SparkProviderConfig[BaseSparkSessionProvider], None] = None
 
     def update(self, other: ClientConfig) -> ClientConfig:
         """Merge this ClientConfig with another, respecting force flags.
@@ -117,6 +134,7 @@ class ClientConfig(BaseModel):
         self.reader_config = merge(self.reader_config, other.reader_config)
         self.writer_config = merge(self.writer_config, other.writer_config)
         self.spark_config = merge(self.spark_config, other.spark_config)
+        self.spark_provider_config = merge(self.spark_provider_config, other.spark_provider_config)
         return self
 
     def load(self, config_path: str) -> ClientConfig:

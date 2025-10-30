@@ -24,6 +24,8 @@ from typing import (
 from pyspark.sql import SparkSession
 
 from datacustomcode.config import SparkConfig, config
+from datacustomcode.spark.base import BaseSparkSessionProvider
+from datacustomcode.spark.default import DefaultSparkSessionProvider
 from datacustomcode.file.path.default import DefaultFindFilePath
 from datacustomcode.io.reader.base import BaseDataCloudReader
 
@@ -34,18 +36,6 @@ if TYPE_CHECKING:
 
     from datacustomcode.io.reader.base import BaseDataCloudReader
     from datacustomcode.io.writer.base import BaseDataCloudWriter, WriteMode
-
-
-def _setup_spark(spark_config: SparkConfig) -> SparkSession:
-    """Setup Spark session from config."""
-    builder = SparkSession.builder
-    if spark_config.master is not None:
-        builder = builder.master(spark_config.master)
-
-    builder = builder.appName(spark_config.app_name)
-    for key, value in spark_config.options.items():
-        builder = builder.config(key, value)
-    return builder.getOrCreate()
 
 
 class DataCloudObjectType(Enum):
@@ -124,6 +114,7 @@ class Client:
         cls,
         reader: Optional[BaseDataCloudReader] = None,
         writer: Optional[BaseDataCloudWriter] = None,
+        spark_provider: Optional[BaseSparkSessionProvider] = None,
     ) -> Client:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
@@ -136,7 +127,15 @@ class Client:
                     raise ValueError(
                         "Spark config is required when reader/writer is not provided"
                     )
-                spark = _setup_spark(config.spark_config)
+                provider: BaseSparkSessionProvider
+                if spark_provider is not None:
+                    provider = spark_provider
+                elif config.spark_provider_config is not None:
+                    provider = config.spark_provider_config.to_object()
+                else:
+                    provider = DefaultSparkSessionProvider()
+
+                spark = provider.get_session(config.spark_config)
 
             if config.reader_config is None and reader is None:
                 raise ValueError(
