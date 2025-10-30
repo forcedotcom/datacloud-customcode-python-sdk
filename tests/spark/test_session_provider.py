@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-import builtins
-
 from datacustomcode.client import Client
 from datacustomcode.config import (
     AccessLayerObjectConfig,
@@ -92,9 +90,10 @@ def test_client_uses_provider_from_config(monkeypatch):
 
     global_config.update(cfg)
 
-    Client()  # noqa: F841
+    Client()
     assert MockReader.last_spark is SENTINEL_SPARK
     assert MockWriter.last_spark is SENTINEL_SPARK
+
 
 class ExplicitProvider(BaseSparkSessionProvider):
     CONFIG_NAME = "ExplicitProvider"
@@ -122,7 +121,6 @@ def test_client_explicit_provider_overrides_config(monkeypatch):
     global_config.update(cfg)
 
     provider = ExplicitProvider()
-    Client(spark_provider=provider)  # noqa: F841
+    Client(spark_provider=provider)
     assert MockReader.last_spark is SENTINEL_SPARK
     assert MockWriter.last_spark is SENTINEL_SPARK
-

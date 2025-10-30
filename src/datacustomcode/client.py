@@ -21,12 +21,10 @@ from typing import (
     Optional,
 )
 
-from pyspark.sql import SparkSession
-
-from datacustomcode.config import SparkConfig, config
-from datacustomcode.spark.default import DefaultSparkSessionProvider
+from datacustomcode.config import config
 from datacustomcode.file.path.default import DefaultFindFilePath
 from datacustomcode.io.reader.base import BaseDataCloudReader
+from datacustomcode.spark.default import DefaultSparkSessionProvider
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -127,7 +125,6 @@ class Client:
                     raise ValueError(
                         "Spark config is required when reader/writer is not provided"
                     )
-                from datacustomcode.spark.base import BaseSparkSessionProvider
 
                 provider: BaseSparkSessionProvider
                 if spark_provider is not None:
