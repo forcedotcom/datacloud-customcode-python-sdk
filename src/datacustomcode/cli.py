@@ -50,7 +50,11 @@ def version():
 @click.option("--client-id", prompt=True)
 @click.option("--client-secret", prompt=True)
 @click.option("--login-url", prompt=True)
-@click.option("--dataspace", default="default", help="Dataspace name (optional, for non-default dataspaces)")
+@click.option(
+    "--dataspace",
+    default="default",
+    help="Dataspace name (optional, for non-default dataspaces)",
+)
 def configure(
     username: str,
     password: str,

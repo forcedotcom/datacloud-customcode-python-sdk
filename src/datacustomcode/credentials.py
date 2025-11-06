@@ -65,7 +65,9 @@ class Credentials:
             credentials_data = {}
             for k, v in ENV_CREDENTIALS.items():
                 if k == "dataspace":
-                    credentials_data[k] = os.environ.get(v)
+                    dataspace_value = os.environ.get(v)
+                    if dataspace_value is not None:
+                        credentials_data[k] = dataspace_value
                 else:
                     credentials_data[k] = os.environ[v]
             return cls(**credentials_data)
@@ -103,7 +105,7 @@ class Credentials:
         config[profile]["client_id"] = self.client_id
         config[profile]["client_secret"] = self.client_secret
         config[profile]["login_url"] = self.login_url
-        
+
         if self.dataspace is not None:
             config[profile]["dataspace"] = self.dataspace
 

@@ -88,7 +88,7 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
             credentials.client_id,
             credentials.client_secret,
         ]
-        
+
         connection_kwargs = {}
         if credentials.dataspace is not None:
             connection_kwargs["dataspace"] = credentials.dataspace
