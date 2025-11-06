@@ -180,6 +180,7 @@ Options:
 - `--client-id TEXT`: Connected App Client ID
 - `--client-secret TEXT`: Connected App Client Secret
 - `--login-url TEXT`: Salesforce login URL
+- `--dataspace TEXT`: Dataspace name (optional, for non-default dataspaces)
 
 
 #### `datacustomcode init`
@@ -307,6 +308,16 @@ You can read more about Jupyter Notebooks here: https://jupyter.org/
 7. Go back to `Setup`, then `OAuth and OpenID Connect Settings`, and enable the "Allow OAuth Username-Password Flows" option
 
 You now have all fields necessary for the `datacustomcode configure` command.
+
+### Working with Dataspaces
+
+If you're working with a non-default dataspace in Salesforce Data Cloud, you can specify the dataspace during configuration:
+
+```bash
+datacustomcode configure --dataspace my-dataspace
+```
+
+**For default dataspaces**, you can omit the `--dataspace` parameter entirely - the SDK will connect to the default dataspace automatically.
 
 ## Other docs
 

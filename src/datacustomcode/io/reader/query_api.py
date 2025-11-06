@@ -81,13 +81,19 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
         self.spark = spark
         credentials = Credentials.from_available(profile=credentials_profile)
 
-        self._conn = SalesforceCDPConnection(
+        connection_args = [
             credentials.login_url,
             credentials.username,
             credentials.password,
             credentials.client_id,
             credentials.client_secret,
-        )
+        ]
+        
+        connection_kwargs = {}
+        if credentials.dataspace is not None:
+            connection_kwargs["dataspace"] = credentials.dataspace
+
+        self._conn = SalesforceCDPConnection(*connection_args, **connection_kwargs)
 
     def read_dlo(
         self,

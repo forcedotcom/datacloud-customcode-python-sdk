@@ -50,6 +50,7 @@ def version():
 @click.option("--client-id", prompt=True)
 @click.option("--client-secret", prompt=True)
 @click.option("--login-url", prompt=True)
+@click.option("--dataspace", default="default", help="Dataspace name (optional, for non-default dataspaces)")
 def configure(
     username: str,
     password: str,
@@ -57,6 +58,7 @@ def configure(
     client_secret: str,
     login_url: str,
     profile: str,
+    dataspace: str | None,
 ) -> None:
     from datacustomcode.credentials import Credentials
 
@@ -66,6 +68,7 @@ def configure(
         client_id=client_id,
         client_secret=client_secret,
         login_url=login_url,
+        dataspace=dataspace,
     ).update_ini(profile=profile)
 
 

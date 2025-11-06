@@ -26,6 +26,7 @@ ENV_CREDENTIALS = {
     "client_id": "SFDC_CLIENT_ID",
     "client_secret": "SFDC_CLIENT_SECRET",
     "login_url": "SFDC_LOGIN_URL",
+    "dataspace": "SFDC_DATASPACE",
 }
 INI_FILE = os.path.expanduser("~/.datacustomcode/credentials.ini")
 
@@ -37,6 +38,7 @@ class Credentials:
     client_id: str
     client_secret: str
     login_url: str
+    dataspace: str | None = None
 
     @classmethod
     def from_ini(
@@ -47,21 +49,30 @@ class Credentials:
         config = configparser.ConfigParser()
         logger.debug(f"Reading {ini_file} for profile {profile}")
         config.read(ini_file)
+        dataspace = config[profile].get("dataspace")
         return cls(
             username=config[profile]["username"],
             password=config[profile]["password"],
             client_id=config[profile]["client_id"],
             client_secret=config[profile]["client_secret"],
             login_url=config[profile]["login_url"],
+            dataspace=dataspace,
         )
 
     @classmethod
     def from_env(cls) -> Credentials:
         try:
-            return cls(**{k: os.environ[v] for k, v in ENV_CREDENTIALS.items()})
+            credentials_data = {}
+            for k, v in ENV_CREDENTIALS.items():
+                if k == "dataspace":
+                    credentials_data[k] = os.environ.get(v)
+                else:
+                    credentials_data[k] = os.environ[v]
+            return cls(**credentials_data)
         except KeyError as exc:
+            required_vars = [v for k, v in ENV_CREDENTIALS.items() if k != "dataspace"]
             raise ValueError(
-                f"All of {ENV_CREDENTIALS.values()} must be set in environment."
+                f"All of {required_vars} must be set in environment. "
             ) from exc
 
     @classmethod
@@ -92,6 +103,9 @@ class Credentials:
         config[profile]["client_id"] = self.client_id
         config[profile]["client_secret"] = self.client_secret
         config[profile]["login_url"] = self.login_url
+        
+        if self.dataspace is not None:
+            config[profile]["dataspace"] = self.dataspace
 
         with open(expanded_ini_file, "w") as f:
             config.write(f)
