@@ -18,7 +18,7 @@ class TestCredentials:
             "client_id": "test_client_id",
             "client_secret": "test_secret",
             "login_url": "https://test.login.url",
-            "dataspace": "test_dataspace",  # Added dataspace
+            "dataspace": "test_dataspace",
         }
 
         with patch.dict(
@@ -31,7 +31,7 @@ class TestCredentials:
             assert creds.client_id == test_creds["client_id"]
             assert creds.client_secret == test_creds["client_secret"]
             assert creds.login_url == test_creds["login_url"]
-            assert creds.dataspace == test_creds["dataspace"]  # Added dataspace assertion
+            assert creds.dataspace == test_creds["dataspace"]
 
     def test_from_env_without_dataspace(self):
         """Test loading credentials from environment variables without dataspace."""
@@ -44,8 +44,10 @@ class TestCredentials:
         }
 
         # Create env dict without dataspace
-        env_dict = {v: test_creds[k] for k, v in ENV_CREDENTIALS.items() if k != "dataspace"}
-        
+        env_dict = {
+            v: test_creds[k] for k, v in ENV_CREDENTIALS.items() if k != "dataspace"
+        }
+
         with patch.dict(os.environ, env_dict, clear=True):
             creds = Credentials.from_env()
 
@@ -121,7 +123,7 @@ class TestCredentials:
             "client_id": "test_client_id",
             "client_secret": "test_secret",
             "login_url": "https://test.login.url",
-            "dataspace": "test_dataspace",  # Added dataspace
+            "dataspace": "test_dataspace",
         }
 
         with (
@@ -137,7 +139,7 @@ class TestCredentials:
             assert creds.client_id == test_creds["client_id"]
             assert creds.client_secret == test_creds["client_secret"]
             assert creds.login_url == test_creds["login_url"]
-            assert creds.dataspace == test_creds["dataspace"]  # Added dataspace assertion
+            assert creds.dataspace == test_creds["dataspace"]
 
     def test_from_available_ini(self):
         """Test that from_available uses INI file when env vars not available."""
