@@ -18,6 +18,7 @@ class TestCredentials:
             "client_id": "test_client_id",
             "client_secret": "test_secret",
             "login_url": "https://test.login.url",
+            "dataspace": "test_dataspace",  # Added dataspace
         }
 
         with patch.dict(
@@ -30,6 +31,30 @@ class TestCredentials:
             assert creds.client_id == test_creds["client_id"]
             assert creds.client_secret == test_creds["client_secret"]
             assert creds.login_url == test_creds["login_url"]
+            assert creds.dataspace == test_creds["dataspace"]  # Added dataspace assertion
+
+    def test_from_env_without_dataspace(self):
+        """Test loading credentials from environment variables without dataspace."""
+        test_creds = {
+            "username": "test_user",
+            "password": "test_pass",
+            "client_id": "test_client_id",
+            "client_secret": "test_secret",
+            "login_url": "https://test.login.url",
+        }
+
+        # Create env dict without dataspace
+        env_dict = {v: test_creds[k] for k, v in ENV_CREDENTIALS.items() if k != "dataspace"}
+        
+        with patch.dict(os.environ, env_dict, clear=True):
+            creds = Credentials.from_env()
+
+            assert creds.username == test_creds["username"]
+            assert creds.password == test_creds["password"]
+            assert creds.client_id == test_creds["client_id"]
+            assert creds.client_secret == test_creds["client_secret"]
+            assert creds.login_url == test_creds["login_url"]
+            assert creds.dataspace is None  # Should default to None
 
     def test_from_env_missing_vars(self):
         """Test that missing environment variables raise appropriate error."""
@@ -47,6 +72,7 @@ class TestCredentials:
         client_id = ini_client_id
         client_secret = ini_secret
         login_url = https://ini.login.url
+        dataspace = ini_dataspace
 
         [other_profile]
         username = other_user
@@ -54,6 +80,7 @@ class TestCredentials:
         client_id = other_client_id
         client_secret = other_secret
         login_url = https://other.login.url
+        dataspace = other_dataspace
         """
 
         with (
@@ -73,6 +100,7 @@ class TestCredentials:
                 assert creds.client_id == "ini_client_id"
                 assert creds.client_secret == "ini_secret"
                 assert creds.login_url == "https://ini.login.url"
+                assert creds.dataspace == "ini_dataspace"
 
                 # Test other profile
                 creds = Credentials.from_ini(
@@ -83,6 +111,7 @@ class TestCredentials:
                 assert creds.client_id == "other_client_id"
                 assert creds.client_secret == "other_secret"
                 assert creds.login_url == "https://other.login.url"
+                assert creds.dataspace == "other_dataspace"
 
     def test_from_available_env(self):
         """Test that from_available uses environment variables when available."""
@@ -92,6 +121,7 @@ class TestCredentials:
             "client_id": "test_client_id",
             "client_secret": "test_secret",
             "login_url": "https://test.login.url",
+            "dataspace": "test_dataspace",  # Added dataspace
         }
 
         with (
@@ -107,6 +137,7 @@ class TestCredentials:
             assert creds.client_id == test_creds["client_id"]
             assert creds.client_secret == test_creds["client_secret"]
             assert creds.login_url == test_creds["login_url"]
+            assert creds.dataspace == test_creds["dataspace"]  # Added dataspace assertion
 
     def test_from_available_ini(self):
         """Test that from_available uses INI file when env vars not available."""
@@ -117,6 +148,7 @@ class TestCredentials:
         client_id = ini_client_id
         client_secret = ini_secret
         login_url = https://ini.login.url
+        dataspace = ini_dataspace
         """
 
         with (
@@ -137,6 +169,7 @@ class TestCredentials:
                 assert creds.client_id == "ini_client_id"
                 assert creds.client_secret == "ini_secret"
                 assert creds.login_url == "https://ini.login.url"
+                assert creds.dataspace == "ini_dataspace"
 
     def test_from_available_no_creds(self):
         """Test that from_available raises error when no credentials are found."""

@@ -32,6 +32,7 @@ class TestCredentialsProfileIntegration:
             mock_credentials.password = "custom_password"
             mock_credentials.client_id = "custom_client_id"
             mock_credentials.client_secret = "custom_secret"
+            mock_credentials.dataspace = "custom_dataspace"  # Added dataspace
             mock_from_available.return_value = mock_credentials
 
             # Mock the SalesforceCDPConnection
@@ -49,13 +50,56 @@ class TestCredentialsProfileIntegration:
                 # Verify the correct profile was used
                 mock_from_available.assert_called_with(profile="custom_profile")
 
-                # Verify the connection was created with the custom credentials
+                # Verify the connection was created with the custom credentials including dataspace
                 mock_conn_class.assert_called_once_with(
                     "https://custom.salesforce.com",
                     "custom@example.com",
                     "custom_password",
                     "custom_client_id",
                     "custom_secret",
+                    dataspace="custom_dataspace",  # Added dataspace parameter
+                )
+
+    def test_query_api_reader_without_dataspace(self):
+        """Test QueryAPIDataCloudReader works when dataspace is None."""
+        mock_spark = MagicMock()
+
+        with patch(
+            "datacustomcode.credentials.Credentials.from_available"
+        ) as mock_from_available:
+            # Mock credentials without dataspace
+            mock_credentials = MagicMock()
+            mock_credentials.login_url = "https://custom.salesforce.com"
+            mock_credentials.username = "custom@example.com"
+            mock_credentials.password = "custom_password"
+            mock_credentials.client_id = "custom_client_id"
+            mock_credentials.client_secret = "custom_secret"
+            mock_credentials.dataspace = None  # No dataspace
+            mock_from_available.return_value = mock_credentials
+
+            # Mock the SalesforceCDPConnection
+            with patch(
+                "datacustomcode.io.reader.query_api.SalesforceCDPConnection"
+            ) as mock_conn_class:
+                mock_conn = MagicMock()
+                mock_conn_class.return_value = mock_conn
+
+                # Test with custom profile
+                QueryAPIDataCloudReader(
+                    mock_spark, credentials_profile="custom_profile"
+                )
+
+                # Verify the correct profile was used
+                mock_from_available.assert_called_with(profile="custom_profile")
+
+                # Verify the connection was created WITHOUT dataspace parameter when None
+                mock_conn_class.assert_called_once_with(
+                    "https://custom.salesforce.com",
+                    "custom@example.com",
+                    "custom_password",
+                    "custom_client_id",
+                    "custom_secret",
+                    # No dataspace parameter when None
                 )
 
     def test_print_writer_with_custom_profile(self):
