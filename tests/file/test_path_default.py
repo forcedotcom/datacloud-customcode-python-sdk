@@ -14,6 +14,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import tempfile
 from unittest.mock import MagicMock, patch
@@ -89,23 +90,96 @@ class TestDefaultFindFilePath:
             assert result == mock_path
             mock_resolve.assert_called_once_with("test.txt")
 
+    def test_resolve_file_path_env_var_set_file_exists(self):
+        """Test _resolve_file_path when environment variable is set and file exists."""
+        finder = DefaultFindFilePath()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            test_file = Path(temp_dir) / "test.txt"
+            test_file.write_text("test content")
+
+            with patch.dict(os.environ, {finder.DEFAULT_ENV_VAR: str(temp_dir)}):
+                result = finder._resolve_file_path("test.txt")
+
+                assert result == test_file
+                assert result.exists()
+
+    def test_resolve_file_path_env_var_set_file_not_found(self):
+        """Test _resolve_file_path when environment variable is set but file not found,
+        falls back to code package."""
+        finder = DefaultFindFilePath()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Set env var to a directory that doesn't contain the file
+            with patch.dict(os.environ, {finder.DEFAULT_ENV_VAR: str(temp_dir)}):
+                with patch.object(
+                    finder, "_code_package_exists", return_value=True
+                ) as mock_exists:
+                    with patch.object(
+                        finder, "_get_code_package_file_path"
+                    ) as mock_get_path:
+                        mock_path = MagicMock()
+                        mock_path.exists.return_value = True
+                        mock_get_path.return_value = mock_path
+
+                        result = finder._resolve_file_path("test.txt")
+
+                        assert result == mock_path
+                        mock_exists.assert_called_once()
+                        mock_get_path.assert_called_once_with("test.txt")
+
+    def test_resolve_file_path_env_var_not_set(self):
+        """Test _resolve_file_path when environment variable is not set,
+        uses normal flow."""
+        finder = DefaultFindFilePath()
+
+        # Ensure env var is not set
+        env_backup = os.environ.pop(finder.DEFAULT_ENV_VAR, None)
+        try:
+            with patch.object(
+                finder, "_code_package_exists", return_value=True
+            ) as mock_exists:
+                with patch.object(
+                    finder, "_get_code_package_file_path"
+                ) as mock_get_path:
+                    mock_path = MagicMock()
+                    mock_path.exists.return_value = True
+                    mock_get_path.return_value = mock_path
+
+                    result = finder._resolve_file_path("test.txt")
+
+                    assert result == mock_path
+                    mock_exists.assert_called_once()
+                    mock_get_path.assert_called_once_with("test.txt")
+        finally:
+            if env_backup is not None:
+                os.environ[finder.DEFAULT_ENV_VAR] = env_backup
+
     def test_resolve_file_path_code_package_exists(self):
         """Test _resolve_file_path when code package exists and file is found."""
         finder = DefaultFindFilePath()
 
-        with patch.object(
-            finder, "_code_package_exists", return_value=True
-        ) as mock_exists:
-            with patch.object(finder, "_get_code_package_file_path") as mock_get_path:
-                mock_path = MagicMock()
-                mock_path.exists.return_value = True
-                mock_get_path.return_value = mock_path
+        # Ensure env var is not set to test normal flow
+        env_backup = os.environ.pop(finder.DEFAULT_ENV_VAR, None)
+        try:
+            with patch.object(
+                finder, "_code_package_exists", return_value=True
+            ) as mock_exists:
+                with patch.object(
+                    finder, "_get_code_package_file_path"
+                ) as mock_get_path:
+                    mock_path = MagicMock()
+                    mock_path.exists.return_value = True
+                    mock_get_path.return_value = mock_path
 
-                result = finder._resolve_file_path("test.txt")
+                    result = finder._resolve_file_path("test.txt")
 
-                assert result == mock_path
-                mock_exists.assert_called_once()
-                mock_get_path.assert_called_once_with("test.txt")
+                    assert result == mock_path
+                    mock_exists.assert_called_once()
+                    mock_get_path.assert_called_once_with("test.txt")
+        finally:
+            if env_backup is not None:
+                os.environ[finder.DEFAULT_ENV_VAR] = env_backup
 
     def test_resolve_file_path_code_package_exists_file_not_found(self):
         """Test _resolve_file_path when code package exists but file not found,
