@@ -37,6 +37,7 @@ class DefaultFindFilePath(BaseDataAccessLayer):
     """
 
     # Default configuration values
+    DEFAULT_ENV_VAR = "LIBRARY_PATH"
     DEFAULT_CODE_PACKAGE = "payload"
     DEFAULT_FILE_FOLDER = "files"
     DEFAULT_CONFIG_FILE = "config.json"
@@ -91,6 +92,13 @@ class DefaultFindFilePath(BaseDataAccessLayer):
         Returns:
             The full path to the file
         """
+        # First check if environment variable is set
+        env_path = os.getenv(self.DEFAULT_ENV_VAR)
+        if env_path:
+            file_path = Path(env_path) / file_name
+            if file_path.exists():
+                return file_path
+
         # First try the default code package location
         if self._code_package_exists():
             file_path = self._get_code_package_file_path(file_name)
