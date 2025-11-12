@@ -39,9 +39,7 @@ class PrintDataCloudWriter(BaseDataCloudWriter):
                     self.spark, credentials_profile, dataspace=dataspace
                 )
             else:
-                self.reader = QueryAPIDataCloudReader(
-                    self.spark, credentials_profile
-                )
+                self.reader = QueryAPIDataCloudReader(self.spark, credentials_profile)
         else:
             self.reader = reader
 

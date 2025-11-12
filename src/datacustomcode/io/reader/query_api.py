@@ -85,7 +85,7 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
         self.spark = spark
         credentials = Credentials.from_available(profile=credentials_profile)
 
-        if dataspace is not None:
+        if dataspace is not None and dataspace != "default":
             self._conn = SalesforceCDPConnection(
                 credentials.login_url,
                 credentials.username,
