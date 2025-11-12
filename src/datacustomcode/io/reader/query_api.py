@@ -18,6 +18,7 @@ import logging
 from typing import (
     TYPE_CHECKING,
     Final,
+    Optional,
     Union,
 )
 
@@ -76,18 +77,31 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
     CONFIG_NAME = "QueryAPIDataCloudReader"
 
     def __init__(
-        self, spark: SparkSession, credentials_profile: str = "default"
+        self,
+        spark: SparkSession,
+        credentials_profile: str = "default",
+        dataspace: Optional[str] = None,
     ) -> None:
         self.spark = spark
         credentials = Credentials.from_available(profile=credentials_profile)
 
-        self._conn = SalesforceCDPConnection(
-            credentials.login_url,
-            credentials.username,
-            credentials.password,
-            credentials.client_id,
-            credentials.client_secret,
-        )
+        if dataspace is not None:
+            self._conn = SalesforceCDPConnection(
+                credentials.login_url,
+                credentials.username,
+                credentials.password,
+                credentials.client_id,
+                credentials.client_secret,
+                dataspace=dataspace,
+            )
+        else:
+            self._conn = SalesforceCDPConnection(
+                credentials.login_url,
+                credentials.username,
+                credentials.password,
+                credentials.client_id,
+                credentials.client_secret,
+            )
 
     def read_dlo(
         self,

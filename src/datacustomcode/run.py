@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import importlib
+import json
+import os
 from pathlib import Path
 import runpy
 import sys
@@ -36,6 +38,37 @@ def run_entrypoint(
         profile: The credentials profile to use.
     """
     add_py_folder(entrypoint)
+    
+    # Read dataspace from config.json if it exists
+    entrypoint_dir = os.path.dirname(entrypoint)
+    config_json_path = os.path.join(entrypoint_dir, "config.json")
+    if os.path.exists(config_json_path):
+        try:
+            with open(config_json_path, "r") as f:
+                config_json = json.load(f)
+                dataspace = config_json.get("dataspace")
+                if dataspace:
+                    # Add dataspace to reader config options
+                    if (
+                        config.reader_config
+                        and hasattr(config.reader_config, "options")
+                    ):
+                        config.reader_config.options["dataspace"] = dataspace
+                    # Add dataspace to writer config options (for PrintDataCloudWriter)
+                    if (
+                        config.writer_config
+                        and hasattr(config.writer_config, "options")
+                    ):
+                        config.writer_config.options["dataspace"] = dataspace
+        except json.JSONDecodeError as err:
+            raise ValueError(
+                f"config.json at {config_json_path} is not valid JSON"
+            ) from err
+        except FileNotFoundError as err:
+            raise FileNotFoundError(
+                f"config.json not found at {config_json_path}"
+            ) from err
+    
     if profile != "default":
         if config.reader_config and hasattr(config.reader_config, "options"):
             config.reader_config.options["credentials_profile"] = profile
