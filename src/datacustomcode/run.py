@@ -64,7 +64,13 @@ def run_entrypoint(
             f"Please ensure config.json contains a 'dataspace' field."
         )
 
+    # Load config file first (if provided) so that dataspace from config.json
+    # can override any dataspace in the config file
+    if config_file:
+        config.load(config_file)
+
     # Add dataspace to reader config options
+    # (after loading config file to ensure it takes precedence)
     if config.reader_config and hasattr(config.reader_config, "options"):
         config.reader_config.options["dataspace"] = dataspace
     # Add dataspace to writer config options (for PrintDataCloudWriter)
@@ -76,9 +82,6 @@ def run_entrypoint(
             config.reader_config.options["credentials_profile"] = profile
         if config.writer_config and hasattr(config.writer_config, "options"):
             config.writer_config.options["credentials_profile"] = profile
-
-    if config_file:
-        config.load(config_file)
     for dependency in dependencies:
         try:
             importlib.import_module(dependency)

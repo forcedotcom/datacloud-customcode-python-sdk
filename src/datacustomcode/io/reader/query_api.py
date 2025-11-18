@@ -92,7 +92,7 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
                 credentials.password,
                 credentials.client_id,
                 credentials.client_secret,
-                dataspace=dataspace,
+                dataspace,
             )
         else:
             self._conn = SalesforceCDPConnection(
