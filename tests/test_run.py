@@ -241,13 +241,25 @@ class TestDataspaceScenarios:
     """Test dataspace functionality in run_entrypoint."""
 
     def test_run_entrypoint_with_default_dataspace(self):
-        """Test that run_entrypoint runs successfully with dataspace='default'."""
+        """Test that run_entrypoint sets dataspace='default' correctly."""
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as temp:
             entrypoint_content = textwrap.dedent(
                 """
-                # Test entrypoint - just verify it runs
+                # Test entrypoint
+                from datacustomcode.config import config
                 with open("dataspace_output.txt", "w") as f:
-                    f.write("Entrypoint executed successfully\\n")
+                    rds = (
+                        config.reader_config.options.get("dataspace")
+                        if config.reader_config
+                        else None
+                    )
+                    wds = (
+                        config.writer_config.options.get("dataspace")
+                        if config.writer_config
+                        else None
+                    )
+                    f.write(f"Reader dataspace: {rds}\\n")
+                    f.write(f"Writer dataspace: {wds}\\n")
             """
             )
             temp.write(entrypoint_content.encode("utf-8"))
@@ -266,10 +278,11 @@ class TestDataspaceScenarios:
                 profile="default",
             )
 
-            # Verify entrypoint executed
+            # Verify dataspace was set
             with open("dataspace_output.txt", "r") as f:
                 content = f.read()
-                assert "Entrypoint executed successfully" in content
+                assert "Reader dataspace: default" in content
+                assert "Writer dataspace: default" in content
 
         finally:
             if os.path.exists(entrypoint_file):
@@ -280,14 +293,26 @@ class TestDataspaceScenarios:
                 os.unlink("dataspace_output.txt")
 
     def test_run_entrypoint_with_custom_dataspace(self):
-        """Test that run_entrypoint runs successfully with custom dataspace."""
+        """Test that run_entrypoint sets custom dataspace correctly."""
         custom_dataspace = "dataspace-1"
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as temp:
             entrypoint_content = textwrap.dedent(
                 """
-                # Test entrypoint - just verify it runs
+                # Test entrypoint
+                from datacustomcode.config import config
                 with open("dataspace_output.txt", "w") as f:
-                    f.write("Entrypoint executed successfully\\n")
+                    rds = (
+                        config.reader_config.options.get("dataspace")
+                        if config.reader_config
+                        else None
+                    )
+                    wds = (
+                        config.writer_config.options.get("dataspace")
+                        if config.writer_config
+                        else None
+                    )
+                    f.write(f"Reader dataspace: {rds}\\n")
+                    f.write(f"Writer dataspace: {wds}\\n")
             """
             )
             temp.write(entrypoint_content.encode("utf-8"))
@@ -299,8 +324,6 @@ class TestDataspaceScenarios:
             json.dump({"dataspace": custom_dataspace}, f)
 
         try:
-            # Verify entrypoint runs successfully with custom dataspace
-            # (if dataspace validation failed, this would raise an error)
             run_entrypoint(
                 entrypoint=entrypoint_file,
                 config_file=None,
@@ -308,10 +331,11 @@ class TestDataspaceScenarios:
                 profile="default",
             )
 
-            # Verify entrypoint executed
+            # Verify custom dataspace was set
             with open("dataspace_output.txt", "r") as f:
                 content = f.read()
-                assert "Entrypoint executed successfully" in content
+                assert f"Reader dataspace: {custom_dataspace}" in content
+                assert f"Writer dataspace: {custom_dataspace}" in content
 
         finally:
             if os.path.exists(entrypoint_file):
