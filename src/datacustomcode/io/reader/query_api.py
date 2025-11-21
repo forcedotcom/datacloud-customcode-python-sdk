@@ -72,6 +72,9 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
     """DataCloud reader using Query API.
 
     This reader emulates data access within Data Cloud by calling the Query API.
+    Supports dataspace configuration for querying data within specific dataspaces.
+    When a dataspace is provided (and not "default"), queries are executed within
+    that dataspace context.
     """
 
     CONFIG_NAME = "QueryAPIDataCloudReader"
@@ -82,6 +85,15 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
         credentials_profile: str = "default",
         dataspace: Optional[str] = None,
     ) -> None:
+        """Initialize QueryAPIDataCloudReader.
+
+        Args:
+            spark: SparkSession instance for creating DataFrames.
+            credentials_profile: Credentials profile name (default: "default").
+            dataspace: Optional dataspace identifier. If provided and not "default",
+                the connection will be configured for the specified dataspace.
+                When None or "default", uses the default dataspace.
+        """
         self.spark = spark
         credentials = Credentials.from_available(profile=credentials_profile)
 
@@ -92,7 +104,7 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
                 credentials.password,
                 credentials.client_id,
                 credentials.client_secret,
-                dataspace,
+                dataspace=dataspace,
             )
         else:
             self._conn = SalesforceCDPConnection(
@@ -120,9 +132,11 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
         Returns:
             PySparkDataFrame: The PySpark DataFrame.
         """
-        pandas_df = self._conn.get_pandas_dataframe(
-            SQL_QUERY_TEMPLATE.format(name, row_limit)
-        )
+        query = SQL_QUERY_TEMPLATE.format(name, row_limit)
+
+        pandas_df = self._conn.get_pandas_dataframe(query)
+
+        # Convert pandas DataFrame to Spark DataFrame
         if not schema:
             # auto infer schema
             schema = _pandas_to_spark_schema(pandas_df)
@@ -135,9 +149,22 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
         schema: Union[AtomicType, StructType, str, None] = None,
         row_limit: int = 1000,
     ) -> PySparkDataFrame:
-        pandas_df = self._conn.get_pandas_dataframe(
-            SQL_QUERY_TEMPLATE.format(name, row_limit)
-        )
+        """
+        Read a Data Model Object (DMO) from the Data Cloud, limited to a number of rows.
+
+        Args:
+            name (str): The name of the DMO.
+            schema (Optional[Union[AtomicType, StructType, str]]): Schema of the DMO.
+            row_limit (int): Maximum number of rows to fetch.
+
+        Returns:
+            PySparkDataFrame: The PySpark DataFrame.
+        """
+        query = SQL_QUERY_TEMPLATE.format(name, row_limit)
+
+        pandas_df = self._conn.get_pandas_dataframe(query)
+
+        # Convert pandas DataFrame to Spark DataFrame
         if not schema:
             # auto infer schema
             schema = _pandas_to_spark_schema(pandas_df)

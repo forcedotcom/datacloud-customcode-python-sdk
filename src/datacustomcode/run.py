@@ -23,6 +23,18 @@ from typing import List, Union
 from datacustomcode.config import config
 
 
+def _set_config_option(config_obj, key: str, value: str) -> None:
+    """Set an option on a config object if it exists and has options attribute.
+
+    Args:
+        config_obj: Config object (reader_config or writer_config)
+        key: Option key to set
+        value: Option value to set
+    """
+    if config_obj and hasattr(config_obj, "options"):
+        config_obj.options[key] = value
+
+
 def run_entrypoint(
     entrypoint: str,
     config_file: Union[str, None],
@@ -69,19 +81,14 @@ def run_entrypoint(
     if config_file:
         config.load(config_file)
 
-    # Add dataspace to reader config options
+    # Add dataspace to reader and writer config options
     # (after loading config file to ensure it takes precedence)
-    if config.reader_config and hasattr(config.reader_config, "options"):
-        config.reader_config.options["dataspace"] = dataspace
-    # Add dataspace to writer config options (for PrintDataCloudWriter)
-    if config.writer_config and hasattr(config.writer_config, "options"):
-        config.writer_config.options["dataspace"] = dataspace
+    _set_config_option(config.reader_config, "dataspace", dataspace)
+    _set_config_option(config.writer_config, "dataspace", dataspace)
 
     if profile != "default":
-        if config.reader_config and hasattr(config.reader_config, "options"):
-            config.reader_config.options["credentials_profile"] = profile
-        if config.writer_config and hasattr(config.writer_config, "options"):
-            config.writer_config.options["credentials_profile"] = profile
+        _set_config_option(config.reader_config, "credentials_profile", profile)
+        _set_config_option(config.writer_config, "credentials_profile", profile)
     for dependency in dependencies:
         try:
             importlib.import_module(dependency)
