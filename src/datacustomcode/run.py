@@ -76,13 +76,11 @@ def run_entrypoint(
             f"Please ensure config.json contains a 'dataspace' field."
         )
 
-    # Load config file first (if provided) so that dataspace from config.json
-    # can override any dataspace in the config file
+    # Load config file first
     if config_file:
         config.load(config_file)
 
     # Add dataspace to reader and writer config options
-    # (after loading config file to ensure it takes precedence)
     _set_config_option(config.reader_config, "dataspace", dataspace)
     _set_config_option(config.writer_config, "dataspace", dataspace)
 
