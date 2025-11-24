@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import sys
@@ -45,7 +46,7 @@ def test_config_file():
 
 @pytest.fixture
 def test_entrypoint_file():
-    """Create a temporary test entrypoint script."""
+    """Create a temporary test entrypoint script with config.json."""
     with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as temp:
         entrypoint_content = textwrap.dedent(
             """
@@ -76,11 +77,19 @@ def test_entrypoint_file():
         temp.write(entrypoint_content.encode("utf-8"))
         temp_name = temp.name
 
+    # Create config.json in the same directory as the entrypoint
+    entrypoint_dir = os.path.dirname(temp_name)
+    config_json_path = os.path.join(entrypoint_dir, "config.json")
+    with open(config_json_path, "w") as f:
+        json.dump({"dataspace": "default"}, f)
+
     yield temp_name
 
     # Cleanup
     if os.path.exists(temp_name):
         os.unlink(temp_name)
+    if os.path.exists(config_json_path):
+        os.unlink(config_json_path)
     if os.path.exists("test_entrypoint_output.txt"):
         os.unlink("test_entrypoint_output.txt")
 
@@ -169,6 +178,12 @@ def test_run_entrypoint_with_dependencies():
             temp.write(entrypoint_content.encode("utf-8"))
             entrypoint_file = temp.name
 
+        # Create config.json in the same directory as the entrypoint
+        entrypoint_dir = os.path.dirname(entrypoint_file)
+        config_json_path = os.path.join(entrypoint_dir, "config.json")
+        with open(config_json_path, "w") as f:
+            json.dump({"dataspace": "default"}, f)
+
         # Create a minimal config file
         with tempfile.NamedTemporaryFile(
             suffix=".yaml", delete=False, mode="w"
@@ -197,6 +212,10 @@ def test_run_entrypoint_with_dependencies():
         # Cleanup safely
         if os.path.exists(entrypoint_file):
             os.unlink(entrypoint_file)
+        entrypoint_dir = os.path.dirname(entrypoint_file)
+        config_json_path = os.path.join(entrypoint_dir, "config.json")
+        if os.path.exists(config_json_path):
+            os.unlink(config_json_path)
         if os.path.exists(config_file):
             os.unlink(config_file)
         if os.path.exists("dependency_output.txt"):
@@ -216,3 +235,214 @@ def test_run_entrypoint_with_dependencies():
         # Remove the path we added
         if module_dir in sys.path:
             sys.path.remove(module_dir)
+
+
+class TestDataspaceScenarios:
+    """Test dataspace functionality in run_entrypoint."""
+
+    def test_run_entrypoint_with_default_dataspace(self):
+        """Test that run_entrypoint sets dataspace='default' correctly."""
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as temp:
+            entrypoint_content = textwrap.dedent(
+                """
+                # Test entrypoint
+                from datacustomcode.config import config
+                with open("dataspace_output.txt", "w") as f:
+                    rds = (
+                        config.reader_config.options.get("dataspace")
+                        if config.reader_config
+                        else None
+                    )
+                    wds = (
+                        config.writer_config.options.get("dataspace")
+                        if config.writer_config
+                        else None
+                    )
+                    f.write(f"Reader dataspace: {rds}\\n")
+                    f.write(f"Writer dataspace: {wds}\\n")
+            """
+            )
+            temp.write(entrypoint_content.encode("utf-8"))
+            entrypoint_file = temp.name
+
+        entrypoint_dir = os.path.dirname(entrypoint_file)
+        config_json_path = os.path.join(entrypoint_dir, "config.json")
+        with open(config_json_path, "w") as f:
+            json.dump({"dataspace": "default"}, f)
+
+        try:
+            run_entrypoint(
+                entrypoint=entrypoint_file,
+                config_file=None,
+                dependencies=[],
+                profile="default",
+            )
+
+            # Verify dataspace was set
+            with open("dataspace_output.txt", "r") as f:
+                content = f.read()
+                assert "Reader dataspace: default" in content
+                assert "Writer dataspace: default" in content
+
+        finally:
+            if os.path.exists(entrypoint_file):
+                os.unlink(entrypoint_file)
+            if os.path.exists(config_json_path):
+                os.unlink(config_json_path)
+            if os.path.exists("dataspace_output.txt"):
+                os.unlink("dataspace_output.txt")
+
+    def test_run_entrypoint_with_custom_dataspace(self):
+        """Test that run_entrypoint sets custom dataspace correctly."""
+        custom_dataspace = "dataspace-1"
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as temp:
+            entrypoint_content = textwrap.dedent(
+                """
+                # Test entrypoint
+                from datacustomcode.config import config
+                with open("dataspace_output.txt", "w") as f:
+                    rds = (
+                        config.reader_config.options.get("dataspace")
+                        if config.reader_config
+                        else None
+                    )
+                    wds = (
+                        config.writer_config.options.get("dataspace")
+                        if config.writer_config
+                        else None
+                    )
+                    f.write(f"Reader dataspace: {rds}\\n")
+                    f.write(f"Writer dataspace: {wds}\\n")
+            """
+            )
+            temp.write(entrypoint_content.encode("utf-8"))
+            entrypoint_file = temp.name
+
+        entrypoint_dir = os.path.dirname(entrypoint_file)
+        config_json_path = os.path.join(entrypoint_dir, "config.json")
+        with open(config_json_path, "w") as f:
+            json.dump({"dataspace": custom_dataspace}, f)
+
+        try:
+            run_entrypoint(
+                entrypoint=entrypoint_file,
+                config_file=None,
+                dependencies=[],
+                profile="default",
+            )
+
+            # Verify custom dataspace was set
+            with open("dataspace_output.txt", "r") as f:
+                content = f.read()
+                assert f"Reader dataspace: {custom_dataspace}" in content
+                assert f"Writer dataspace: {custom_dataspace}" in content
+
+        finally:
+            if os.path.exists(entrypoint_file):
+                os.unlink(entrypoint_file)
+            if os.path.exists(config_json_path):
+                os.unlink(config_json_path)
+            if os.path.exists("dataspace_output.txt"):
+                os.unlink("dataspace_output.txt")
+
+    def test_run_entrypoint_missing_config_json(self):
+        """Test run_entrypoint raises FileNotFoundError when config.json is missing."""
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as temp:
+            temp.write(b"# Test entrypoint\n")
+            entrypoint_file = temp.name
+
+        try:
+            with pytest.raises(FileNotFoundError) as exc_info:
+                run_entrypoint(
+                    entrypoint=entrypoint_file,
+                    config_file=None,
+                    dependencies=[],
+                    profile="default",
+                )
+            assert "config.json not found" in str(exc_info.value)
+            assert "config.json is required" in str(exc_info.value)
+
+        finally:
+            if os.path.exists(entrypoint_file):
+                os.unlink(entrypoint_file)
+
+    def test_run_entrypoint_invalid_json(self):
+        """Test run_entrypoint raises ValueError for invalid JSON in config.json."""
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as temp:
+            temp.write(b"# Test entrypoint\n")
+            entrypoint_file = temp.name
+
+        entrypoint_dir = os.path.dirname(entrypoint_file)
+        config_json_path = os.path.join(entrypoint_dir, "config.json")
+        with open(config_json_path, "w") as f:
+            f.write("{ invalid json }")
+
+        try:
+            with pytest.raises(ValueError) as exc_info:
+                run_entrypoint(
+                    entrypoint=entrypoint_file,
+                    config_file=None,
+                    dependencies=[],
+                    profile="default",
+                )
+            assert "not valid JSON" in str(exc_info.value)
+
+        finally:
+            if os.path.exists(entrypoint_file):
+                os.unlink(entrypoint_file)
+            if os.path.exists(config_json_path):
+                os.unlink(config_json_path)
+
+    def test_run_entrypoint_missing_dataspace_field(self):
+        """Test run_entrypoint raises ValueError when dataspace field is missing."""
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as temp:
+            temp.write(b"# Test entrypoint\n")
+            entrypoint_file = temp.name
+
+        entrypoint_dir = os.path.dirname(entrypoint_file)
+        config_json_path = os.path.join(entrypoint_dir, "config.json")
+        with open(config_json_path, "w") as f:
+            json.dump({"other_field": "value"}, f)
+
+        try:
+            with pytest.raises(ValueError) as exc_info:
+                run_entrypoint(
+                    entrypoint=entrypoint_file,
+                    config_file=None,
+                    dependencies=[],
+                    profile="default",
+                )
+            assert "missing required field 'dataspace'" in str(exc_info.value)
+
+        finally:
+            if os.path.exists(entrypoint_file):
+                os.unlink(entrypoint_file)
+            if os.path.exists(config_json_path):
+                os.unlink(config_json_path)
+
+    def test_run_entrypoint_empty_dataspace_value(self):
+        """Test that run_entrypoint raises ValueError when dataspace is empty."""
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as temp:
+            temp.write(b"# Test entrypoint\n")
+            entrypoint_file = temp.name
+
+        entrypoint_dir = os.path.dirname(entrypoint_file)
+        config_json_path = os.path.join(entrypoint_dir, "config.json")
+        with open(config_json_path, "w") as f:
+            json.dump({"dataspace": ""}, f)
+
+        try:
+            with pytest.raises(ValueError) as exc_info:
+                run_entrypoint(
+                    entrypoint=entrypoint_file,
+                    config_file=None,
+                    dependencies=[],
+                    profile="default",
+                )
+            assert "missing required field 'dataspace'" in str(exc_info.value)
+
+        finally:
+            if os.path.exists(entrypoint_file):
+                os.unlink(entrypoint_file)
+            if os.path.exists(config_json_path):
+                os.unlink(config_json_path)

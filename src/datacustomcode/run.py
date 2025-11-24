@@ -13,12 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import importlib
+import json
+import os
 from pathlib import Path
 import runpy
 import sys
 from typing import List, Union
 
 from datacustomcode.config import config
+
+
+def _set_config_option(config_obj, key: str, value: str) -> None:
+    """Set an option on a config object if it exists and has options attribute.
+
+    Args:
+        config_obj: Config object (reader_config or writer_config)
+        key: Option key to set
+        value: Option value to set
+    """
+    if config_obj and hasattr(config_obj, "options"):
+        config_obj.options[key] = value
 
 
 def run_entrypoint(
@@ -36,14 +50,43 @@ def run_entrypoint(
         profile: The credentials profile to use.
     """
     add_py_folder(entrypoint)
-    if profile != "default":
-        if config.reader_config and hasattr(config.reader_config, "options"):
-            config.reader_config.options["credentials_profile"] = profile
-        if config.writer_config and hasattr(config.writer_config, "options"):
-            config.writer_config.options["credentials_profile"] = profile
 
+    # Read dataspace from config.json (required)
+    entrypoint_dir = os.path.dirname(entrypoint)
+    config_json_path = os.path.join(entrypoint_dir, "config.json")
+
+    if not os.path.exists(config_json_path):
+        raise FileNotFoundError(
+            f"config.json not found at {config_json_path}. config.json is required."
+        )
+
+    try:
+        with open(config_json_path, "r") as f:
+            config_json = json.load(f)
+    except json.JSONDecodeError as err:
+        raise ValueError(
+            f"config.json at {config_json_path} is not valid JSON"
+        ) from err
+
+    # Require dataspace to be present in config.json
+    dataspace = config_json.get("dataspace")
+    if not dataspace:
+        raise ValueError(
+            f"config.json at {config_json_path} is missing required field 'dataspace'. "
+            f"Please ensure config.json contains a 'dataspace' field."
+        )
+
+    # Load config file first
     if config_file:
         config.load(config_file)
+
+    # Add dataspace to reader and writer config options
+    _set_config_option(config.reader_config, "dataspace", dataspace)
+    _set_config_option(config.writer_config, "dataspace", dataspace)
+
+    if profile != "default":
+        _set_config_option(config.reader_config, "credentials_profile", profile)
+        _set_config_option(config.writer_config, "credentials_profile", profile)
     for dependency in dependencies:
         try:
             importlib.import_module(dependency)
