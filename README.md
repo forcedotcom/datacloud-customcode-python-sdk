@@ -77,7 +77,9 @@ After modifying the `entrypoint.py` as needed, using any dependencies you add in
 4. The SDK automatically packages all dependencies when you run `datacustomcode zip`
 
 ```zsh
+cd my_package
 datacustomcode scan ./payload/entrypoint.py
+datacustomcode zip --path ./payload
 datacustomcode deploy --path ./payload --name my_custom_script --cpu-size CPU_L
 ```
 
@@ -183,7 +185,7 @@ Options:
 
 
 #### `datacustomcode init`
-Initialize a new development environment with a template.
+Initialize a new development environment with a code package template.
 
 Argument:
 - `DIRECTORY`: Directory to create project in (default: ".")
@@ -213,19 +215,19 @@ Options:
 
 
 #### `datacustomcode zip`
-Zip a transformation job in preparation to upload to Data Cloud.
+Zip a transformation job in preparation to upload to Data Cloud. Make sure to change directory into your code package folder (e.g., `my_package`) before running this command.
 
 Options:
-- `--path TEXT`: Path to the code directory (default: ".")
+- `--path TEXT`: Path to the code directory i.e. the payload folder (default: ".")
 - `--network TEXT`: docker network (default: "default")
 
 
 #### `datacustomcode deploy`
-Deploy a transformation job to Data Cloud.
+Deploy a transformation job to Data Cloud. Note that this command takes care of creating a zip file from provided path before deployment. Make sure to change directory into your code package folder (e.g., `my_package`) before running this command.
 
 Options:
 - `--profile TEXT`: Credential profile name (default: "default")
-- `--path TEXT`: Path to the code directory (default: ".")
+- `--path TEXT`: Path to the code directory i.e. the payload folder (default: ".")
 - `--name TEXT`: Name of the transformation job [required]
 - `--version TEXT`: Version of the transformation job (default: "0.0.1")
 - `--description TEXT`: Description of the transformation job (default: "")
