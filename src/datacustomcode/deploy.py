@@ -91,9 +91,29 @@ def _make_api_call(
     logger.debug(f"Request params: {kwargs}")
 
     response = requests.request(method=method, url=url, headers=headers, **kwargs)
-    json_response = response.json()
     if response.status_code >= 400:
-        logger.debug(f"Error Response: {json_response}")
+        logger.debug(f"Error Response Status: {response.status_code}")
+        logger.debug(f"Error Response Headers: {response.headers}")
+        logger.debug(f"Error Response Text: {response.text[:500]}")
+
+    if not response.text or response.text.strip() == "":
+        response.raise_for_status()
+        raise ValueError(
+            f"Received empty response from {method} {url}. "
+            f"Status code: {response.status_code}"
+        )
+
+    try:
+        json_response = response.json()
+    except requests.exceptions.JSONDecodeError as e:
+        logger.error(f"Failed to parse JSON response. Status: {response.status_code}")
+        logger.error(f"Response text: {response.text[:500]}")
+        raise ValueError(
+            f"Invalid JSON response from {method} {url}. "
+            f"Status code: {response.status_code}, "
+            f"Response: {response.text[:200]}"
+        ) from e
+
     response.raise_for_status()
     assert isinstance(
         json_response, dict
