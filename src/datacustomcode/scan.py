@@ -249,9 +249,9 @@ def dc_config_json_from_file(file_path: str) -> dict[str, Any]:
                 if not dataspace_value or (
                     isinstance(dataspace_value, str) and dataspace_value.strip() == ""
                 ):
-                    logger.error(
-                        f"dataspace in {config_json_path} is empty or None."
-                        f"Updating config file to use dataspace 'default'."
+                    logger.warning(
+                        f"dataspace in {config_json_path} is empty or None. "
+                        f"Updating config file to use dataspace 'default'. "
                     )
                     config["dataspace"] = "default"
                 else:
@@ -259,7 +259,7 @@ def dc_config_json_from_file(file_path: str) -> dict[str, Any]:
             else:
                 raise ValueError(
                     f"dataspace must be defined in {config_json_path}. "
-                    f"Please add a 'dataspace' field to the config.json file."
+                    f"Please add a 'dataspace' field to the config.json file. "
                 )
         except json.JSONDecodeError as e:
             raise ValueError(

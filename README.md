@@ -79,7 +79,6 @@ After modifying the `entrypoint.py` as needed, using any dependencies you add in
 ```zsh
 cd my_package
 datacustomcode scan ./payload/entrypoint.py
-datacustomcode zip --path ./payload
 datacustomcode deploy --path ./payload --name my_custom_script --cpu-size CPU_L
 ```
 
