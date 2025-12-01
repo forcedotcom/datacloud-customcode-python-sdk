@@ -15,6 +15,8 @@
 from __future__ import annotations
 
 import ast
+import json
+import logging
 import os
 import sys
 from typing import (
@@ -29,12 +31,14 @@ import pydantic
 
 from datacustomcode.version import get_version
 
+logger = logging.getLogger(__name__)
+
 DATA_ACCESS_METHODS = ["read_dlo", "read_dmo", "write_to_dlo", "write_to_dmo"]
 
 DATA_TRANSFORM_CONFIG_TEMPLATE = {
     "sdkVersion": get_version(),
     "entryPoint": "",
-    "dataspace": "default",
+    "dataspace": "",
     "permissions": {
         "read": {},
         "write": {},
@@ -232,6 +236,40 @@ def dc_config_json_from_file(file_path: str) -> dict[str, Any]:
     config = DATA_TRANSFORM_CONFIG_TEMPLATE.copy()
     config["entryPoint"] = file_path.rpartition("/")[-1]
 
+    file_dir = os.path.dirname(file_path)
+    config_json_path = os.path.join(file_dir, "config.json")
+
+    if os.path.exists(config_json_path) and os.path.isfile(config_json_path):
+        try:
+            with open(config_json_path, "r") as f:
+                existing_config = json.load(f)
+
+            if "dataspace" in existing_config:
+                dataspace_value = existing_config["dataspace"]
+                if not dataspace_value or (
+                    isinstance(dataspace_value, str) and dataspace_value.strip() == ""
+                ):
+                    logger.warning(
+                        f"dataspace in {config_json_path} is empty or None. "
+                        f"Updating config file to use dataspace 'default'. "
+                    )
+                    config["dataspace"] = "default"
+                else:
+                    config["dataspace"] = dataspace_value
+            else:
+                raise ValueError(
+                    f"dataspace must be defined in {config_json_path}. "
+                    f"Please add a 'dataspace' field to the config.json file. "
+                )
+        except json.JSONDecodeError as e:
+            raise ValueError(
+                f"Failed to parse JSON from {config_json_path}: {e}"
+            ) from e
+        except OSError as e:
+            raise OSError(f"Failed to read config file {config_json_path}: {e}") from e
+    else:
+        config["dataspace"] = "default"
+
     read: dict[str, list[str]] = {}
     if output.read_dlo:
         read["dlo"] = list(output.read_dlo)
@@ -244,4 +282,5 @@ def dc_config_json_from_file(file_path: str) -> dict[str, Any]:
         write["dmo"] = list(output.write_to_dmo)
 
     config["permissions"] = {"read": read, "write": write}
+
     return config

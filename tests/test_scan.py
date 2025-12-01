@@ -358,6 +358,238 @@ class TestDcConfigJson:
         finally:
             os.remove(temp_path)
 
+    @patch(
+        "datacustomcode.scan.DATA_TRANSFORM_CONFIG_TEMPLATE",
+        {
+            "sdkVersion": "1.2.3",
+            "entryPoint": "",
+            "dataspace": "",
+            "permissions": {
+                "read": {},
+                "write": {},
+            },
+        },
+    )
+    def test_preserves_existing_dataspace(self):
+        """Test that existing dataspace value is preserved when config.json exists."""
+        import json
+
+        content = textwrap.dedent(
+            """
+            from datacustomcode.client import Client
+
+            client = Client()
+            df = client.read_dlo("input_dlo")
+            client.write_to_dlo("output_dlo", df, "overwrite")
+        """
+        )
+        temp_path = create_test_script(content)
+        file_dir = os.path.dirname(temp_path)
+        config_path = os.path.join(file_dir, "config.json")
+
+        try:
+            # Create an existing config.json with a custom dataspace
+            existing_config = {
+                "sdkVersion": "1.0.0",
+                "entryPoint": "test.py",
+                "dataspace": "my_custom_dataspace",
+                "permissions": {
+                    "read": {"dlo": ["old_dlo"]},
+                    "write": {"dlo": ["old_output"]},
+                },
+            }
+            with open(config_path, "w") as f:
+                json.dump(existing_config, f)
+
+            # Generate new config - should preserve dataspace
+            result = dc_config_json_from_file(temp_path)
+            assert result["dataspace"] == "my_custom_dataspace"
+            assert result["permissions"]["read"]["dlo"] == ["input_dlo"]
+            assert result["permissions"]["write"]["dlo"] == ["output_dlo"]
+        finally:
+            os.remove(temp_path)
+            if os.path.exists(config_path):
+                os.remove(config_path)
+
+    @patch(
+        "datacustomcode.scan.DATA_TRANSFORM_CONFIG_TEMPLATE",
+        {
+            "sdkVersion": "1.2.3",
+            "entryPoint": "",
+            "dataspace": "",
+            "permissions": {
+                "read": {},
+                "write": {},
+            },
+        },
+    )
+    def test_uses_default_for_empty_dataspace(self, caplog):
+        """Test that empty dataspace value uses default and logs warning."""
+        import json
+        import logging
+
+        content = textwrap.dedent(
+            """
+            from datacustomcode.client import Client
+
+            client = Client()
+            df = client.read_dlo("input_dlo")
+            client.write_to_dlo("output_dlo", df, "overwrite")
+        """
+        )
+        temp_path = create_test_script(content)
+        file_dir = os.path.dirname(temp_path)
+        config_path = os.path.join(file_dir, "config.json")
+
+        try:
+            # Create an existing config.json with empty dataspace
+            existing_config = {
+                "sdkVersion": "1.0.0",
+                "entryPoint": "test.py",
+                "dataspace": "",
+                "permissions": {
+                    "read": {"dlo": ["old_dlo"]},
+                    "write": {"dlo": ["old_output"]},
+                },
+            }
+            with open(config_path, "w") as f:
+                json.dump(existing_config, f)
+
+            # Should use "default" for empty dataspace (not raise error)
+            with caplog.at_level(logging.WARNING):
+                result = dc_config_json_from_file(temp_path)
+
+            assert result["dataspace"] == "default"
+            assert result["permissions"]["read"]["dlo"] == ["input_dlo"]
+            assert result["permissions"]["write"]["dlo"] == ["output_dlo"]
+
+            # Verify that a warning was logged
+            assert len(caplog.records) > 0
+            assert any(
+                "dataspace" in record.message.lower()
+                and "empty" in record.message.lower()
+                for record in caplog.records
+            )
+        finally:
+            os.remove(temp_path)
+            if os.path.exists(config_path):
+                os.remove(config_path)
+
+    @patch(
+        "datacustomcode.scan.DATA_TRANSFORM_CONFIG_TEMPLATE",
+        {
+            "sdkVersion": "1.2.3",
+            "entryPoint": "",
+            "dataspace": "",
+            "permissions": {
+                "read": {},
+                "write": {},
+            },
+        },
+    )
+    def test_uses_default_dataspace_when_no_config(self):
+        """Test missing config.json uses default dataspace."""
+        content = textwrap.dedent(
+            """
+            from datacustomcode.client import Client
+
+            client = Client()
+            df = client.read_dlo("input_dlo")
+            client.write_to_dlo("output_dlo", df, "overwrite")
+        """
+        )
+        temp_path = create_test_script(content)
+
+        try:
+            # No existing config.json - should use "default" dataspace
+            result = dc_config_json_from_file(temp_path)
+            assert result["dataspace"] == "default"
+            assert result["permissions"]["read"]["dlo"] == ["input_dlo"]
+            assert result["permissions"]["write"]["dlo"] == ["output_dlo"]
+        finally:
+            os.remove(temp_path)
+
+    @patch(
+        "datacustomcode.scan.DATA_TRANSFORM_CONFIG_TEMPLATE",
+        {
+            "sdkVersion": "1.2.3",
+            "entryPoint": "",
+            "dataspace": "",
+            "permissions": {
+                "read": {},
+                "write": {},
+            },
+        },
+    )
+    def test_rejects_missing_dataspace(self):
+        """Test that config.json missing dataspace field raises ValueError."""
+        import json
+
+        content = textwrap.dedent(
+            """
+            from datacustomcode.client import Client
+
+            client = Client()
+            df = client.read_dlo("input_dlo")
+            client.write_to_dlo("output_dlo", df, "overwrite")
+        """
+        )
+        temp_path = create_test_script(content)
+        file_dir = os.path.dirname(temp_path)
+        config_path = os.path.join(file_dir, "config.json")
+
+        try:
+            # Create an existing config.json without dataspace field
+            existing_config = {
+                "sdkVersion": "1.0.0",
+                "entryPoint": "test.py",
+                "permissions": {
+                    "read": {"dlo": ["old_dlo"]},
+                    "write": {"dlo": ["old_output"]},
+                },
+            }
+            with open(config_path, "w") as f:
+                json.dump(existing_config, f)
+
+            # Should raise ValueError when dataspace field is missing
+            with pytest.raises(
+                ValueError, match="dataspace must be defined in.*config.json"
+            ):
+                dc_config_json_from_file(temp_path)
+        finally:
+            os.remove(temp_path)
+            if os.path.exists(config_path):
+                os.remove(config_path)
+
+    def test_raises_error_on_invalid_json(self):
+        """Test that invalid JSON in config.json raises an error."""
+
+        content = textwrap.dedent(
+            """
+            from datacustomcode.client import Client
+
+            client = Client()
+            df = client.read_dlo("input_dlo")
+            client.write_to_dlo("output_dlo", df, "overwrite")
+        """
+        )
+        temp_path = create_test_script(content)
+        file_dir = os.path.dirname(temp_path)
+        config_path = os.path.join(file_dir, "config.json")
+
+        try:
+            # Create an invalid JSON file
+            with open(config_path, "w") as f:
+                f.write("{ invalid json }")
+
+            # Should raise ValueError for invalid JSON
+            with pytest.raises(ValueError, match="Failed to parse JSON"):
+                dc_config_json_from_file(temp_path)
+        finally:
+            os.remove(temp_path)
+            if os.path.exists(config_path):
+                os.remove(config_path)
+
 
 class TestDataAccessLayerCalls:
     """Tests for the DataAccessLayerCalls class directly."""
