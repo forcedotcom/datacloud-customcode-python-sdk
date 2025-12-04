@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 import textwrap
@@ -12,8 +13,10 @@ from datacustomcode.scan import (
     dc_config_json_from_file,
     scan_file,
     scan_file_for_imports,
+    update_config,
     write_requirements_file,
 )
+from datacustomcode.version import get_version
 
 
 def create_test_script(content: str) -> str:
@@ -282,18 +285,6 @@ class TestScanFile:
 
 
 class TestDcConfigJson:
-    @patch(
-        "datacustomcode.scan.DATA_TRANSFORM_CONFIG_TEMPLATE",
-        {
-            "sdkVersion": "1.2.3",
-            "entryPoint": "",
-            "dataspace": "default",
-            "permissions": {
-                "read": {},
-                "write": {},
-            },
-        },
-    )
     def test_dlo_to_dlo_config(self):
         """Test generating config JSON for DLO to DLO operations."""
         content = textwrap.dedent(
@@ -311,27 +302,20 @@ class TestDcConfigJson:
         )
         temp_path = create_test_script(content)
         try:
-            result = dc_config_json_from_file(temp_path)
+            result = dc_config_json_from_file(temp_path, "script")
             assert result["entryPoint"] == os.path.basename(temp_path)
             assert result["dataspace"] == "default"
-            assert result["sdkVersion"] == "1.2.3"  # From mocked version
+            assert result["sdkVersion"] == get_version()
+            file_dir = os.path.dirname(temp_path)
+            config_path = os.path.join(file_dir, "config.json")
+            with open(config_path, "w") as f:
+                json.dump(result, f)
+            result = update_config(temp_path)
             assert result["permissions"]["read"]["dlo"] == ["input_dlo"]
             assert result["permissions"]["write"]["dlo"] == ["output_dlo"]
         finally:
             os.remove(temp_path)
 
-    @patch(
-        "datacustomcode.scan.DATA_TRANSFORM_CONFIG_TEMPLATE",
-        {
-            "sdkVersion": "1.2.3",
-            "entryPoint": "",
-            "dataspace": "default",
-            "permissions": {
-                "read": {},
-                "write": {},
-            },
-        },
-    )
     def test_dmo_to_dmo_config(self):
         """Test generating config JSON for DMO to DMO operations."""
         content = textwrap.dedent(
@@ -349,10 +333,11 @@ class TestDcConfigJson:
         )
         temp_path = create_test_script(content)
         try:
-            config = dc_config_json_from_file(temp_path)
+            config = dc_config_json_from_file(temp_path, "script")
             assert config["entryPoint"] == os.path.basename(temp_path)
             assert config["dataspace"] == "default"
-            assert config["sdkVersion"] == "1.2.3"  # From mocked version
+            assert config["sdkVersion"] == get_version()
+            config = update_config(temp_path)
             assert config["permissions"]["read"]["dmo"] == ["input_dmo"]
             assert config["permissions"]["write"]["dmo"] == ["output_dmo"]
         finally:
@@ -392,6 +377,7 @@ class TestDcConfigJson:
             existing_config = {
                 "sdkVersion": "1.0.0",
                 "entryPoint": "test.py",
+                "type": "script",
                 "dataspace": "my_custom_dataspace",
                 "permissions": {
                     "read": {"dlo": ["old_dlo"]},
@@ -402,7 +388,7 @@ class TestDcConfigJson:
                 json.dump(existing_config, f)
 
             # Generate new config - should preserve dataspace
-            result = dc_config_json_from_file(temp_path)
+            result = update_config(temp_path)
             assert result["dataspace"] == "my_custom_dataspace"
             assert result["permissions"]["read"]["dlo"] == ["input_dlo"]
             assert result["permissions"]["write"]["dlo"] == ["output_dlo"]
@@ -411,18 +397,6 @@ class TestDcConfigJson:
             if os.path.exists(config_path):
                 os.remove(config_path)
 
-    @patch(
-        "datacustomcode.scan.DATA_TRANSFORM_CONFIG_TEMPLATE",
-        {
-            "sdkVersion": "1.2.3",
-            "entryPoint": "",
-            "dataspace": "",
-            "permissions": {
-                "read": {},
-                "write": {},
-            },
-        },
-    )
     def test_uses_default_for_empty_dataspace(self, caplog):
         """Test that empty dataspace value uses default and logs warning."""
         import json
@@ -446,6 +420,7 @@ class TestDcConfigJson:
             existing_config = {
                 "sdkVersion": "1.0.0",
                 "entryPoint": "test.py",
+                "type": "script",
                 "dataspace": "",
                 "permissions": {
                     "read": {"dlo": ["old_dlo"]},
@@ -457,7 +432,7 @@ class TestDcConfigJson:
 
             # Should use "default" for empty dataspace (not raise error)
             with caplog.at_level(logging.WARNING):
-                result = dc_config_json_from_file(temp_path)
+                result = update_config(temp_path)
 
             assert result["dataspace"] == "default"
             assert result["permissions"]["read"]["dlo"] == ["input_dlo"]
@@ -475,18 +450,6 @@ class TestDcConfigJson:
             if os.path.exists(config_path):
                 os.remove(config_path)
 
-    @patch(
-        "datacustomcode.scan.DATA_TRANSFORM_CONFIG_TEMPLATE",
-        {
-            "sdkVersion": "1.2.3",
-            "entryPoint": "",
-            "dataspace": "",
-            "permissions": {
-                "read": {},
-                "write": {},
-            },
-        },
-    )
     def test_uses_default_dataspace_when_no_config(self):
         """Test missing config.json uses default dataspace."""
         content = textwrap.dedent(
@@ -502,25 +465,11 @@ class TestDcConfigJson:
 
         try:
             # No existing config.json - should use "default" dataspace
-            result = dc_config_json_from_file(temp_path)
+            result = dc_config_json_from_file(temp_path, "script")
             assert result["dataspace"] == "default"
-            assert result["permissions"]["read"]["dlo"] == ["input_dlo"]
-            assert result["permissions"]["write"]["dlo"] == ["output_dlo"]
         finally:
             os.remove(temp_path)
 
-    @patch(
-        "datacustomcode.scan.DATA_TRANSFORM_CONFIG_TEMPLATE",
-        {
-            "sdkVersion": "1.2.3",
-            "entryPoint": "",
-            "dataspace": "",
-            "permissions": {
-                "read": {},
-                "write": {},
-            },
-        },
-    )
     def test_rejects_missing_dataspace(self):
         """Test that config.json missing dataspace field raises ValueError."""
         import json
@@ -543,6 +492,7 @@ class TestDcConfigJson:
             existing_config = {
                 "sdkVersion": "1.0.0",
                 "entryPoint": "test.py",
+                "type": "script",
                 "permissions": {
                     "read": {"dlo": ["old_dlo"]},
                     "write": {"dlo": ["old_output"]},
@@ -553,9 +503,11 @@ class TestDcConfigJson:
 
             # Should raise ValueError when dataspace field is missing
             with pytest.raises(
-                ValueError, match="dataspace must be defined in.*config.json"
+                ValueError,
+                match="dataspace must be defined. Please add a 'dataspace' field to "
+                "the config.json file.",
             ):
-                dc_config_json_from_file(temp_path)
+                update_config(temp_path)
         finally:
             os.remove(temp_path)
             if os.path.exists(config_path):
@@ -584,7 +536,7 @@ class TestDcConfigJson:
 
             # Should raise ValueError for invalid JSON
             with pytest.raises(ValueError, match="Failed to parse JSON"):
-                dc_config_json_from_file(temp_path)
+                update_config(temp_path)
         finally:
             os.remove(temp_path)
             if os.path.exists(config_path):
@@ -660,8 +612,11 @@ def test_real_world_example():
         result = scan_file(temp_path)
         assert "customer_data_raw" in result.read_dlo
         assert "customer_data_enriched" in result.write_to_dlo
-
-        config = dc_config_json_from_file(temp_path)
+        result = dc_config_json_from_file(temp_path, "script")
+        config_path = os.path.join(os.path.dirname(temp_path), "config.json")
+        with open(config_path, "w") as f:
+            json.dump(result, f)
+        config = update_config(temp_path)
         assert config["permissions"]["read"]["dlo"] == ["customer_data_raw"]
         assert config["permissions"]["write"]["dlo"] == ["customer_data_enriched"]
     finally:

@@ -17,15 +17,31 @@ import shutil
 
 from loguru import logger
 
-template_dir = os.path.join(os.path.dirname(__file__), "templates")
+script_template_dir = os.path.join(os.path.dirname(__file__), "templates", "script")
+function_template_dir = os.path.join(os.path.dirname(__file__), "templates", "function")
 
 
-def copy_template(target_dir: str) -> None:
+def copy_script_template(target_dir: str) -> None:
     """Copy the template to the target directory."""
     os.makedirs(target_dir, exist_ok=True)
 
-    for item in os.listdir(template_dir):
-        source = os.path.join(template_dir, item)
+    for item in os.listdir(script_template_dir):
+        source = os.path.join(script_template_dir, item)
+        destination = os.path.join(target_dir, item)
+
+        if os.path.isdir(source):
+            logger.debug(f"Copying directory {source} to {destination}...")
+            shutil.copytree(source, destination, dirs_exist_ok=True)
+        else:
+            logger.debug(f"Copying file {source} to {destination}...")
+            shutil.copy2(source, destination)
+
+
+def copy_function_template(target_dir: str) -> None:
+    os.makedirs(target_dir, exist_ok=True)
+
+    for item in os.listdir(function_template_dir):
+        source = os.path.join(function_template_dir, item)
         destination = os.path.join(target_dir, item)
 
         if os.path.isdir(source):
