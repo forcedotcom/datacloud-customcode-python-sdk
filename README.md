@@ -298,15 +298,30 @@ You can read more about Jupyter Notebooks here: https://jupyter.org/
 ### Creating a connected app
 
 1. Log in to salesforce as an admin. In the top right corner, click on the gear icon and go to `Setup`
-2. In the left hand side, search for "App Manager" and select the `App Manager` underneath `Apps`
-3. Click on `New Connected App` in the upper right
-4. Fill in the required fields within the `Basic Information` section
-5. Under the `API (Enable OAuth Settings)` section:
-    1. Click on the checkbox to Enable OAuth Settings.
-    2. Provide a callback URL like http://localhost:55555/callback
-    3. In the Selected OAuth Scopes, make sure that `refresh_token`, `api`, `cdp_query_api`, `cdp_profile_api` is selected.
-    4. Click on Save to save the connected app
-6. From the detail page that opens up afterwards, click the "Manage Consumer Details" button to find your client id and client secret
+2. In the left hand column search for `oauth`
+3. Select `OAuth and OpenID Connect Settings`
+4. Toggle on `Allow OAuth Username-Password Flows` and accept the dialog box that pops up
+5. Clear the search bar
+7. Expand `Apps`, expand `External Client Apps`, click `Settings`
+8. Toggle on `Allow access to External Client App consumer secrets via REST API`
+9. Toggle on `Allow creation of connected apps`
+10. Click `Enable` in the warning box
+11. Click `New Connected App` button
+12. Fill in the required fields within the `Basic Information` section
+13. Under the `API (Enable OAuth Settings)` section:
+    a. Click on the checkbox to Enable OAuth Settings.
+    b. Provide a callback URL like http://localhost:55555/callback
+    c. In the Selected OAuth Scopes, make sure that `refresh_token`, `api`, `cdp_query_api`, `cdp_profile_api` is selected.
+    d. Click on Save to save the connected app
+14. From the detail page that opens up afterwards, click the `Manage Consumer Details` button to find your client id and client secret
+15. Click `Cancel` button once complete
+16. Click `Manage` button
+17. Click `Edit Policies`
+18. Under `IP Relaxation` select `Relax IP restrictions`
+19. Click `Save`
+20. Logout
+21. Use the URL of the login page as the `login_url` value when setting up the SDK
+
 7. Go back to `Setup`, then `OAuth and OpenID Connect Settings`, and enable the "Allow OAuth Username-Password Flows" option
 
 You now have all fields necessary for the `datacustomcode configure` command.
