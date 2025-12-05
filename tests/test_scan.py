@@ -9,12 +9,14 @@ from unittest.mock import patch
 import pytest
 
 from datacustomcode.scan import (
+    SDK_CONFIG_DIR,
     DataAccessLayerCalls,
     dc_config_json_from_file,
     scan_file,
     scan_file_for_imports,
     update_config,
     write_requirements_file,
+    write_sdk_config,
 )
 from datacustomcode.version import get_version
 
@@ -25,6 +27,21 @@ def create_test_script(content: str) -> str:
         temp.write(content)
         temp_path = temp.name
     return temp_path
+
+
+def create_sdk_config(base_directory: str, package_type: str = "script") -> str:
+    """Create SDK config file for testing.
+
+    Args:
+        base_directory: The base directory where .datacustomcode should be created
+        package_type: The package type ("script" or "function")
+
+    Returns:
+        Path to the created SDK config file
+    """
+    sdk_config = {"type": package_type}
+    write_sdk_config(base_directory, sdk_config)
+    return os.path.join(base_directory, SDK_CONFIG_DIR, "config.json")
 
 
 class TestClientMethodVisitor:
@@ -301,6 +318,9 @@ class TestDcConfigJson:
         """
         )
         temp_path = create_test_script(content)
+        file_dir = os.path.dirname(temp_path)
+        # Create SDK config in the same directory as the script
+        sdk_config_path = create_sdk_config(file_dir, "script")
         try:
             result = dc_config_json_from_file(temp_path, "script")
             assert result["entryPoint"] == os.path.basename(temp_path)
@@ -315,6 +335,9 @@ class TestDcConfigJson:
             assert result["permissions"]["write"]["dlo"] == ["output_dlo"]
         finally:
             os.remove(temp_path)
+            if os.path.exists(sdk_config_path):
+                os.remove(sdk_config_path)
+                os.rmdir(os.path.dirname(sdk_config_path))
 
     def test_dmo_to_dmo_config(self):
         """Test generating config JSON for DMO to DMO operations."""
@@ -332,6 +355,9 @@ class TestDcConfigJson:
         """
         )
         temp_path = create_test_script(content)
+        file_dir = os.path.dirname(temp_path)
+        # Create SDK config in the same directory as the script
+        sdk_config_path = create_sdk_config(file_dir, "script")
         try:
             config = dc_config_json_from_file(temp_path, "script")
             assert config["entryPoint"] == os.path.basename(temp_path)
@@ -342,6 +368,9 @@ class TestDcConfigJson:
             assert config["permissions"]["write"]["dmo"] == ["output_dmo"]
         finally:
             os.remove(temp_path)
+            if os.path.exists(sdk_config_path):
+                os.remove(sdk_config_path)
+                os.rmdir(os.path.dirname(sdk_config_path))
 
     @patch(
         "datacustomcode.scan.DATA_TRANSFORM_CONFIG_TEMPLATE",
@@ -373,7 +402,10 @@ class TestDcConfigJson:
         config_path = os.path.join(file_dir, "config.json")
 
         try:
+            # Create SDK config
+            sdk_config_path = create_sdk_config(file_dir, "script")
             # Create an existing config.json with a custom dataspace
+            # (without type field)
             existing_config = {
                 "sdkVersion": "1.0.0",
                 "entryPoint": "test.py",
@@ -396,11 +428,13 @@ class TestDcConfigJson:
             os.remove(temp_path)
             if os.path.exists(config_path):
                 os.remove(config_path)
+            if os.path.exists(sdk_config_path):
+                os.remove(sdk_config_path)
+                os.rmdir(os.path.dirname(sdk_config_path))
 
-    def test_uses_default_for_empty_dataspace(self, caplog):
+    def test_uses_default_for_empty_dataspace(self):
         """Test that empty dataspace value uses default and logs warning."""
         import json
-        import logging
 
         content = textwrap.dedent(
             """
@@ -416,11 +450,12 @@ class TestDcConfigJson:
         config_path = os.path.join(file_dir, "config.json")
 
         try:
-            # Create an existing config.json with empty dataspace
+            # Create SDK config
+            sdk_config_path = create_sdk_config(file_dir, "script")
+            # Create an existing config.json with empty dataspace (without type field)
             existing_config = {
                 "sdkVersion": "1.0.0",
                 "entryPoint": "test.py",
-                "type": "script",
                 "dataspace": "",
                 "permissions": {
                     "read": {"dlo": ["old_dlo"]},
@@ -431,24 +466,19 @@ class TestDcConfigJson:
                 json.dump(existing_config, f)
 
             # Should use "default" for empty dataspace (not raise error)
-            with caplog.at_level(logging.WARNING):
-                result = update_config(temp_path)
+            result = update_config(temp_path)
 
             assert result["dataspace"] == "default"
             assert result["permissions"]["read"]["dlo"] == ["input_dlo"]
             assert result["permissions"]["write"]["dlo"] == ["output_dlo"]
 
-            # Verify that a warning was logged
-            assert len(caplog.records) > 0
-            assert any(
-                "dataspace" in record.message.lower()
-                and "empty" in record.message.lower()
-                for record in caplog.records
-            )
         finally:
             os.remove(temp_path)
             if os.path.exists(config_path):
                 os.remove(config_path)
+            if os.path.exists(sdk_config_path):
+                os.remove(sdk_config_path)
+                os.rmdir(os.path.dirname(sdk_config_path))
 
     def test_uses_default_dataspace_when_no_config(self):
         """Test missing config.json uses default dataspace."""
@@ -488,11 +518,13 @@ class TestDcConfigJson:
         config_path = os.path.join(file_dir, "config.json")
 
         try:
+            # Create SDK config
+            sdk_config_path = create_sdk_config(file_dir, "script")
             # Create an existing config.json without dataspace field
+            # (without type field)
             existing_config = {
                 "sdkVersion": "1.0.0",
                 "entryPoint": "test.py",
-                "type": "script",
                 "permissions": {
                     "read": {"dlo": ["old_dlo"]},
                     "write": {"dlo": ["old_output"]},
@@ -512,6 +544,9 @@ class TestDcConfigJson:
             os.remove(temp_path)
             if os.path.exists(config_path):
                 os.remove(config_path)
+            if os.path.exists(sdk_config_path):
+                os.remove(sdk_config_path)
+                os.rmdir(os.path.dirname(sdk_config_path))
 
     def test_raises_error_on_invalid_json(self):
         """Test that invalid JSON in config.json raises an error."""

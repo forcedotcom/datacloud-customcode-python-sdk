@@ -147,7 +147,11 @@ def deploy(
 @click.argument("directory", default=".")
 @click.option("--type", default="script", type=click.Choice(["script", "function"]))
 def init(directory: str, type: str):
-    from datacustomcode.scan import dc_config_json_from_file, update_config
+    from datacustomcode.scan import (
+        dc_config_json_from_file,
+        update_config,
+        write_sdk_config,
+    )
     from datacustomcode.template import copy_function_template, copy_script_template
 
     click.echo("Copying template to " + click.style(directory, fg="blue", bold=True))
@@ -157,6 +161,11 @@ def init(directory: str, type: str):
         copy_function_template(directory)
     entrypoint_path = os.path.join(directory, "payload", "entrypoint.py")
     config_location = os.path.join(os.path.dirname(entrypoint_path), "config.json")
+
+    # Write package type to SDK-specific config
+    sdk_config = {"type": type}
+    write_sdk_config(directory, sdk_config)
+
     config_json = dc_config_json_from_file(entrypoint_path, type)
     with open(config_location, "w") as f:
         json.dump(config_json, f, indent=2)

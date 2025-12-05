@@ -11,8 +11,11 @@ class TestInit:
     @patch("datacustomcode.template.copy_script_template")
     @patch("datacustomcode.scan.update_config")
     @patch("datacustomcode.scan.dc_config_json_from_file")
+    @patch("datacustomcode.scan.write_sdk_config")
     @patch("builtins.open", new_callable=mock_open)
-    def test_init_command(self, mock_file, mock_scan, mock_update, mock_copy):
+    def test_init_command(
+        self, mock_file, mock_write_sdk, mock_scan, mock_update, mock_copy
+    ):
         """Test init command."""
         mock_scan.return_value = {
             "sdkVersion": "1.0.0",
@@ -42,6 +45,8 @@ class TestInit:
 
             assert result.exit_code == 0
             mock_copy.assert_called_once_with("test_dir")
+            # Verify SDK config was written
+            mock_write_sdk.assert_called_once_with("test_dir", {"type": "script"})
             mock_scan.assert_called_once_with(
                 os.path.join("test_dir", "payload", "entrypoint.py"), "script"
             )
