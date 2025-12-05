@@ -43,8 +43,7 @@ def dc_function(request: dict) -> dict:
 
     for item in items:
         # Item is DocElement as dict
-        logger.info("Processing item: ")
-        logger.info(item)
+        logger.info(f"Processing item: {item}")
 
         text = item.get("text", "")
         metadata = item.get("metadata", {})
