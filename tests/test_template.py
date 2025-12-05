@@ -6,7 +6,7 @@ import tempfile
 
 import pytest
 
-from datacustomcode.template import copy_template, template_dir
+from datacustomcode.template import copy_script_template, script_template_dir
 
 
 class TestTemplate:
@@ -18,17 +18,17 @@ class TestTemplate:
 
     def test_template_dir_exists(self):
         """Test that the template directory exists."""
-        assert os.path.isdir(template_dir)
+        assert os.path.isdir(script_template_dir)
         # Verify there are actual files in the template dir
-        assert len(os.listdir(template_dir)) > 0
+        assert len(os.listdir(script_template_dir)) > 0
 
     def test_copy_template_basic(self, temp_dir):
         """Test basic functionality of copy_template."""
         # Call the function to copy templates to temporary directory
-        copy_template(temp_dir)
+        copy_script_template(temp_dir)
 
         # Get the list of files in both directories
-        template_items = os.listdir(template_dir)
+        template_items = os.listdir(script_template_dir)
         copied_items = os.listdir(temp_dir)
 
         # Verify all template items were copied
@@ -36,7 +36,7 @@ class TestTemplate:
             assert item in copied_items
 
             # Check if the copied item matches the original
-            source_path = os.path.join(template_dir, item)
+            source_path = os.path.join(script_template_dir, item)
             dest_path = os.path.join(temp_dir, item)
 
             if os.path.isdir(source_path):
@@ -82,13 +82,13 @@ class TestTemplate:
         assert not os.path.exists(nonexistent_dir)
 
         # Copy templates
-        copy_template(nonexistent_dir)
+        copy_script_template(nonexistent_dir)
 
         # Verify directory was created
         assert os.path.isdir(nonexistent_dir)
 
         # Verify contents match the template directory
-        template_items = set(os.listdir(template_dir))
+        template_items = set(os.listdir(script_template_dir))
         copied_items = set(os.listdir(nonexistent_dir))
         assert template_items == copied_items
 
@@ -100,7 +100,7 @@ class TestTemplate:
             f.write("This is an existing file")
 
         # Copy templates
-        copy_template(temp_dir)
+        copy_script_template(temp_dir)
 
         # Verify the existing file is still there
         assert os.path.exists(test_file)
@@ -111,6 +111,6 @@ class TestTemplate:
         assert content == "This is an existing file"
 
         # Verify all template items were also copied
-        template_items = os.listdir(template_dir)
+        template_items = os.listdir(script_template_dir)
         for item in template_items:
             assert os.path.exists(os.path.join(temp_dir, item))

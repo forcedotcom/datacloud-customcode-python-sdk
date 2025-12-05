@@ -1,0 +1,11 @@
+FROM public.ecr.aws/emr-on-eks/spark/emr-7.3.0:latest
+
+USER root
+
+RUN pip3.11 install venv-pack
+
+# Create workspace directory
+RUN mkdir /workspace
+WORKDIR /workspace
+
+CMD ["./build_native_dependencies.sh"]

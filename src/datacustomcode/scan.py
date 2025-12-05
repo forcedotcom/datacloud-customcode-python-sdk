@@ -37,14 +37,20 @@ DATA_ACCESS_METHODS = ["read_dlo", "read_dmo", "write_to_dlo", "write_to_dmo"]
 
 DATA_TRANSFORM_CONFIG_TEMPLATE = {
     "sdkVersion": get_version(),
+    "type": "script",
     "entryPoint": "",
-    "dataspace": "",
+    "dataspace": "default",
     "permissions": {
         "read": {},
         "write": {},
     },
 }
 
+FUNCTION_CONFIG_TEMPLATE = {
+    "sdkVersion": get_version(),
+    "type": "function",
+    "entryPoint": "",
+}
 STANDARD_LIBS = set(sys.stdlib_module_names)
 
 
@@ -230,37 +236,25 @@ def scan_file(file_path: str) -> DataAccessLayerCalls:
         return visitor.found()
 
 
-def dc_config_json_from_file(file_path: str) -> dict[str, Any]:
+def dc_config_json_from_file(file_path: str, type: str) -> dict[str, Any]:
     """Create a Data Cloud Custom Code config JSON from a script."""
-    output = scan_file(file_path)
-    config = DATA_TRANSFORM_CONFIG_TEMPLATE.copy()
+    config: dict[str, Any]
+    if type == "script":
+        config = DATA_TRANSFORM_CONFIG_TEMPLATE.copy()
+    elif type == "function":
+        config = FUNCTION_CONFIG_TEMPLATE.copy()
     config["entryPoint"] = file_path.rpartition("/")[-1]
+    return config
 
+
+def update_config(file_path: str) -> dict[str, Any]:
     file_dir = os.path.dirname(file_path)
     config_json_path = os.path.join(file_dir, "config.json")
-
+    existing_config: dict[str, Any]
     if os.path.exists(config_json_path) and os.path.isfile(config_json_path):
         try:
             with open(config_json_path, "r") as f:
                 existing_config = json.load(f)
-
-            if "dataspace" in existing_config:
-                dataspace_value = existing_config["dataspace"]
-                if not dataspace_value or (
-                    isinstance(dataspace_value, str) and dataspace_value.strip() == ""
-                ):
-                    logger.warning(
-                        f"dataspace in {config_json_path} is empty or None. "
-                        f"Updating config file to use dataspace 'default'. "
-                    )
-                    config["dataspace"] = "default"
-                else:
-                    config["dataspace"] = dataspace_value
-            else:
-                raise ValueError(
-                    f"dataspace must be defined in {config_json_path}. "
-                    f"Please add a 'dataspace' field to the config.json file. "
-                )
         except json.JSONDecodeError as e:
             raise ValueError(
                 f"Failed to parse JSON from {config_json_path}: {e}"
@@ -268,19 +262,40 @@ def dc_config_json_from_file(file_path: str) -> dict[str, Any]:
         except OSError as e:
             raise OSError(f"Failed to read config file {config_json_path}: {e}") from e
     else:
-        config["dataspace"] = "default"
+        raise ValueError(f"config.json not found at {config_json_path}")
+    if existing_config["type"] == "script":
+        existing_config["dataspace"] = get_dataspace(existing_config)
+        output = scan_file(file_path)
+        read: dict[str, list[str]] = {}
+        if output.read_dlo:
+            read["dlo"] = list(output.read_dlo)
+        else:
+            read["dmo"] = list(output.read_dmo)
+        write: dict[str, list[str]] = {}
+        if output.write_to_dlo:
+            write["dlo"] = list(output.write_to_dlo)
+        else:
+            write["dmo"] = list(output.write_to_dmo)
 
-    read: dict[str, list[str]] = {}
-    if output.read_dlo:
-        read["dlo"] = list(output.read_dlo)
+        existing_config["permissions"] = {"read": read, "write": write}
+    return existing_config
+
+
+def get_dataspace(existing_config: dict[str, str]) -> str:
+    if "dataspace" in existing_config:
+        dataspace_value = existing_config["dataspace"]
+        if not dataspace_value or (
+            isinstance(dataspace_value, str) and dataspace_value.strip() == ""
+        ):
+            logger.warning(
+                "dataspace is empty or None. "
+                "Updating config file to use dataspace 'default'. "
+            )
+            return "default"
+        else:
+            return dataspace_value
     else:
-        read["dmo"] = list(output.read_dmo)
-    write: dict[str, list[str]] = {}
-    if output.write_to_dlo:
-        write["dlo"] = list(output.write_to_dlo)
-    else:
-        write["dmo"] = list(output.write_to_dmo)
-
-    config["permissions"] = {"read": read, "write": write}
-
-    return config
+        raise ValueError(
+            "dataspace must be defined. "
+            "Please add a 'dataspace' field to the config.json file. "
+        )
