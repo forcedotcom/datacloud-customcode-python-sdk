@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import ast
 import json
-import logging
 import os
 import sys
 from typing import (
@@ -27,25 +26,108 @@ from typing import (
     Union,
 )
 
+from loguru import logger
 import pydantic
 
 from datacustomcode.version import get_version
-
-logger = logging.getLogger(__name__)
 
 DATA_ACCESS_METHODS = ["read_dlo", "read_dmo", "write_to_dlo", "write_to_dmo"]
 
 DATA_TRANSFORM_CONFIG_TEMPLATE = {
     "sdkVersion": get_version(),
     "entryPoint": "",
-    "dataspace": "",
+    "dataspace": "default",
     "permissions": {
         "read": {},
         "write": {},
     },
 }
 
+FUNCTION_CONFIG_TEMPLATE = {
+    "sdkVersion": get_version(),
+    "entryPoint": "",
+}
 STANDARD_LIBS = set(sys.stdlib_module_names)
+
+SDK_CONFIG_DIR = ".datacustomcode_proj"
+SDK_CONFIG_FILE = "sdk_config.json"
+
+
+def get_sdk_config_path(base_directory: str) -> str:
+    """Get the path to the SDK-specific config file.
+
+    Args:
+        base_directory: The base directory of the project
+            (where .datacustomcode should be)
+
+    Returns:
+        The path to the SDK config file
+    """
+    sdk_config_dir = os.path.join(base_directory, SDK_CONFIG_DIR)
+    return os.path.join(sdk_config_dir, SDK_CONFIG_FILE)
+
+
+def read_sdk_config(base_directory: str) -> dict[str, Any]:
+    """Read the SDK-specific config file.
+
+    Args:
+        base_directory: The base directory of the project
+
+    Returns:
+        The SDK config dictionary, or empty dict if file doesn't exist
+    """
+    config_path = get_sdk_config_path(base_directory)
+    if os.path.exists(config_path) and os.path.isfile(config_path):
+        try:
+            with open(config_path, "r") as f:
+                config_data: dict[str, Any] = json.load(f)
+                return config_data
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Failed to parse JSON from {config_path}: {e}") from e
+        except OSError as e:
+            raise OSError(f"Failed to read SDK config file {config_path}: {e}") from e
+    else:
+        raise FileNotFoundError(f"SDK config file not found at {config_path}")
+
+
+def write_sdk_config(base_directory: str, config: dict[str, Any]) -> None:
+    """Write the SDK-specific config file.
+
+    Args:
+        base_directory: The base directory of the project
+        config: The config dictionary to write
+    """
+    config_path = get_sdk_config_path(base_directory)
+    sdk_config_dir = os.path.dirname(config_path)
+    os.makedirs(sdk_config_dir, exist_ok=True)
+    with open(config_path, "w") as f:
+        json.dump(config, f, indent=2)
+
+
+def get_package_type(base_directory: str) -> str:
+    """Get the package type (script or function) from SDK config.
+
+    Args:
+        base_directory: The base directory of the project
+
+    Returns:
+        The package type ("script" or "function")
+
+    Raises:
+        ValueError: If the type is not found in the SDK config
+    """
+    try:
+        sdk_config = read_sdk_config(base_directory)
+    except FileNotFoundError as e:
+        logger.debug(f"Defaulting to script package type. {e}")
+        return "script"
+    if "type" not in sdk_config:
+        config_path = get_sdk_config_path(base_directory)
+        raise ValueError(
+            f"Package type not found in SDK config at {config_path}. "
+            "Please run 'datacustomcode init' to initialize the project."
+        )
+    return str(sdk_config["type"])
 
 
 class DataAccessLayerCalls(pydantic.BaseModel):
@@ -230,37 +312,50 @@ def scan_file(file_path: str) -> DataAccessLayerCalls:
         return visitor.found()
 
 
-def dc_config_json_from_file(file_path: str) -> dict[str, Any]:
+def dc_config_json_from_file(file_path: str, type: str) -> dict[str, Any]:
     """Create a Data Cloud Custom Code config JSON from a script."""
-    output = scan_file(file_path)
-    config = DATA_TRANSFORM_CONFIG_TEMPLATE.copy()
+    config: dict[str, Any]
+    if type == "script":
+        config = DATA_TRANSFORM_CONFIG_TEMPLATE.copy()
+    elif type == "function":
+        config = FUNCTION_CONFIG_TEMPLATE.copy()
     config["entryPoint"] = file_path.rpartition("/")[-1]
+    return config
 
+
+def find_base_directory(file_path: str) -> str:
+    """Find the base directory containing .datacustomcode by walking up from file_path.
+
+    Args:
+        file_path: Path to a file in the project
+
+    Returns:
+        The base directory path, or the directory containing the file if not found
+    """
+    current_dir = os.path.dirname(os.path.abspath(file_path))
+    root = os.path.abspath(os.sep)
+
+    while current_dir != root:
+        if os.path.exists(os.path.join(current_dir, SDK_CONFIG_DIR)):
+            return current_dir
+        current_dir = os.path.dirname(current_dir)
+
+    # If not found, assume the payload directory's parent is the base
+    # (payload/entrypoint.py -> base directory is parent of payload)
+    file_dir = os.path.dirname(os.path.abspath(file_path))
+    if os.path.basename(file_dir) == "payload":
+        return os.path.dirname(file_dir)
+    return file_dir
+
+
+def update_config(file_path: str) -> dict[str, Any]:
     file_dir = os.path.dirname(file_path)
     config_json_path = os.path.join(file_dir, "config.json")
-
+    existing_config: dict[str, Any]
     if os.path.exists(config_json_path) and os.path.isfile(config_json_path):
         try:
             with open(config_json_path, "r") as f:
                 existing_config = json.load(f)
-
-            if "dataspace" in existing_config:
-                dataspace_value = existing_config["dataspace"]
-                if not dataspace_value or (
-                    isinstance(dataspace_value, str) and dataspace_value.strip() == ""
-                ):
-                    logger.warning(
-                        f"dataspace in {config_json_path} is empty or None. "
-                        f"Updating config file to use dataspace 'default'. "
-                    )
-                    config["dataspace"] = "default"
-                else:
-                    config["dataspace"] = dataspace_value
-            else:
-                raise ValueError(
-                    f"dataspace must be defined in {config_json_path}. "
-                    f"Please add a 'dataspace' field to the config.json file. "
-                )
         except json.JSONDecodeError as e:
             raise ValueError(
                 f"Failed to parse JSON from {config_json_path}: {e}"
@@ -268,19 +363,45 @@ def dc_config_json_from_file(file_path: str) -> dict[str, Any]:
         except OSError as e:
             raise OSError(f"Failed to read config file {config_json_path}: {e}") from e
     else:
-        config["dataspace"] = "default"
+        raise ValueError(f"config.json not found at {config_json_path}")
 
-    read: dict[str, list[str]] = {}
-    if output.read_dlo:
-        read["dlo"] = list(output.read_dlo)
+    # Get package type from SDK config
+    base_directory = find_base_directory(file_path)
+    package_type = get_package_type(base_directory)
+
+    if package_type == "script":
+        existing_config["dataspace"] = get_dataspace(existing_config)
+        output = scan_file(file_path)
+        read: dict[str, list[str]] = {}
+        if output.read_dlo:
+            read["dlo"] = list(output.read_dlo)
+        else:
+            read["dmo"] = list(output.read_dmo)
+        write: dict[str, list[str]] = {}
+        if output.write_to_dlo:
+            write["dlo"] = list(output.write_to_dlo)
+        else:
+            write["dmo"] = list(output.write_to_dmo)
+
+        existing_config["permissions"] = {"read": read, "write": write}
+    return existing_config
+
+
+def get_dataspace(existing_config: dict[str, str]) -> str:
+    if "dataspace" in existing_config:
+        dataspace_value = existing_config["dataspace"]
+        if not dataspace_value or (
+            isinstance(dataspace_value, str) and dataspace_value.strip() == ""
+        ):
+            logger.warning(
+                "dataspace is empty or None. "
+                "Updating config file to use dataspace 'default'. "
+            )
+            return "default"
+        else:
+            return dataspace_value
     else:
-        read["dmo"] = list(output.read_dmo)
-    write: dict[str, list[str]] = {}
-    if output.write_to_dlo:
-        write["dlo"] = list(output.write_to_dlo)
-    else:
-        write["dmo"] = list(output.write_to_dmo)
-
-    config["permissions"] = {"read": read, "write": write}
-
-    return config
+        raise ValueError(
+            "dataspace must be defined. "
+            "Please add a 'dataspace' field to the config.json file. "
+        )

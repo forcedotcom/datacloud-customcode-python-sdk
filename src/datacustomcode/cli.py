@@ -145,18 +145,36 @@ def deploy(
 
 @cli.command()
 @click.argument("directory", default=".")
-def init(directory: str):
-    from datacustomcode.scan import dc_config_json_from_file
-    from datacustomcode.template import copy_template
+@click.option(
+    "--code-type", default="script", type=click.Choice(["script", "function"])
+)
+def init(directory: str, code_type: str):
+    from datacustomcode.scan import (
+        dc_config_json_from_file,
+        update_config,
+        write_sdk_config,
+    )
+    from datacustomcode.template import copy_function_template, copy_script_template
 
     click.echo("Copying template to " + click.style(directory, fg="blue", bold=True))
-    copy_template(directory)
+    if code_type == "script":
+        copy_script_template(directory)
+    elif code_type == "function":
+        copy_function_template(directory)
     entrypoint_path = os.path.join(directory, "payload", "entrypoint.py")
     config_location = os.path.join(os.path.dirname(entrypoint_path), "config.json")
-    config_json = dc_config_json_from_file(entrypoint_path)
+
+    # Write package type to SDK-specific config
+    sdk_config = {"type": code_type}
+    write_sdk_config(directory, sdk_config)
+
+    config_json = dc_config_json_from_file(entrypoint_path, code_type)
     with open(config_location, "w") as f:
         json.dump(config_json, f, indent=2)
 
+    updated_config_json = update_config(entrypoint_path)
+    with open(config_location, "w") as f:
+        json.dump(updated_config_json, f, indent=2)
     click.echo(
         "Start developing by updating the code in "
         + click.style(entrypoint_path, fg="blue", bold=True)
@@ -176,7 +194,7 @@ def init(directory: str):
     "--no-requirements", is_flag=True, help="Skip generating requirements.txt file"
 )
 def scan(filename: str, config: str, dry_run: bool, no_requirements: bool):
-    from datacustomcode.scan import dc_config_json_from_file, write_requirements_file
+    from datacustomcode.scan import update_config, write_requirements_file
 
     config_location = config or os.path.join(os.path.dirname(filename), "config.json")
     click.echo(
@@ -184,7 +202,7 @@ def scan(filename: str, config: str, dry_run: bool, no_requirements: bool):
         + click.style(config_location, fg="blue", bold=True)
     )
     click.echo("Scanning " + click.style(filename, fg="blue", bold=True) + "...")
-    config_json = dc_config_json_from_file(filename)
+    config_json = update_config(filename)
 
     click.secho(json.dumps(config_json, indent=2), fg="yellow")
     if not dry_run:
