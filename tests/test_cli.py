@@ -41,7 +41,7 @@ class TestInit:
             # Create test directory structure
             os.makedirs(os.path.join("test_dir", "payload"), exist_ok=True)
 
-            result = runner.invoke(init, ["test_dir", "--type", "script"])
+            result = runner.invoke(init, ["test_dir", "--code-type", "script"])
 
             assert result.exit_code == 0
             mock_copy.assert_called_once_with("test_dir")
