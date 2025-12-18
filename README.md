@@ -302,27 +302,25 @@ You can read more about Jupyter Notebooks here: https://jupyter.org/
 3. Select `OAuth and OpenID Connect Settings`
 4. Toggle on `Allow OAuth Username-Password Flows` and accept the dialog box that pops up
 5. Clear the search bar
-7. Expand `Apps`, expand `External Client Apps`, click `Settings`
-8. Toggle on `Allow access to External Client App consumer secrets via REST API`
-9. Toggle on `Allow creation of connected apps`
-10. Click `Enable` in the warning box
-11. Click `New Connected App` button
-12. Fill in the required fields within the `Basic Information` section
-13. Under the `API (Enable OAuth Settings)` section:
+6. Expand `Apps`, expand `External Client Apps`, click `Settings`
+7. Toggle on `Allow access to External Client App consumer secrets via REST API`
+8. Toggle on `Allow creation of connected apps`
+9. Click `Enable` in the warning box
+10. Click `New Connected App` button
+11. Fill in the required fields within the `Basic Information` section
+12. Under the `API (Enable OAuth Settings)` section:
     a. Click on the checkbox to Enable OAuth Settings.
     b. Provide a callback URL like http://localhost:55555/callback
     c. In the Selected OAuth Scopes, make sure that `refresh_token`, `api`, `cdp_query_api`, `cdp_profile_api` is selected.
     d. Click on Save to save the connected app
-14. From the detail page that opens up afterwards, click the `Manage Consumer Details` button to find your client id and client secret
-15. Click `Cancel` button once complete
-16. Click `Manage` button
-17. Click `Edit Policies`
-18. Under `IP Relaxation` select `Relax IP restrictions`
-19. Click `Save`
-20. Logout
-21. Use the URL of the login page as the `login_url` value when setting up the SDK
-
-7. Go back to `Setup`, then `OAuth and OpenID Connect Settings`, and enable the "Allow OAuth Username-Password Flows" option
+13. From the detail page that opens up afterwards, click the `Manage Consumer Details` button to find your client id and client secret
+14. Click `Cancel` button once complete
+15. Click `Manage` button
+16. Click `Edit Policies`
+17. Under `IP Relaxation` select `Relax IP restrictions`
+18. Click `Save`
+19. Logout
+20. Use the URL of the login page as the `login_url` value when setting up the SDK
 
 You now have all fields necessary for the `datacustomcode configure` command.
 
