@@ -11,6 +11,7 @@ import os
 from unittest.mock import MagicMock, patch
 
 from datacustomcode.config import config
+from datacustomcode.credentials import AuthType
 from datacustomcode.io.reader.query_api import QueryAPIDataCloudReader
 from datacustomcode.io.writer.print import PrintDataCloudWriter
 
@@ -27,6 +28,7 @@ class TestCredentialsProfileIntegration:
         ) as mock_from_available:
             # Mock credentials for custom profile
             mock_credentials = MagicMock()
+            mock_credentials.auth_type = AuthType.USERNAME_PASSWORD
             mock_credentials.login_url = "https://custom.salesforce.com"
             mock_credentials.username = "custom@example.com"
             mock_credentials.password = "custom_password"
@@ -52,10 +54,10 @@ class TestCredentialsProfileIntegration:
                 # Verify the connection was created with the custom credentials
                 mock_conn_class.assert_called_once_with(
                     "https://custom.salesforce.com",
-                    "custom@example.com",
-                    "custom_password",
-                    "custom_client_id",
-                    "custom_secret",
+                    username="custom@example.com",
+                    password="custom_password",
+                    client_id="custom_client_id",
+                    client_secret="custom_secret",
                 )
 
     def test_print_writer_with_custom_profile(self):
@@ -67,6 +69,7 @@ class TestCredentialsProfileIntegration:
         ) as mock_from_available:
             # Mock credentials for custom profile
             mock_credentials = MagicMock()
+            mock_credentials.auth_type = AuthType.USERNAME_PASSWORD
             mock_credentials.login_url = "https://custom.salesforce.com"
             mock_credentials.username = "custom@example.com"
             mock_credentials.password = "custom_password"
@@ -160,6 +163,7 @@ class TestCredentialsProfileIntegration:
         ) as mock_from_available:
             # Mock credentials
             mock_credentials = MagicMock()
+            mock_credentials.auth_type = AuthType.USERNAME_PASSWORD
             mock_credentials.login_url = "https://consistent.salesforce.com"
             mock_credentials.username = "consistent@example.com"
             mock_credentials.password = "consistent_password"
@@ -201,6 +205,7 @@ class TestCredentialsProfileIntegration:
             # Mock different credentials for different profiles
             def mock_credentials_side_effect(profile="default"):
                 mock_creds = MagicMock()
+                mock_creds.auth_type = AuthType.USERNAME_PASSWORD
                 if profile == "profile1":
                     mock_creds.login_url = "https://profile1.salesforce.com"
                     mock_creds.username = "profile1@example.com"
