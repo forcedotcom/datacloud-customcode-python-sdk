@@ -18,9 +18,10 @@ import configparser
 from dataclasses import dataclass, field
 from enum import Enum
 import os
-from typing import Optional
+from typing import Optional, Tuple
 
 from loguru import logger
+import requests
 
 INI_FILE = os.path.expanduser("~/.datacustomcode/credentials.ini")
 
@@ -29,7 +30,7 @@ class AuthType(str, Enum):
     """Supported authentication methods for Salesforce Data Cloud."""
 
     USERNAME_PASSWORD = "username_password"
-    OAUTH_TOKENS = "oauth_tokens"
+    OAUTH = "oauth"
 
 
 # Environment variable mappings for each auth type
@@ -44,11 +45,65 @@ ENV_CREDENTIALS_USERNAME_PASSWORD = {
     "client_secret": "SFDC_CLIENT_SECRET",
 }
 
-ENV_CREDENTIALS_OAUTH_TOKENS = {
+ENV_CREDENTIALS_OAUTH = {
     "client_secret": "SFDC_CLIENT_SECRET",
-    "refresh_token": "SFDC_REFRESH_TOKEN",
-    "core_token": "SFDC_CORE_TOKEN",
 }
+
+
+def fetch_oauth_token(
+    login_url: str,
+    client_id: str,
+    client_secret: str,
+) -> Tuple[str, str]:
+    """Fetch OAuth token using Client Credentials flow.
+
+    This function authenticates using the OAuth 2.0 Client Credentials grant type.
+    It makes a POST request to the Salesforce OAuth endpoint to obtain an access token.
+
+    Args:
+        login_url: Salesforce login URL (e.g., https://login.salesforce.com)
+        client_id: Connected App client ID
+        client_secret: Connected App client secret
+
+    Returns:
+        Tuple of (core_token, instance_url)
+
+    Raises:
+        requests.HTTPError: If the token request fails
+        ValueError: If the response doesn't contain expected fields
+    """
+    token_url = f"{login_url}/services/oauth2/token"
+    params = {
+        "grant_type": "client_credentials",
+        "client_id": client_id,
+        "client_secret": client_secret,
+    }
+
+    logger.debug(f"Fetching OAuth token from {token_url}")
+
+    response = requests.post(url=token_url, params=params)
+    print(f"response: {response.text}")  # [to be removed]
+
+    if response.status_code == 200:
+        token_data = response.json()
+        core_token = token_data.get("access_token")
+        instance_url = token_data.get("instance_url")
+
+        if not core_token:
+            raise ValueError("OAuth response missing 'access_token' field")
+        if not instance_url:
+            raise ValueError("OAuth response missing 'instance_url' field")
+
+        logger.debug("Successfully obtained OAuth token")
+        return core_token, instance_url
+    else:
+        error_msg = f"OAuth token request failed with code {response.status_code}"
+        try:
+            error_detail = response.json()
+            error_msg += f": {error_detail}"
+        except Exception:
+            error_msg += f": {response.text}"
+        raise requests.HTTPError(error_msg, response=response)
 
 
 @dataclass
@@ -56,24 +111,21 @@ class Credentials:
     """Flexible credentials supporting multiple authentication methods.
 
     Supports two authentication methods:
-    - OAUTH_TOKENS: Refresh token-based authentication (default)
+    - OAUTH: OAuth 2.0 client credentials flow (default, simplest)
     - USERNAME_PASSWORD: Traditional username/password OAuth flow
-
     """
 
     # Required for all auth types
     login_url: str
     client_id: str
-    auth_type: AuthType = field(default=AuthType.OAUTH_TOKENS)
+    auth_type: AuthType = field(default=AuthType.OAUTH)
 
     # Username/Password flow fields
     username: Optional[str] = None
     password: Optional[str] = None
-    client_secret: Optional[str] = None
 
-    # OAuth Tokens flow fields
-    core_token: Optional[str] = None
-    refresh_token: Optional[str] = None
+    # Common field (used by both auth types)
+    client_secret: Optional[str] = None
 
     def __post_init__(self):
         """Validate credentials based on auth_type."""
@@ -94,14 +146,34 @@ class Credentials:
                     f"Username/Password auth requires: {', '.join(missing)}"
                 )
 
-        elif self.auth_type == AuthType.OAUTH_TOKENS:
-            missing = []
-            if not self.refresh_token:
-                missing.append("refresh_token")
+        elif self.auth_type == AuthType.OAUTH:
             if not self.client_secret:
-                missing.append("client_secret")
-            if missing:
-                raise ValueError(f"OAuth Tokens auth requires: {', '.join(missing)}")
+                raise ValueError("OAuth auth requires: client_secret")
+
+    def get_oauth_token(self) -> Tuple[str, str]:
+        """Fetch OAuth token using client credentials flow.
+
+        This method fetches a core_token that can be used with the CDP connector.
+        It uses the client_id and client_secret to obtain a token.
+
+        Returns:
+            Tuple of (core_token, instance_url)
+
+        Raises:
+            ValueError: If auth_type is not OAUTH
+            requests.HTTPError: If the token request fails
+        """
+        if self.auth_type != AuthType.OAUTH:
+            raise ValueError("get_oauth_token() is only for OAUTH auth type")
+
+        if self.client_secret is None:
+            raise ValueError("client_secret is required for OAUTH auth type")
+
+        return fetch_oauth_token(
+            self.login_url,
+            self.client_id,
+            self.client_secret,
+        )
 
     @classmethod
     def from_ini(
@@ -135,8 +207,8 @@ class Credentials:
 
         section = config[profile]
 
-        # Determine auth type (default to oauth_tokens)
-        auth_type_str = section.get("auth_type", AuthType.OAUTH_TOKENS.value)
+        # Determine auth type (default to oauth)
+        auth_type_str = section.get("auth_type", AuthType.OAUTH.value)
         try:
             auth_type = AuthType(auth_type_str)
         except ValueError as exc:
@@ -153,9 +225,6 @@ class Credentials:
             username=section.get("username"),
             password=section.get("password"),
             client_secret=section.get("client_secret"),
-            # OAuth Tokens fields
-            core_token=section.get("core_token"),
-            refresh_token=section.get("refresh_token"),
         )
 
     @classmethod
@@ -166,12 +235,10 @@ class Credentials:
             Common (required):
                 SFDC_LOGIN_URL: Salesforce login URL
                 SFDC_CLIENT_ID: Connected App client ID
-                SFDC_AUTH_TYPE: Authentication type (optional, defaults to oauth_tokens)
+                SFDC_AUTH_TYPE: Authentication type (optional, defaults to oauth)
 
-            For oauth_tokens (default):
+            For oauth (default):
                 SFDC_CLIENT_SECRET: Connected App client secret
-                SFDC_REFRESH_TOKEN: OAuth refresh token
-                SFDC_CORE_TOKEN: OAuth core/access token (optional)
 
             For username_password:
                 SFDC_USERNAME: Salesforce username
@@ -194,7 +261,7 @@ class Credentials:
             )
 
         # Determine auth type
-        auth_type_str = os.environ.get("SFDC_AUTH_TYPE", AuthType.OAUTH_TOKENS.value)
+        auth_type_str = os.environ.get("SFDC_AUTH_TYPE", AuthType.OAUTH.value)
         try:
             auth_type = AuthType(auth_type_str)
         except ValueError as exc:
@@ -210,10 +277,8 @@ class Credentials:
             # Username/Password fields
             username=os.environ.get("SFDC_USERNAME"),
             password=os.environ.get("SFDC_PASSWORD"),
+
             client_secret=os.environ.get("SFDC_CLIENT_SECRET"),
-            # OAuth Tokens fields
-            core_token=os.environ.get("SFDC_CORE_TOKEN"),
-            refresh_token=os.environ.get("SFDC_REFRESH_TOKEN"),
         )
 
     @classmethod
@@ -276,16 +341,10 @@ class Credentials:
             config[profile]["username"] = self.username or ""
             config[profile]["password"] = self.password or ""
             config[profile]["client_secret"] = self.client_secret or ""
-            # Remove fields from other auth types
-            for key in ["refresh_token", "core_token"]:
-                config[profile].pop(key, None)
 
-        elif self.auth_type == AuthType.OAUTH_TOKENS:
+        elif self.auth_type == AuthType.OAUTH:
             config[profile]["client_secret"] = self.client_secret or ""
-            config[profile]["refresh_token"] = self.refresh_token or ""
-            if self.core_token:
-                config[profile]["core_token"] = self.core_token
-            # Remove fields from other auth types
+            # Remove fields from username_password auth type
             for key in ["username", "password"]:
                 config[profile].pop(key, None)
 

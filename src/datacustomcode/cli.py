@@ -70,29 +70,25 @@ def _configure_username_password(
     )
 
 
-def _configure_oauth_tokens(
+def _configure_oauth(
     login_url: str,
     client_id: str,
     profile: str,
 ) -> None:
-    """Configure credentials for OAuth Tokens authentication."""
+    """Configure credentials for OAuth authentication."""
     from datacustomcode.credentials import AuthType, Credentials
 
     client_secret = click.prompt("Client Secret")
-    refresh_token = click.prompt("Refresh Token")
-    core_token = click.prompt("Core Token (optional, press Enter to skip)", default="")
 
     credentials = Credentials(
         login_url=login_url,
         client_id=client_id,
-        auth_type=AuthType.OAUTH_TOKENS,
+        auth_type=AuthType.OAUTH,
         client_secret=client_secret,
-        refresh_token=refresh_token,
-        core_token=core_token if core_token else None,
     )
     credentials.update_ini(profile=profile)
     click.secho(
-        f"OAuth Tokens credentials saved to profile '{profile}' successfully",
+        f"OAuth credentials saved to profile '{profile}' successfully",
         fg="green",
     )
 
@@ -101,22 +97,23 @@ def _configure_oauth_tokens(
 @click.option("--profile", default="default", help="Credential profile name")
 @click.option(
     "--auth-type",
-    type=click.Choice(["oauth_tokens", "username_password"]),
+    type=click.Choice(["oauth", "username_password"]),
     default=None,
     help="""Authentication method to use.
 
     \b
-    oauth_tokens      - Refresh token-based authentication (default)
+    oauth             - OAuth 2.0 client credentials flow (default, simplest)
     username_password - Traditional username/password OAuth flow
     """,
 )
 def configure(profile: str, auth_type: str) -> None:
+    """Configure credentials for connecting to Data Cloud."""
     from datacustomcode.credentials import AuthType
 
     # If auth_type not specified, prompt for it
     if auth_type is None:
         click.echo("\nSelect authentication method:")
-        click.echo("  1. OAuth Tokens (refresh token) [default]")
+        click.echo("  1. OAuth [default]")
         click.echo("  2. Username/Password")
         choice = click.prompt(
             "Enter choice",
@@ -124,7 +121,7 @@ def configure(profile: str, auth_type: str) -> None:
             default="1",
         )
         auth_type_map = {
-            "1": "oauth_tokens",
+            "1": "oauth",
             "2": "username_password",
         }
         auth_type = auth_type_map[choice]
@@ -137,8 +134,8 @@ def configure(profile: str, auth_type: str) -> None:
     # Route to appropriate handler based on auth type
     if auth_type == AuthType.USERNAME_PASSWORD.value:
         _configure_username_password(login_url, client_id, profile)
-    elif auth_type == AuthType.OAUTH_TOKENS.value:
-        _configure_oauth_tokens(login_url, client_id, profile)
+    elif auth_type == AuthType.OAUTH.value:
+        _configure_oauth(login_url, client_id, profile)
 
 
 @cli.command()
