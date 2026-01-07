@@ -111,32 +111,22 @@ def create_cdp_connection(
                 client_secret=credentials.client_secret,
             )
 
-    elif credentials.auth_type == AuthType.OAUTH:
-        # OAuth: fetch token automatically, then create connection
-        logger.debug("Creating CDP connection with OAuth authentication")
-        core_token, instance_url = credentials.get_oauth_token()
-        logger.debug(f"Obtained OAuth token, instance: {instance_url}")
-
-        # Create connection with the fetched core_token.
-        # Note: A dummy refresh_token is needed so authentication_helper
-        # enters the refresh_token branch and uses our core_token.
-        # The dummy value is never used if core_token exchange succeeds.
+    elif credentials.auth_type == AuthType.OAUTH_TOKENS:
+        logger.debug("Creating CDP connection with OAuth Tokens authentication")
         if effective_dataspace is not None:
             return SalesforceCDPConnection(
-                instance_url,
+                credentials.login_url,
                 client_id=credentials.client_id,
                 client_secret=credentials.client_secret,
-                core_token=core_token,
-                refresh_token="datacusstomcode_refresh_token",
+                refresh_token=credentials.refresh_token,
                 dataspace=effective_dataspace,
             )
         else:
             return SalesforceCDPConnection(
-                instance_url,
+                credentials.login_url,
                 client_id=credentials.client_id,
                 client_secret=credentials.client_secret,
-                core_token=core_token,
-                refresh_token="datacusstomcode_refresh_token",
+                refresh_token=credentials.refresh_token,
             )
 
     else:
@@ -148,7 +138,7 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
 
     This reader emulates data access within Data Cloud by calling the Query API.
     Supports multiple authentication methods:
-    - OAuth (default, needs client_id/secret, token fetched automatically)
+    - OAuth Tokens (default, needs client_id/secret, with refresh_token) authentication
     - Username/Password OAuth flow
 
     Supports dataspace configuration for querying data within specific dataspaces.

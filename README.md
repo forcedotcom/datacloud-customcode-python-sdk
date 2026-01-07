@@ -174,13 +174,26 @@ Display the current version of the package.
 #### `datacustomcode configure`
 Configure credentials for connecting to Data Cloud.
 
+**Prerequisites:**
+- A [connected app](#creating-a-connected-app) with OAuth settings configured
+- For OAuth Tokens authentication: [refresh token and core token](#obtaining-refresh-token-and-core-token)
+
 Options:
 - `--profile TEXT`: Credential profile name (default: "default")
+- `--auth-type TEXT`: Authentication method (`oauth_tokens` or `username_password`, default: `oauth_tokens`)
+- `--login-url TEXT`: Salesforce login URL
+
+For Username/Password authentication:
 - `--username TEXT`: Salesforce username
 - `--password TEXT`: Salesforce password
 - `--client-id TEXT`: Connected App Client ID
 - `--client-secret TEXT`: Connected App Client Secret
-- `--login-url TEXT`: Salesforce login URL
+
+For OAuth Tokens authentication:
+- `--client-id TEXT`: Connected App Client ID
+- `--client-secret TEXT`: Connected App Client Secret
+- `--refresh-token TEXT`: OAuth refresh token (see [Obtaining Refresh Token](#obtaining-refresh-token-and-core-token))
+- `--core-token TEXT`: (Optional) OAuth core/access token - if not provided, it will be obtained using the refresh token
 
 
 #### `datacustomcode init`
@@ -323,6 +336,71 @@ You can read more about Jupyter Notebooks here: https://jupyter.org/
 20. Use the URL of the login page as the `login_url` value when setting up the SDK
 
 You now have all fields necessary for the `datacustomcode configure` command.
+
+### Obtaining Refresh Token and Core Token
+
+If you're using OAuth Tokens authentication (instead of Username/Password), follow these steps to obtain your refresh token and core token (access token).
+
+#### Step 1: Note Connected App Details
+
+From your connected app, note down the following:
+- **Client ID**
+- **Client Secret**
+- **Callback URL** (e.g., `http://localhost:55555/callback`)
+
+#### Step 2: Obtain Authorization Code
+
+1. Open a browser and navigate to the following URL (replace placeholders with your values):
+
+   ```
+   <LOGIN_URL>/services/oauth2/authorize?response_type=code&client_id=<CLIENT_ID>&redirect_uri=<CALLBACK_URL>
+   ```
+
+2. After authenticating, you'll be redirected to your callback URL. The redirected URL will be in the form:
+   ```
+   <CALLBACK_URL>?code=<CODE>
+   ```
+
+3. Extract the `<CODE>` from the address bar. If the address bar doesn't show it, check the **Network tab** in your browser's developer tools.
+
+#### Step 3: Exchange Code for Tokens
+
+Make a POST request to exchange the authorization code for tokens. You can use `curl` or Postman:
+
+```bash
+curl --location --request POST '<LOGIN_URL>/services/oauth2/token' \
+  --header 'Content-Type: application/x-www-form-urlencoded' \
+  --data-urlencode 'grant_type=authorization_code' \
+  --data-urlencode 'code=<CODE>' \
+  --data-urlencode 'client_id=<CLIENT_ID>' \
+  --data-urlencode 'client_secret=<CLIENT_SECRET>' \
+  --data-urlencode 'redirect_uri=<CALLBACK_URL>'
+```
+
+The response will be a JSON object containing:
+
+```json
+{
+  "access_token": "<access_token>",
+  "refresh_token": "<refresh_token>",
+  "signature": "<signature>",
+  "scope": "refresh_token cdp_query_api api cdp_profile_api cdp_api full",
+  "id_token": "<id_token>",
+  "instance_url": "https://your-instance.my.salesforce.com",
+  "id": "https://login.salesforce.com/id/00DSB.../005SB...",
+  "token_type": "Bearer",
+  "issued_at": "1767743916187"
+}
+```
+
+The key fields you need are:
+| Field | Description |
+|-------|-------------|
+| `access_token` | The **core token** (also called access token) |
+| `refresh_token` | The **refresh token** for obtaining new access tokens |
+| `instance_url` | Your Salesforce instance URL |
+
+Use the `refresh_token` value when running `datacustomcode configure` with OAuth Tokens authentication.
 
 ## Other docs
 

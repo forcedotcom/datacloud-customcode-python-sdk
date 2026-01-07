@@ -30,7 +30,7 @@ class PrintDataCloudWriter(BaseDataCloudWriter):
     the target DLO schema and prints the DataFrame contents.
 
     Supports multiple authentication methods through the credentials_profile:
-    - OAuth (default, needs just client_id/secret)
+    - OAuth Tokens (core_token and refresh_token) authentication
     - Username/Password OAuth flow
 
     The authentication method is determined by the credentials stored in the
