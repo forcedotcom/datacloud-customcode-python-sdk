@@ -136,7 +136,7 @@ def configure(profile: str, auth_type: str) -> None:
 
     # Common fields for all auth types
     click.echo(f"\nConfiguring {auth_type} authentication for profile '{profile}':\n")
-    login_url = click.prompt("Login URL", default="https://login.salesforce.com")
+    login_url = click.prompt("Login URL")
     client_id = click.prompt("Client ID")
 
     # Route to appropriate handler based on auth type
