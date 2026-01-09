@@ -308,32 +308,30 @@ You can read more about Jupyter Notebooks here: https://jupyter.org/
 
 ## Prerequisite details
 
-### Creating a connected app
+### Creating an External Client app
 
-1. Log in to salesforce as an admin. In the top right corner, click on the gear icon and go to `Setup`
-2. In the left hand column search for `oauth`
-3. Select `OAuth and OpenID Connect Settings`
-4. Toggle on `Allow OAuth Username-Password Flows` and accept the dialog box that pops up
-5. Clear the search bar
-6. Expand `Apps`, expand `External Client Apps`, click `Settings`
-7. Toggle on `Allow access to External Client App consumer secrets via REST API`
-8. Toggle on `Allow creation of connected apps`
-9. Click `Enable` in the warning box
-10. Click `New Connected App` button
-11. Fill in the required fields within the `Basic Information` section
-12. Under the `API (Enable OAuth Settings)` section:
-    a. Click on the checkbox to Enable OAuth Settings.
-    b. Provide a callback URL like http://localhost:55555/callback
-    c. In the Selected OAuth Scopes, make sure that `refresh_token`, `api`, `cdp_query_api`, `cdp_profile_api` is selected.
-    d. Click on Save to save the connected app
-13. From the detail page that opens up afterwards, click the `Manage Consumer Details` button to find your client id and client secret
-14. Click `Cancel` button once complete
-15. Click `Manage` button
-16. Click `Edit Policies`
-17. Under `IP Relaxation` select `Relax IP restrictions`
-18. Click `Save`
-19. Logout
-20. Use the URL of the login page as the `login_url` value when setting up the SDK
+1. Log in to Salesforce as an admin. In the top right corner, click on the gear icon and go to `Setup`
+2. On the left sidebar, expand `Apps`, expand `External Client Apps`, click `Settings`
+3. Toggle on `Allow access to External Client App consumer secrets via REST API`
+4. Expand `Apps`, expand `External Client Apps`, click `External Client App Manager`
+5. Click `New External Client App` button
+6. Fill in the required fields within the `Basic Information` section
+7. Under the `API (Enable OAuth Settings)` section:
+    1. Click on the checkbox to Enable OAuth Settings
+    2. Provide a callback URL like `http://localhost:5555/callback`
+    3. In the Selected OAuth Scopes, make sure that `refresh_token`, `api`, `cdp_query_api`, `cdp_profile_api` is selected
+    4. Check the following:
+        - Enable Authorization Code and Credentials Flow
+        - Require user credentials in the POST body for Authorization Code and Credentials Flow
+    5. Uncheck `Require Proof Key for Code Exchange (PKCE) extension for Supported Authorization Flows`
+    6. Click on `Create` button
+8. On your newly created External Client App page, on the `Policies` tab:
+    1. In the `App Authorization` section, choose an appropriate Refresh Token Policy as per your expected usage and preference.
+    2. Under `App Authorization`, set IP Relaxation to `Relax IP restrictions` unless otherwise needed
+9. Click `Save`
+10. Go to the `Settings` tab, under `OAuth Settings`. There, you can use the `Consumer Key and Secret` button to obtain the `client_id` and `client_secret` used during configuring credentials using this SDK
+11. Logout
+12. Use the URL of the login page as the `login_url` value when setting up the SDK
 
 You now have all fields necessary for the `datacustomcode configure` command.
 
