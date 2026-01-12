@@ -43,30 +43,91 @@ def version():
         click.echo("Version information not available")
 
 
-@cli.command()
-@click.option("--profile", default="default")
-@click.option("--username", prompt=True)
-@click.option("--password", prompt=True, hide_input=True)
-@click.option("--client-id", prompt=True)
-@click.option("--client-secret", prompt=True)
-@click.option("--login-url", prompt=True)
-def configure(
-    username: str,
-    password: str,
-    client_id: str,
-    client_secret: str,
+def _configure_username_password(
     login_url: str,
+    client_id: str,
     profile: str,
 ) -> None:
-    from datacustomcode.credentials import Credentials
+    """Configure credentials for Username/Password authentication."""
+    from datacustomcode.credentials import AuthType, Credentials
 
-    Credentials(
+    username = click.prompt("Username")
+    password = click.prompt("Password", hide_input=True)
+    client_secret = click.prompt("Client Secret")
+
+    credentials = Credentials(
+        login_url=login_url,
+        client_id=client_id,
+        auth_type=AuthType.USERNAME_PASSWORD,
         username=username,
         password=password,
-        client_id=client_id,
         client_secret=client_secret,
+    )
+    credentials.update_ini(profile=profile)
+    click.secho(
+        f"Username/Password credentials saved to profile '{profile}' successfully",
+        fg="green",
+    )
+
+
+def _configure_oauth_tokens(
+    login_url: str,
+    client_id: str,
+    profile: str,
+) -> None:
+    """Configure credentials for OAuth Tokens authentication."""
+    from datacustomcode.credentials import AuthType, Credentials
+
+    client_secret = click.prompt("Client Secret")
+    refresh_token = click.prompt("Refresh Token")
+    core_token = click.prompt(
+        "Core Token (optional, press Enter to skip)",
+        default="",
+        show_default=False,
+    )
+
+    credentials = Credentials(
         login_url=login_url,
-    ).update_ini(profile=profile)
+        client_id=client_id,
+        auth_type=AuthType.OAUTH_TOKENS,
+        client_secret=client_secret,
+        refresh_token=refresh_token,
+        core_token=core_token if core_token else None,
+    )
+    credentials.update_ini(profile=profile)
+    click.secho(
+        f"OAuth Tokens credentials saved to profile '{profile}' successfully",
+        fg="green",
+    )
+
+
+@cli.command()
+@click.option("--profile", default="default", help="Credential profile name")
+@click.option(
+    "--auth-type",
+    type=click.Choice(["oauth_tokens", "username_password"]),
+    default="oauth_tokens",
+    help="""Authentication method to use.
+
+    \b
+    oauth_tokens      - OAuth tokens (refresh_token/core_token) authentication [DEFAULT]
+    username_password - Traditional username/password OAuth flow
+    """,
+)
+def configure(profile: str, auth_type: str) -> None:
+    """Configure credentials for connecting to Data Cloud."""
+    from datacustomcode.credentials import AuthType
+
+    # Common fields for all auth types
+    click.echo(f"\nConfiguring {auth_type} authentication for profile '{profile}':\n")
+    login_url = click.prompt("Login URL")
+    client_id = click.prompt("Client ID")
+
+    # Route to appropriate handler based on auth type
+    if auth_type == AuthType.USERNAME_PASSWORD.value:
+        _configure_username_password(login_url, client_id, profile)
+    elif auth_type == AuthType.OAUTH_TOKENS.value:
+        _configure_oauth_tokens(login_url, client_id, profile)
 
 
 @cli.command()

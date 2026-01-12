@@ -10,7 +10,7 @@ import zipfile
 import pytest
 import requests
 
-from datacustomcode.credentials import Credentials
+from datacustomcode.credentials import AuthType, Credentials
 from datacustomcode.deploy import DloPermission, Permissions
 
 # Patch get_version before importing deploy module
@@ -461,11 +461,12 @@ class TestRetrieveAccessToken:
     def test_retrieve_access_token(self, mock_make_api_call):
         """Test retrieving access token."""
         credentials = Credentials(
+            login_url="https://example.com",
+            client_id="id",
+            auth_type=AuthType.USERNAME_PASSWORD,
             username="user",
             password="pass",
-            client_id="id",
             client_secret="secret",
-            login_url="https://example.com",
         )
 
         mock_make_api_call.return_value = {
@@ -828,11 +829,12 @@ class TestDeployFull:
     ):
         """Test full deployment process."""
         credentials = Credentials(
+            login_url="https://example.com",
+            client_id="id",
+            auth_type=AuthType.USERNAME_PASSWORD,
             username="user",
             password="pass",
-            client_id="id",
             client_secret="secret",
-            login_url="https://example.com",
         )
         metadata = TransformationJobMetadata(
             name="test_job",
@@ -911,11 +913,12 @@ class TestDeployFullWithDockerIntegration:
     ):
         """Test full deployment process with Docker dependency building."""
         credentials = Credentials(
+            login_url="https://example.com",
+            client_id="id",
+            auth_type=AuthType.USERNAME_PASSWORD,
             username="user",
             password="pass",
-            client_id="id",
             client_secret="secret",
-            login_url="https://example.com",
         )
         metadata = TransformationJobMetadata(
             name="test_job",

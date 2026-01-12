@@ -174,13 +174,64 @@ Display the current version of the package.
 #### `datacustomcode configure`
 Configure credentials for connecting to Data Cloud.
 
+**Prerequisites:**
+- A [connected app](#creating-a-connected-app) with OAuth settings configured
+- For OAuth Tokens authentication: [refresh token and core token](#obtaining-refresh-token-and-core-token)
+
 Options:
 - `--profile TEXT`: Credential profile name (default: "default")
+- `--auth-type TEXT`: Authentication method (`oauth_tokens` or `username_password`, default: `oauth_tokens`)
+- `--login-url TEXT`: Salesforce login URL
+
+For Username/Password authentication:
 - `--username TEXT`: Salesforce username
 - `--password TEXT`: Salesforce password
 - `--client-id TEXT`: Connected App Client ID
 - `--client-secret TEXT`: Connected App Client Secret
-- `--login-url TEXT`: Salesforce login URL
+
+For OAuth Tokens authentication:
+- `--client-id TEXT`: Connected App Client ID
+- `--client-secret TEXT`: Connected App Client Secret
+- `--refresh-token TEXT`: OAuth refresh token (see [Obtaining Refresh Token](#obtaining-refresh-token-and-core-token))
+- `--core-token TEXT`: (Optional) OAuth core/access token - if not provided, it will be obtained using the refresh token
+
+##### Using Environment Variables (Alternative)
+
+Instead of using `datacustomcode configure`, you can also set credentials via environment variables.
+
+> [!NOTE]
+> Environment variables take precedence over the credentials INI file when both are present.
+
+**Common (required for all auth types):**
+| Variable | Description |
+|----------|-------------|
+| `SFDC_LOGIN_URL` | Salesforce login URL (e.g., `https://login.salesforce.com`) |
+| `SFDC_CLIENT_ID` | External Client App Client ID |
+| `SFDC_AUTH_TYPE` | Authentication type: `oauth_tokens` (default) or `username_password` |
+
+**For OAuth Tokens authentication (`SFDC_AUTH_TYPE=oauth_tokens`):**
+| Variable | Description |
+|----------|-------------|
+| `SFDC_CLIENT_SECRET` | External Client App Client Secret |
+| `SFDC_REFRESH_TOKEN` | OAuth refresh token |
+| `SFDC_CORE_TOKEN` | (Optional) OAuth core/access token |
+
+**For Username/Password authentication (`SFDC_AUTH_TYPE=username_password`):**
+| Variable | Description |
+|----------|-------------|
+| `SFDC_USERNAME` | Salesforce username |
+| `SFDC_PASSWORD` | Salesforce password |
+| `SFDC_CLIENT_SECRET` | External Client App Client Secret |
+
+Example usage:
+```bash
+export SFDC_LOGIN_URL="https://login.salesforce.com"
+export SFDC_CLIENT_ID="your_client_id"
+export SFDC_CLIENT_SECRET="your_client_secret"
+export SFDC_REFRESH_TOKEN="your_refresh_token"
+
+datacustomcode run ./payload/entrypoint.py
+```
 
 
 #### `datacustomcode init`
@@ -295,34 +346,96 @@ You can read more about Jupyter Notebooks here: https://jupyter.org/
 
 ## Prerequisite details
 
-### Creating a connected app
+### Creating an External Client app
 
-1. Log in to salesforce as an admin. In the top right corner, click on the gear icon and go to `Setup`
-2. In the left hand column search for `oauth`
-3. Select `OAuth and OpenID Connect Settings`
-4. Toggle on `Allow OAuth Username-Password Flows` and accept the dialog box that pops up
-5. Clear the search bar
-6. Expand `Apps`, expand `External Client Apps`, click `Settings`
-7. Toggle on `Allow access to External Client App consumer secrets via REST API`
-8. Toggle on `Allow creation of connected apps`
-9. Click `Enable` in the warning box
-10. Click `New Connected App` button
-11. Fill in the required fields within the `Basic Information` section
-12. Under the `API (Enable OAuth Settings)` section:
-    a. Click on the checkbox to Enable OAuth Settings.
-    b. Provide a callback URL like http://localhost:55555/callback
-    c. In the Selected OAuth Scopes, make sure that `refresh_token`, `api`, `cdp_query_api`, `cdp_profile_api` is selected.
-    d. Click on Save to save the connected app
-13. From the detail page that opens up afterwards, click the `Manage Consumer Details` button to find your client id and client secret
-14. Click `Cancel` button once complete
-15. Click `Manage` button
-16. Click `Edit Policies`
-17. Under `IP Relaxation` select `Relax IP restrictions`
-18. Click `Save`
-19. Logout
-20. Use the URL of the login page as the `login_url` value when setting up the SDK
+1. Log in to Salesforce as an admin. In the top right corner, click on the gear icon and go to `Setup`
+2. On the left sidebar, expand `Apps`, expand `External Client Apps`, click `Settings`
+3. Expand `Apps`, expand `External Client Apps`, click `External Client App Manager`
+4. Click `New External Client App` button
+5. Fill in the required fields within the `Basic Information` section
+6. Under the `API (Enable OAuth Settings)` section:
+    1. Click on the checkbox to Enable OAuth Settings
+    2. Provide a callback URL like `http://localhost:5555/callback`
+    3. In the Selected OAuth Scopes, make sure that `refresh_token`, `api`, `cdp_query_api`, `cdp_profile_api` are selected
+    4. Check the following:
+        - Enable Authorization Code and Credentials Flow
+        - Require user credentials in the POST body for Authorization Code and Credentials Flow
+    5. Uncheck `Require Proof Key for Code Exchange (PKCE) extension for Supported Authorization Flows`
+    6. Click on `Create` button
+7. On your newly created External Client App page, on the `Policies` tab:
+    1. In the `App Authorization` section, choose an appropriate Refresh Token Policy as per your expected usage and preference.
+    2. Under `App Authorization`, set IP Relaxation to `Relax IP restrictions` unless otherwise needed
+8. Click `Save`
+9. Go to the `Settings` tab, under `OAuth Settings`. There, you can click on the `Consumer Key and Secret` button which will open a new tab. There you can copy the `client_id` and `client_secret` values which are to be used during configuring credentials using this SDK.
+10. Logout
+11. Use the URL of the login page as the `login_url` value when setting up the SDK
 
 You now have all fields necessary for the `datacustomcode configure` command.
+
+### Obtaining Refresh Token and Core Token
+
+If you're using OAuth Tokens authentication (instead of Username/Password), follow these steps to obtain your refresh token and core token (access token).
+
+#### Step 1: Note Connected App Details
+
+From your connected app, note down the following:
+- **Client ID**
+- **Client Secret**
+- **Callback URL** (e.g., `http://localhost:55555/callback`)
+
+#### Step 2: Obtain Authorization Code
+
+1. Open a browser and navigate to the following URL (replace placeholders with your values):
+
+   ```
+   <LOGIN_URL>/services/oauth2/authorize?response_type=code&client_id=<CLIENT_ID>&redirect_uri=<CALLBACK_URL>
+   ```
+
+2. After authenticating, you'll be redirected to your callback URL. The redirected URL will be in the form:
+   ```
+   <CALLBACK_URL>?code=<CODE>
+   ```
+
+3. Extract the `<CODE>` from the address bar. If the address bar doesn't show it, check the **Network tab** in your browser's developer tools.
+
+#### Step 3: Exchange Code for Tokens
+
+Make a POST request to exchange the authorization code for tokens. You can use `curl` or Postman:
+
+```bash
+curl --location --request POST '<LOGIN_URL>/services/oauth2/token' \
+  --header 'Content-Type: application/x-www-form-urlencoded' \
+  --data-urlencode 'grant_type=authorization_code' \
+  --data-urlencode 'code=<CODE>' \
+  --data-urlencode 'client_id=<CLIENT_ID>' \
+  --data-urlencode 'client_secret=<CLIENT_SECRET>' \
+  --data-urlencode 'redirect_uri=<CALLBACK_URL>'
+```
+
+The response will be a JSON object containing:
+
+```json
+{
+  "access_token": "<access_token>",
+  "refresh_token": "<refresh_token>",
+  "signature": "<signature>",
+  "scope": "refresh_token cdp_query_api api cdp_profile_api cdp_api full",
+  "id_token": "<id_token>",
+  "instance_url": "https://your-instance.my.salesforce.com",
+  "id": "https://login.salesforce.com/id/00DSB.../005SB...",
+  "token_type": "Bearer",
+  "issued_at": "1767743916187"
+}
+```
+
+The key fields you need are:
+| Field | Description |
+|-------|-------------|
+| `access_token` | The **core token** (also called access token) |
+| `refresh_token` | The **refresh token** for obtaining new access tokens |
+| `instance_url` | Your Salesforce instance URL |
+
+Use the `refresh_token` value when running `datacustomcode configure` with OAuth Tokens authentication.
 
 ## Other docs
 

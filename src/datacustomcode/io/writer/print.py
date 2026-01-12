@@ -23,6 +23,20 @@ from datacustomcode.io.writer.base import BaseDataCloudWriter, WriteMode
 
 
 class PrintDataCloudWriter(BaseDataCloudWriter):
+    """Data Cloud writer that prints DataFrames for local testing.
+
+    This writer is used during local development to validate data transformations
+    without actually writing to Data Cloud. It validates DataFrame columns against
+    the target DLO schema and prints the DataFrame contents.
+
+    Supports multiple authentication methods through the credentials_profile:
+    - OAuth Tokens (core_token and refresh_token) authentication
+    - Username/Password OAuth flow
+
+    The authentication method is determined by the credentials stored in the
+    profile (configured via `datacustomcode configure`).
+    """
+
     CONFIG_NAME = "PrintDataCloudWriter"
 
     def __init__(
@@ -32,14 +46,31 @@ class PrintDataCloudWriter(BaseDataCloudWriter):
         credentials_profile: str = "default",
         dataspace: Optional[str] = None,
     ) -> None:
+        """Initialize PrintDataCloudWriter.
+
+        Args:
+            spark: SparkSession instance for DataFrame operations.
+            reader: Optional QueryAPIDataCloudReader instance for schema validation.
+                If not provided, a new reader will be created using the
+                credentials_profile and dataspace.
+            credentials_profile: Credentials profile name (default: "default").
+                The profile determines which credentials to load and which
+                authentication method to use.
+            dataspace: Optional dataspace identifier for multi-tenant queries.
+        """
         super().__init__(spark)
         if reader is None:
             if dataspace is not None:
                 self.reader = QueryAPIDataCloudReader(
-                    self.spark, credentials_profile, dataspace=dataspace
+                    self.spark,
+                    credentials_profile=credentials_profile,
+                    dataspace=dataspace,
                 )
             else:
-                self.reader = QueryAPIDataCloudReader(self.spark, credentials_profile)
+                self.reader = QueryAPIDataCloudReader(
+                    self.spark,
+                    credentials_profile=credentials_profile,
+                )
         else:
             self.reader = reader
 

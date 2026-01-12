@@ -34,7 +34,7 @@ from pyspark.sql.types import (
 )
 from salesforcecdpconnector.connection import SalesforceCDPConnection
 
-from datacustomcode.credentials import Credentials
+from datacustomcode.credentials import AuthType, Credentials
 from datacustomcode.io.reader.base import BaseDataCloudReader
 
 if TYPE_CHECKING:
@@ -68,10 +68,79 @@ def _pandas_to_spark_schema(
     return StructType(fields)
 
 
+def create_cdp_connection(
+    credentials: Credentials,
+    dataspace: Optional[str] = None,
+) -> SalesforceCDPConnection:
+    """Create a SalesforceCDPConnection based on the credentials auth type.
+
+    This factory function creates the appropriate connection based on the
+    authentication method configured in the credentials.
+
+    Args:
+        credentials: Credentials instance with authentication details.
+        dataspace: Optional dataspace identifier for multi-tenant queries.
+            If None or "default", the dataspace argument is not passed to
+            the connection constructor.
+
+    Returns:
+        SalesforceCDPConnection configured for the specified auth method.
+
+    Raises:
+        ValueError: If the auth type is not supported.
+    """
+    effective_dataspace = dataspace if dataspace and dataspace != "default" else None
+
+    if credentials.auth_type == AuthType.USERNAME_PASSWORD:
+        logger.debug("Creating CDP connection with Username/Password authentication")
+        if effective_dataspace is not None:
+            return SalesforceCDPConnection(
+                credentials.login_url,
+                username=credentials.username,
+                password=credentials.password,
+                client_id=credentials.client_id,
+                client_secret=credentials.client_secret,
+                dataspace=effective_dataspace,
+            )
+        else:
+            return SalesforceCDPConnection(
+                credentials.login_url,
+                username=credentials.username,
+                password=credentials.password,
+                client_id=credentials.client_id,
+                client_secret=credentials.client_secret,
+            )
+
+    elif credentials.auth_type == AuthType.OAUTH_TOKENS:
+        logger.debug("Creating CDP connection with OAuth Tokens authentication")
+        if effective_dataspace is not None:
+            return SalesforceCDPConnection(
+                credentials.login_url,
+                client_id=credentials.client_id,
+                client_secret=credentials.client_secret,
+                refresh_token=credentials.refresh_token,
+                dataspace=effective_dataspace,
+            )
+        else:
+            return SalesforceCDPConnection(
+                credentials.login_url,
+                client_id=credentials.client_id,
+                client_secret=credentials.client_secret,
+                refresh_token=credentials.refresh_token,
+            )
+
+    else:
+        raise ValueError(f"Unsupported authentication type: {credentials.auth_type}")
+
+
 class QueryAPIDataCloudReader(BaseDataCloudReader):
     """DataCloud reader using Query API.
 
     This reader emulates data access within Data Cloud by calling the Query API.
+    Supports multiple authentication methods:
+    - OAuth Tokens (default, needs client_id/secret, with refresh_token) authentication
+    - Username/Password OAuth flow
+
     Supports dataspace configuration for querying data within specific dataspaces.
     When a dataspace is provided (and not "default"), queries are executed within
     that dataspace context.
@@ -90,30 +159,19 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
         Args:
             spark: SparkSession instance for creating DataFrames.
             credentials_profile: Credentials profile name (default: "default").
+                The profile determines which credentials to load from the
+                ~/.datacustomcode/credentials.ini file or environment variables.
             dataspace: Optional dataspace identifier. If provided and not "default",
                 the connection will be configured for the specified dataspace.
                 When None or "default", uses the default dataspace.
         """
         self.spark = spark
         credentials = Credentials.from_available(profile=credentials_profile)
-
-        if dataspace is not None and dataspace != "default":
-            self._conn = SalesforceCDPConnection(
-                credentials.login_url,
-                credentials.username,
-                credentials.password,
-                credentials.client_id,
-                credentials.client_secret,
-                dataspace=dataspace,
-            )
-        else:
-            self._conn = SalesforceCDPConnection(
-                credentials.login_url,
-                credentials.username,
-                credentials.password,
-                credentials.client_id,
-                credentials.client_secret,
-            )
+        logger.debug(
+            "Initializing QueryAPIDataCloudReader with "
+            f"auth_type={credentials.auth_type.value}"
+        )
+        self._conn = create_cdp_connection(credentials, dataspace)
 
     def read_dlo(
         self,
