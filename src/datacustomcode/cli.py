@@ -106,33 +106,17 @@ def _configure_oauth_tokens(
 @click.option(
     "--auth-type",
     type=click.Choice(["oauth_tokens", "username_password"]),
-    default=None,
+    default="oauth_tokens",
     help="""Authentication method to use.
 
     \b
-    oauth_tokens      - OAuth tokens (refresh_token/core_token) authentication
+    oauth_tokens      - OAuth tokens (refresh_token/core_token) authentication [DEFAULT]
     username_password - Traditional username/password OAuth flow
     """,
 )
 def configure(profile: str, auth_type: str) -> None:
     """Configure credentials for connecting to Data Cloud."""
     from datacustomcode.credentials import AuthType
-
-    # If auth_type not specified, prompt for it
-    if auth_type is None:
-        click.echo("\nSelect authentication method:")
-        click.echo("  1. OAuth Tokens [default]")
-        click.echo("  2. Username/Password")
-        choice = click.prompt(
-            "Enter choice",
-            type=click.Choice(["1", "2"]),
-            default="1",
-        )
-        auth_type_map = {
-            "1": "oauth_tokens",
-            "2": "username_password",
-        }
-        auth_type = auth_type_map[choice]
 
     # Common fields for all auth types
     click.echo(f"\nConfiguring {auth_type} authentication for profile '{profile}':\n")

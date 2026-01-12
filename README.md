@@ -195,6 +195,44 @@ For OAuth Tokens authentication:
 - `--refresh-token TEXT`: OAuth refresh token (see [Obtaining Refresh Token](#obtaining-refresh-token-and-core-token))
 - `--core-token TEXT`: (Optional) OAuth core/access token - if not provided, it will be obtained using the refresh token
 
+##### Using Environment Variables (Alternative)
+
+Instead of using `datacustomcode configure`, you can also set credentials via environment variables.
+
+> [!NOTE]
+> Environment variables take precedence over the credentials INI file when both are present.
+
+**Common (required for all auth types):**
+| Variable | Description |
+|----------|-------------|
+| `SFDC_LOGIN_URL` | Salesforce login URL (e.g., `https://login.salesforce.com`) |
+| `SFDC_CLIENT_ID` | External Client App Client ID |
+| `SFDC_AUTH_TYPE` | Authentication type: `oauth_tokens` (default) or `username_password` |
+
+**For OAuth Tokens authentication (`SFDC_AUTH_TYPE=oauth_tokens`):**
+| Variable | Description |
+|----------|-------------|
+| `SFDC_CLIENT_SECRET` | External Client App Client Secret |
+| `SFDC_REFRESH_TOKEN` | OAuth refresh token |
+| `SFDC_CORE_TOKEN` | (Optional) OAuth core/access token |
+
+**For Username/Password authentication (`SFDC_AUTH_TYPE=username_password`):**
+| Variable | Description |
+|----------|-------------|
+| `SFDC_USERNAME` | Salesforce username |
+| `SFDC_PASSWORD` | Salesforce password |
+| `SFDC_CLIENT_SECRET` | External Client App Client Secret |
+
+Example usage:
+```bash
+export SFDC_LOGIN_URL="https://login.salesforce.com"
+export SFDC_CLIENT_ID="your_client_id"
+export SFDC_CLIENT_SECRET="your_client_secret"
+export SFDC_REFRESH_TOKEN="your_refresh_token"
+
+datacustomcode run ./payload/entrypoint.py
+```
+
 
 #### `datacustomcode init`
 Initialize a new development environment with a code package template.
@@ -312,26 +350,25 @@ You can read more about Jupyter Notebooks here: https://jupyter.org/
 
 1. Log in to Salesforce as an admin. In the top right corner, click on the gear icon and go to `Setup`
 2. On the left sidebar, expand `Apps`, expand `External Client Apps`, click `Settings`
-3. Toggle on `Allow access to External Client App consumer secrets via REST API`
-4. Expand `Apps`, expand `External Client Apps`, click `External Client App Manager`
-5. Click `New External Client App` button
-6. Fill in the required fields within the `Basic Information` section
-7. Under the `API (Enable OAuth Settings)` section:
+3. Expand `Apps`, expand `External Client Apps`, click `External Client App Manager`
+4. Click `New External Client App` button
+5. Fill in the required fields within the `Basic Information` section
+6. Under the `API (Enable OAuth Settings)` section:
     1. Click on the checkbox to Enable OAuth Settings
     2. Provide a callback URL like `http://localhost:5555/callback`
-    3. In the Selected OAuth Scopes, make sure that `refresh_token`, `api`, `cdp_query_api`, `cdp_profile_api` is selected
+    3. In the Selected OAuth Scopes, make sure that `refresh_token`, `api`, `cdp_query_api`, `cdp_profile_api` are selected
     4. Check the following:
         - Enable Authorization Code and Credentials Flow
         - Require user credentials in the POST body for Authorization Code and Credentials Flow
     5. Uncheck `Require Proof Key for Code Exchange (PKCE) extension for Supported Authorization Flows`
     6. Click on `Create` button
-8. On your newly created External Client App page, on the `Policies` tab:
+7. On your newly created External Client App page, on the `Policies` tab:
     1. In the `App Authorization` section, choose an appropriate Refresh Token Policy as per your expected usage and preference.
     2. Under `App Authorization`, set IP Relaxation to `Relax IP restrictions` unless otherwise needed
-9. Click `Save`
-10. Go to the `Settings` tab, under `OAuth Settings`. There, you can use the `Consumer Key and Secret` button to obtain the `client_id` and `client_secret` used during configuring credentials using this SDK
-11. Logout
-12. Use the URL of the login page as the `login_url` value when setting up the SDK
+8. Click `Save`
+9. Go to the `Settings` tab, under `OAuth Settings`. There, you can click on the `Consumer Key and Secret` button which will open a new tab. There you can copy the `client_id` and `client_secret` values which are to be used during configuring credentials using this SDK.
+10. Logout
+11. Use the URL of the login page as the `login_url` value when setting up the SDK
 
 You now have all fields necessary for the `datacustomcode configure` command.
 
