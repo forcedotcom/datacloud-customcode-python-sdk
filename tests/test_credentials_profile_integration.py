@@ -28,12 +28,11 @@ class TestCredentialsProfileIntegration:
         ) as mock_from_available:
             # Mock credentials for custom profile
             mock_credentials = MagicMock()
-            mock_credentials.auth_type = AuthType.USERNAME_PASSWORD
+            mock_credentials.auth_type = AuthType.OAUTH_TOKENS
             mock_credentials.login_url = "https://custom.salesforce.com"
-            mock_credentials.username = "custom@example.com"
-            mock_credentials.password = "custom_password"
             mock_credentials.client_id = "custom_client_id"
             mock_credentials.client_secret = "custom_secret"
+            mock_credentials.refresh_token = "custom_refresh"
             mock_from_available.return_value = mock_credentials
 
             # Mock the SalesforceCDPConnection
@@ -54,10 +53,40 @@ class TestCredentialsProfileIntegration:
                 # Verify the connection was created with the custom credentials
                 mock_conn_class.assert_called_once_with(
                     "https://custom.salesforce.com",
-                    username="custom@example.com",
-                    password="custom_password",
                     client_id="custom_client_id",
                     client_secret="custom_secret",
+                    refresh_token="custom_refresh",
+                )
+
+    def test_query_api_reader_client_credentials(self):
+        """Test QueryAPIDataCloudReader with client_credentials auth."""
+        mock_spark = MagicMock()
+
+        with patch(
+            "datacustomcode.credentials.Credentials.from_available"
+        ) as mock_from_available:
+            mock_credentials = MagicMock()
+            mock_credentials.auth_type = AuthType.CLIENT_CREDENTIALS
+            mock_credentials.login_url = "https://client.salesforce.com"
+            mock_credentials.client_id = "client_id"
+            mock_credentials.client_secret = "client_secret"
+            mock_from_available.return_value = mock_credentials
+
+            with patch(
+                "datacustomcode.io.reader.query_api.SalesforceCDPConnection"
+            ) as mock_conn_class:
+                mock_conn = MagicMock()
+                mock_conn_class.return_value = mock_conn
+
+                QueryAPIDataCloudReader(
+                    mock_spark, credentials_profile="client_profile"
+                )
+
+                mock_from_available.assert_called_with(profile="client_profile")
+                mock_conn_class.assert_called_once_with(
+                    "https://client.salesforce.com",
+                    client_id="client_id",
+                    client_secret="client_secret",
                 )
 
     def test_print_writer_with_custom_profile(self):
@@ -69,12 +98,11 @@ class TestCredentialsProfileIntegration:
         ) as mock_from_available:
             # Mock credentials for custom profile
             mock_credentials = MagicMock()
-            mock_credentials.auth_type = AuthType.USERNAME_PASSWORD
+            mock_credentials.auth_type = AuthType.OAUTH_TOKENS
             mock_credentials.login_url = "https://custom.salesforce.com"
-            mock_credentials.username = "custom@example.com"
-            mock_credentials.password = "custom_password"
             mock_credentials.client_id = "custom_client_id"
             mock_credentials.client_secret = "custom_secret"
+            mock_credentials.refresh_token = "custom_refresh"
             mock_from_available.return_value = mock_credentials
 
             # Mock the SalesforceCDPConnection
@@ -163,12 +191,11 @@ class TestCredentialsProfileIntegration:
         ) as mock_from_available:
             # Mock credentials
             mock_credentials = MagicMock()
-            mock_credentials.auth_type = AuthType.USERNAME_PASSWORD
+            mock_credentials.auth_type = AuthType.OAUTH_TOKENS
             mock_credentials.login_url = "https://consistent.salesforce.com"
-            mock_credentials.username = "consistent@example.com"
-            mock_credentials.password = "consistent_password"
             mock_credentials.client_id = "consistent_client_id"
             mock_credentials.client_secret = "consistent_secret"
+            mock_credentials.refresh_token = "consistent_refresh"
             mock_from_available.return_value = mock_credentials
 
             # Mock the SalesforceCDPConnection
@@ -205,18 +232,17 @@ class TestCredentialsProfileIntegration:
             # Mock different credentials for different profiles
             def mock_credentials_side_effect(profile="default"):
                 mock_creds = MagicMock()
-                mock_creds.auth_type = AuthType.USERNAME_PASSWORD
+                mock_creds.auth_type = AuthType.OAUTH_TOKENS
                 if profile == "profile1":
                     mock_creds.login_url = "https://profile1.salesforce.com"
-                    mock_creds.username = "profile1@example.com"
+                    mock_creds.refresh_token = "refresh1"
                 elif profile == "profile2":
                     mock_creds.login_url = "https://profile2.salesforce.com"
-                    mock_creds.username = "profile2@example.com"
+                    mock_creds.refresh_token = "refresh2"
                 else:  # default
                     mock_creds.login_url = "https://default.salesforce.com"
-                    mock_creds.username = "default@example.com"
+                    mock_creds.refresh_token = "refresh_default"
 
-                mock_creds.password = f"{profile}_password"
                 mock_creds.client_id = f"{profile}_client_id"
                 mock_creds.client_secret = f"{profile}_secret"
                 return mock_creds

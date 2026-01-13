@@ -43,33 +43,6 @@ def version():
         click.echo("Version information not available")
 
 
-def _configure_username_password(
-    login_url: str,
-    client_id: str,
-    profile: str,
-) -> None:
-    """Configure credentials for Username/Password authentication."""
-    from datacustomcode.credentials import AuthType, Credentials
-
-    username = click.prompt("Username")
-    password = click.prompt("Password", hide_input=True)
-    client_secret = click.prompt("Client Secret")
-
-    credentials = Credentials(
-        login_url=login_url,
-        client_id=client_id,
-        auth_type=AuthType.USERNAME_PASSWORD,
-        username=username,
-        password=password,
-        client_secret=client_secret,
-    )
-    credentials.update_ini(profile=profile)
-    click.secho(
-        f"Username/Password credentials saved to profile '{profile}' successfully",
-        fg="green",
-    )
-
-
 def _configure_oauth_tokens(
     login_url: str,
     client_id: str,
@@ -101,17 +74,40 @@ def _configure_oauth_tokens(
     )
 
 
+def _configure_client_credentials(
+    login_url: str,
+    client_id: str,
+    profile: str,
+) -> None:
+    """Configure credentials for Client Credentials authentication."""
+    from datacustomcode.credentials import AuthType, Credentials
+
+    client_secret = click.prompt("Client Secret")
+
+    credentials = Credentials(
+        login_url=login_url,
+        client_id=client_id,
+        auth_type=AuthType.CLIENT_CREDENTIALS,
+        client_secret=client_secret,
+    )
+    credentials.update_ini(profile=profile)
+    click.secho(
+        f"Client Credentials saved to profile '{profile}' successfully",
+        fg="green",
+    )
+
+
 @cli.command()
 @click.option("--profile", default="default", help="Credential profile name")
 @click.option(
     "--auth-type",
-    type=click.Choice(["oauth_tokens", "username_password"]),
+    type=click.Choice(["oauth_tokens", "client_credentials"]),
     default="oauth_tokens",
     help="""Authentication method to use.
 
     \b
-    oauth_tokens      - OAuth tokens (refresh_token/core_token) authentication [DEFAULT]
-    username_password - Traditional username/password OAuth flow
+    oauth_tokens       - OAuth tokens (refresh_token) authentication (default)
+    client_credentials - Server-to-server using client_id/secret only
     """,
 )
 def configure(profile: str, auth_type: str) -> None:
@@ -124,10 +120,10 @@ def configure(profile: str, auth_type: str) -> None:
     client_id = click.prompt("Client ID")
 
     # Route to appropriate handler based on auth type
-    if auth_type == AuthType.USERNAME_PASSWORD.value:
-        _configure_username_password(login_url, client_id, profile)
-    elif auth_type == AuthType.OAUTH_TOKENS.value:
+    if auth_type == AuthType.OAUTH_TOKENS.value:
         _configure_oauth_tokens(login_url, client_id, profile)
+    elif auth_type == AuthType.CLIENT_CREDENTIALS.value:
+        _configure_client_credentials(login_url, client_id, profile)
 
 
 @cli.command()

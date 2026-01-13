@@ -91,27 +91,7 @@ def create_cdp_connection(
     """
     effective_dataspace = dataspace if dataspace and dataspace != "default" else None
 
-    if credentials.auth_type == AuthType.USERNAME_PASSWORD:
-        logger.debug("Creating CDP connection with Username/Password authentication")
-        if effective_dataspace is not None:
-            return SalesforceCDPConnection(
-                credentials.login_url,
-                username=credentials.username,
-                password=credentials.password,
-                client_id=credentials.client_id,
-                client_secret=credentials.client_secret,
-                dataspace=effective_dataspace,
-            )
-        else:
-            return SalesforceCDPConnection(
-                credentials.login_url,
-                username=credentials.username,
-                password=credentials.password,
-                client_id=credentials.client_id,
-                client_secret=credentials.client_secret,
-            )
-
-    elif credentials.auth_type == AuthType.OAUTH_TOKENS:
+    if credentials.auth_type == AuthType.OAUTH_TOKENS:
         logger.debug("Creating CDP connection with OAuth Tokens authentication")
         if effective_dataspace is not None:
             return SalesforceCDPConnection(
@@ -129,6 +109,22 @@ def create_cdp_connection(
                 refresh_token=credentials.refresh_token,
             )
 
+    elif credentials.auth_type == AuthType.CLIENT_CREDENTIALS:
+        logger.debug("Creating CDP connection with Client Credentials authentication")
+        if effective_dataspace is not None:
+            return SalesforceCDPConnection(
+                credentials.login_url,
+                client_id=credentials.client_id,
+                client_secret=credentials.client_secret,
+                dataspace=effective_dataspace,
+            )
+        else:
+            return SalesforceCDPConnection(
+                credentials.login_url,
+                client_id=credentials.client_id,
+                client_secret=credentials.client_secret,
+            )
+
     else:
         raise ValueError(f"Unsupported authentication type: {credentials.auth_type}")
 
@@ -138,8 +134,8 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
 
     This reader emulates data access within Data Cloud by calling the Query API.
     Supports multiple authentication methods:
-    - OAuth Tokens (default, needs client_id/secret, with refresh_token) authentication
-    - Username/Password OAuth flow
+    - OAuth Tokens (default, needs client_id/secret with refresh_token)
+    - Client Credentials (server-to-server, needs client_id/secret only)
 
     Supports dataspace configuration for querying data within specific dataspaces.
     When a dataspace is provided (and not "default"), queries are executed within
