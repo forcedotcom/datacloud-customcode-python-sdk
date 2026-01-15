@@ -28,8 +28,8 @@ INI_FILE = os.path.expanduser("~/.datacustomcode/credentials.ini")
 class AuthType(str, Enum):
     """Supported authentication methods for Salesforce Data Cloud."""
 
-    USERNAME_PASSWORD = "username_password"
     OAUTH_TOKENS = "oauth_tokens"
+    CLIENT_CREDENTIALS = "client_credentials"
 
 
 # Environment variable mappings for each auth type
@@ -38,16 +38,14 @@ ENV_CREDENTIALS_COMMON = {
     "client_id": "SFDC_CLIENT_ID",
 }
 
-ENV_CREDENTIALS_USERNAME_PASSWORD = {
-    "username": "SFDC_USERNAME",
-    "password": "SFDC_PASSWORD",
-    "client_secret": "SFDC_CLIENT_SECRET",
-}
-
 ENV_CREDENTIALS_OAUTH_TOKENS = {
     "client_secret": "SFDC_CLIENT_SECRET",
     "refresh_token": "SFDC_REFRESH_TOKEN",
     "core_token": "SFDC_CORE_TOKEN",
+}
+
+ENV_CREDENTIALS_CLIENT_CREDENTIALS = {
+    "client_secret": "SFDC_CLIENT_SECRET",
 }
 
 
@@ -56,18 +54,14 @@ class Credentials:
     """Flexible credentials supporting multiple authentication methods.
 
     Supports two authentication methods:
-    - OAUTH_TOKENS: OAuth tokens (core_token and refresh_token) authentication
-    - USERNAME_PASSWORD: Traditional username/password OAuth flow
+    - OAUTH_TOKENS: OAuth tokens (refresh_token) authentication (default)
+    - CLIENT_CREDENTIALS: Server-to-server integration using client_id/secret only
     """
 
     # Required for all auth types
     login_url: str
     client_id: str
     auth_type: AuthType = field(default=AuthType.OAUTH_TOKENS)
-
-    # Username/Password flow fields
-    username: Optional[str] = None
-    password: Optional[str] = None
 
     # Common field
     client_secret: Optional[str] = None
@@ -82,20 +76,7 @@ class Credentials:
 
     def _validate(self) -> None:
         """Validate that required fields are present for the auth type."""
-        if self.auth_type == AuthType.USERNAME_PASSWORD:
-            missing = []
-            if not self.username:
-                missing.append("username")
-            if not self.password:
-                missing.append("password")
-            if not self.client_secret:
-                missing.append("client_secret")
-            if missing:
-                raise ValueError(
-                    f"Username/Password auth requires: {', '.join(missing)}"
-                )
-
-        elif self.auth_type == AuthType.OAUTH_TOKENS:
+        if self.auth_type == AuthType.OAUTH_TOKENS:
             missing = []
             if not self.refresh_token:
                 missing.append("refresh_token")
@@ -103,6 +84,10 @@ class Credentials:
                 missing.append("client_secret")
             if missing:
                 raise ValueError(f"OAuth Tokens auth requires: {', '.join(missing)}")
+
+        elif self.auth_type == AuthType.CLIENT_CREDENTIALS:
+            if not self.client_secret:
+                raise ValueError("Client Credentials auth requires: client_secret")
 
     @classmethod
     def from_ini(
@@ -150,9 +135,6 @@ class Credentials:
             login_url=section["login_url"],
             client_id=section["client_id"],
             auth_type=auth_type,
-            # Username/Password fields
-            username=section.get("username"),
-            password=section.get("password"),
             client_secret=section.get("client_secret"),
             # OAuth Tokens fields
             core_token=section.get("core_token"),
@@ -166,18 +148,13 @@ class Credentials:
         Environment variables:
             Common (required):
                 SFDC_LOGIN_URL: Salesforce login URL
-                SFDC_CLIENT_ID: Connected App client ID
+                SFDC_CLIENT_ID: External Client App client ID
                 SFDC_AUTH_TYPE: Authentication type (optional, defaults to oauth_tokens)
 
             For oauth_tokens (default):
-                SFDC_CLIENT_SECRET: Connected App client secret
+                SFDC_CLIENT_SECRET: External Client App client secret
                 SFDC_REFRESH_TOKEN: OAuth refresh token
                 SFDC_CORE_TOKEN: OAuth core/access token (optional)
-
-            For username_password:
-                SFDC_USERNAME: Salesforce username
-                SFDC_PASSWORD: Salesforce password
-                SFDC_CLIENT_SECRET: Connected App client secret
 
         Returns:
             Credentials instance loaded from environment variables
@@ -208,9 +185,6 @@ class Credentials:
             login_url=login_url,
             client_id=client_id,
             auth_type=auth_type,
-            # Username/Password fields
-            username=os.environ.get("SFDC_USERNAME"),
-            password=os.environ.get("SFDC_PASSWORD"),
             client_secret=os.environ.get("SFDC_CLIENT_SECRET"),
             # OAuth Tokens fields
             core_token=os.environ.get("SFDC_CORE_TOKEN"),
@@ -273,21 +247,19 @@ class Credentials:
         config[profile]["client_id"] = self.client_id
 
         # Save fields based on auth type
-        if self.auth_type == AuthType.USERNAME_PASSWORD:
-            config[profile]["username"] = self.username or ""
-            config[profile]["password"] = self.password or ""
-            config[profile]["client_secret"] = self.client_secret or ""
-            # Remove fields from other auth types
-            for key in ["refresh_token", "core_token"]:
-                config[profile].pop(key, None)
-
-        elif self.auth_type == AuthType.OAUTH_TOKENS:
+        if self.auth_type == AuthType.OAUTH_TOKENS:
             config[profile]["client_secret"] = self.client_secret or ""
             config[profile]["refresh_token"] = self.refresh_token or ""
             if self.core_token:
                 config[profile]["core_token"] = self.core_token
             # Remove fields from other auth types
             for key in ["username", "password"]:
+                config[profile].pop(key, None)
+
+        elif self.auth_type == AuthType.CLIENT_CREDENTIALS:
+            config[profile]["client_secret"] = self.client_secret or ""
+            # Remove fields from other auth types
+            for key in ["username", "password", "refresh_token", "core_token"]:
                 config[profile].pop(key, None)
 
         with open(expanded_ini_file, "w") as f:
