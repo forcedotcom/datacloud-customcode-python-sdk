@@ -66,7 +66,7 @@ datacustomcode run ./payload/entrypoint.py
 ```
 
 > [!IMPORTANT]
-> The example entrypoint.py requires a `Account_Home__dll` DLO to be present.  And in order to deploy the script (next step), the output DLO (which is `Account_Home_copy__dll` in the example entrypoint.py) also needs to exist and be in the same dataspace as `Account_Home__dll`.
+> The example entrypoint.py requires a `Account_std__dll` DLO to be present.  And in order to deploy the script (next step), the output DLO (which is `Account_std_copy__dll` in the example entrypoint.py) also needs to exist and be in the same dataspace as `Account_std__dll`.
 
 After modifying the `entrypoint.py` as needed, using any dependencies you add in the `.venv` virtual environment, you can run this script in Data Cloud:
 
