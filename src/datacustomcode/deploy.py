@@ -56,7 +56,7 @@ COMPUTE_TYPES = {
 }
 
 
-class TransformationJobMetadata(BaseModel):
+class CodeExtensionMetadata(BaseModel):
     name: str
     version: str
     description: str
@@ -149,7 +149,7 @@ class CreateDeploymentResponse(BaseModel):
 
 
 def create_deployment(
-    access_token: AccessTokenResponse, metadata: TransformationJobMetadata
+    access_token: AccessTokenResponse, metadata: CodeExtensionMetadata
 ) -> CreateDeploymentResponse:
     """Create a custom code deployment in the DataCloud."""
     url = _join_strip_url(access_token.instance_url, DATA_CUSTOM_CODE_PATH)
@@ -238,7 +238,7 @@ class DeploymentsResponse(BaseModel):
 
 
 def get_deployments(
-    access_token: AccessTokenResponse, metadata: TransformationJobMetadata
+    access_token: AccessTokenResponse, metadata: CodeExtensionMetadata
 ) -> DeploymentsResponse:
     """Get all custom code deployments from the DataCloud."""
     url = _join_strip_url(
@@ -250,7 +250,7 @@ def get_deployments(
 
 def wait_for_deployment(
     access_token: AccessTokenResponse,
-    metadata: TransformationJobMetadata,
+    metadata: CodeExtensionMetadata,
     callback: Union[Callable[[str], None], None] = None,
 ) -> None:
     """Wait for deployment to complete.
@@ -340,7 +340,7 @@ def get_config(directory: str) -> BaseConfig:
 def create_data_transform(
     directory: str,
     access_token: AccessTokenResponse,
-    metadata: TransformationJobMetadata,
+    metadata: CodeExtensionMetadata,
     data_transform_config: DataTransformConfig,
 ) -> dict:
     """Create a data transform in the DataCloud."""
@@ -445,7 +445,7 @@ def zip(
 
 def deploy_full(
     directory: str,
-    metadata: TransformationJobMetadata,
+    metadata: CodeExtensionMetadata,
     credentials: Credentials,
     docker_network: str,
     callback=None,
@@ -470,7 +470,7 @@ def deploy_full(
 
 
 def run_data_transform(
-    access_token: AccessTokenResponse, metadata: TransformationJobMetadata
+    access_token: AccessTokenResponse, metadata: CodeExtensionMetadata
 ) -> dict:
     logger.debug(f"Triggering data transform {metadata.name}")
     url = _join_strip_url(

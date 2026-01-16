@@ -21,10 +21,10 @@ from datacustomcode.deploy import (
 with patch("datacustomcode.version.get_version", return_value="1.2.3"):
     from datacustomcode.deploy import (
         AccessTokenResponse,
+        CodeExtensionMetadata,
         CreateDeploymentResponse,
         DataTransformConfig,
         DeploymentsResponse,
-        TransformationJobMetadata,
         _make_api_call,
         _retrieve_access_token,
         create_data_transform,
@@ -491,7 +491,7 @@ class TestCreateDeployment:
         access_token = AccessTokenResponse(
             access_token="test_token", instance_url="https://instance.example.com"
         )
-        metadata = TransformationJobMetadata(
+        metadata = CodeExtensionMetadata(
             name="test_job",
             version="1.0.0",
             description="Test job",
@@ -514,7 +514,7 @@ class TestCreateDeployment:
         access_token = AccessTokenResponse(
             access_token="test_token", instance_url="https://instance.example.com"
         )
-        metadata = TransformationJobMetadata(
+        metadata = CodeExtensionMetadata(
             name="test_job",
             version="1.0.0",
             description="Test job",
@@ -634,7 +634,7 @@ class TestGetDeployments:
         access_token = AccessTokenResponse(
             access_token="test_token", instance_url="https://instance.example.com"
         )
-        metadata = TransformationJobMetadata(
+        metadata = CodeExtensionMetadata(
             name="test_job",
             version="1.0.0",
             description="Test job",
@@ -661,7 +661,7 @@ class TestWaitForDeployment:
         access_token = AccessTokenResponse(
             access_token="test_token", instance_url="https://instance.example.com"
         )
-        metadata = TransformationJobMetadata(
+        metadata = CodeExtensionMetadata(
             name="test_job",
             version="1.0.0",
             description="Test job",
@@ -691,7 +691,7 @@ class TestWaitForDeployment:
         access_token = AccessTokenResponse(
             access_token="test_token", instance_url="https://instance.example.com"
         )
-        metadata = TransformationJobMetadata(
+        metadata = CodeExtensionMetadata(
             name="test_job",
             version="1.0.0",
             description="Test job",
@@ -771,7 +771,7 @@ class TestCreateDataTransform:
         access_token = AccessTokenResponse(
             access_token="test_token", instance_url="https://instance.example.com"
         )
-        metadata = TransformationJobMetadata(
+        metadata = CodeExtensionMetadata(
             name="test_job",
             version="1.0.0",
             description="Test job",
@@ -849,7 +849,7 @@ class TestDeployFull:
             password="pass",
             client_secret="secret",
         )
-        metadata = TransformationJobMetadata(
+        metadata = CodeExtensionMetadata(
             name="test_job",
             version="1.0.0",
             description="Test job",
@@ -889,7 +889,7 @@ class TestRunDataTransform:
         access_token = AccessTokenResponse(
             access_token="test_token", instance_url="https://instance.example.com"
         )
-        metadata = TransformationJobMetadata(
+        metadata = CodeExtensionMetadata(
             name="test_job",
             version="1.0.0",
             description="Test job",
@@ -933,7 +933,7 @@ class TestDeployFullWithDockerIntegration:
             password="pass",
             client_secret="secret",
         )
-        metadata = TransformationJobMetadata(
+        metadata = CodeExtensionMetadata(
             name="test_job",
             version="1.0.0",
             description="Test job",

@@ -170,7 +170,7 @@ def deploy(
     network: str,
 ):
     from datacustomcode.credentials import Credentials
-    from datacustomcode.deploy import TransformationJobMetadata, deploy_full
+    from datacustomcode.deploy import CodeExtensionMetadata, deploy_full
 
     logger.debug("Deploying project")
 
@@ -187,7 +187,7 @@ def deploy(
 
     logger.debug(f"Deploying with CPU size: {cpu_size}")
 
-    metadata = TransformationJobMetadata(
+    metadata = CodeExtensionMetadata(
         name=name,
         version=version,
         description=description,
