@@ -531,6 +531,30 @@ class TestCreateDeployment:
         with pytest.raises(ValueError, match="Deployment test_job exists"):
             create_deployment(access_token, metadata)
 
+    @patch("datacustomcode.deploy._make_api_call")
+    def test_create_deployment_function_invoke_options(self, mock_make_api_call):
+        """Test deployment creation with function invoke options."""
+        access_token = AccessTokenResponse(
+            access_token="test_token", instance_url="https://instance.example.com"
+        )
+        metadata = CodeExtensionMetadata(
+            name="test_job",
+            version="1.0.0",
+            description="Test job",
+            computeType="CPU_M",
+            functionInvokeOptions=["option1", "option2"],
+        )
+
+        mock_make_api_call.return_value = {
+            "fileUploadUrl": "https://upload.example.com"
+        }
+
+        result = create_deployment(access_token, metadata)
+
+        mock_make_api_call.assert_called_once()
+        assert isinstance(result, CreateDeploymentResponse)
+        assert result.fileUploadUrl == "https://upload.example.com"
+
 
 class TestZip:
     @patch("datacustomcode.deploy.has_nonempty_requirements_file")

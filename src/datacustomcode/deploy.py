@@ -61,6 +61,7 @@ class CodeExtensionMetadata(BaseModel):
     version: str
     description: str
     computeType: str
+    functionInvokeOptions: Union[list[str], None] = None
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -153,13 +154,17 @@ def create_deployment(
 ) -> CreateDeploymentResponse:
     """Create a custom code deployment in the DataCloud."""
     url = _join_strip_url(access_token.instance_url, DATA_CUSTOM_CODE_PATH)
-    body = {
-        "label": metadata.name,
-        "name": metadata.name,
-        "description": metadata.description,
-        "version": metadata.version,
-        "computeType": metadata.computeType,
-    }
+    body = dict[str, Any](
+        {
+            "label": metadata.name,
+            "name": metadata.name,
+            "description": metadata.description,
+            "version": metadata.version,
+            "computeType": metadata.computeType,
+        }
+    )
+    if metadata.functionInvokeOptions:
+        body["functionInvokeOptions"] = metadata.functionInvokeOptions
     logger.debug(f"Creating deployment {metadata.name}...")
     try:
         response = _make_api_call(
@@ -312,7 +317,7 @@ class DloPermission(BaseModel):
 
 
 def get_config(directory: str) -> BaseConfig:
-    """Get the data transform config from the config.json file."""
+    """Get the code extension config from the config.json file."""
     config_path = os.path.join(directory, "config.json")
     try:
         with open(config_path, "r") as f:
