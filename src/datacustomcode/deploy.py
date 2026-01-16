@@ -35,6 +35,7 @@ from pydantic import BaseModel
 import requests
 
 from datacustomcode.cmd import cmd_output
+from datacustomcode.scan import find_base_directory, get_package_type
 
 if TYPE_CHECKING:
     from datacustomcode.credentials import Credentials
@@ -287,11 +288,18 @@ DATA_TRANSFORM_REQUEST_TEMPLATE: dict[str, Any] = {
 }
 
 
-class DataTransformConfig(BaseModel):
+class BaseConfig(BaseModel):
     sdkVersion: str
     entryPoint: str
+
+
+class DataTransformConfig(BaseConfig):
     dataspace: str
     permissions: Permissions
+
+
+class FunctionConfig(BaseConfig):
+    pass
 
 
 class Permissions(BaseModel):
@@ -303,13 +311,20 @@ class DloPermission(BaseModel):
     dlo: list[str]
 
 
-def get_data_transform_config(directory: str) -> DataTransformConfig:
+def get_config(directory: str) -> BaseConfig:
     """Get the data transform config from the config.json file."""
     config_path = os.path.join(directory, "config.json")
     try:
         with open(config_path, "r") as f:
             config = json.loads(f.read())
+            base_directory = find_base_directory(config_path)
+            package_type = get_package_type(base_directory)
+        if package_type == "script":
             return DataTransformConfig(**config)
+        elif package_type == "function":
+            return FunctionConfig(**config)
+        else:
+            raise ValueError(f"Invalid package type: {package_type}")
     except FileNotFoundError as err:
         raise FileNotFoundError(f"config.json not found at {config_path}") from err
     except json.JSONDecodeError as err:
@@ -322,20 +337,14 @@ def get_data_transform_config(directory: str) -> DataTransformConfig:
         ) from err
 
 
-def verify_data_transform_config(directory: str) -> None:
-    """Verify the data transform config.json contents."""
-    get_data_transform_config(directory)
-    logger.debug(f"Verified data transform config in {directory}")
-
-
 def create_data_transform(
     directory: str,
     access_token: AccessTokenResponse,
     metadata: TransformationJobMetadata,
+    data_transform_config: DataTransformConfig,
 ) -> dict:
     """Create a data transform in the DataCloud."""
     script_name = metadata.name
-    data_transform_config = get_data_transform_config(directory)
     request_hydrated = DATA_TRANSFORM_REQUEST_TEMPLATE.copy()
 
     # Add nodes for each write DLO
@@ -445,7 +454,7 @@ def deploy_full(
     access_token = _retrieve_access_token(credentials)
 
     # prepare payload
-    verify_data_transform_config(directory)
+    config = get_config(directory)
 
     # create deployment and upload payload
     deployment = create_deployment(access_token, metadata)
@@ -454,7 +463,9 @@ def deploy_full(
     wait_for_deployment(access_token, metadata, callback)
 
     # create data transform
-    create_data_transform(directory, access_token, metadata)
+
+    if isinstance(config, DataTransformConfig):
+        create_data_transform(directory, access_token, metadata, config)
     return access_token
 
 

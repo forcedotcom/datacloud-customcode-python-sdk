@@ -4,7 +4,6 @@ import json
 import os
 import tempfile
 import textwrap
-from unittest.mock import patch
 
 import pytest
 
@@ -372,18 +371,6 @@ class TestDcConfigJson:
                 os.remove(sdk_config_path)
                 os.rmdir(os.path.dirname(sdk_config_path))
 
-    @patch(
-        "datacustomcode.scan.DATA_TRANSFORM_CONFIG_TEMPLATE",
-        {
-            "sdkVersion": "1.2.3",
-            "entryPoint": "",
-            "dataspace": "",
-            "permissions": {
-                "read": {},
-                "write": {},
-            },
-        },
-    )
     def test_preserves_existing_dataspace(self):
         """Test that existing dataspace value is preserved when config.json exists."""
         import json
