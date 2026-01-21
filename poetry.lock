@@ -2933,14 +2933,14 @@ requests = ">=2.0.1,<3.0.0"
 
 [[package]]
 name = "salesforce-cdp-connector"
-version = "1.0.17"
+version = "1.0.18"
 description = "Salesforce Data Cloud Python Connector"
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "salesforce_cdp_connector-1.0.17-py3-none-any.whl", hash = "sha256:c9eb5f501fa1301d141a661ef68a450714ff51b1e17a8e5a5af3e94992c9ccec"},
-    {file = "salesforce_cdp_connector-1.0.17.tar.gz", hash = "sha256:5b387df1a01ae9cc933c63b98cf9912be88fd06aeb397aa6bd88bf76314f1c4f"},
+    {file = "salesforce_cdp_connector-1.0.18-py3-none-any.whl", hash = "sha256:c0fd013028fc129047f6447a3d9d7768d63f804afe63930d8f431831a3b09d25"},
+    {file = "salesforce_cdp_connector-1.0.18.tar.gz", hash = "sha256:27db845bbaced08612b94a8d041dd1edc43ecdd1ebef54bbf672b8652fe69af1"},
 ]
 
 [package.dependencies]
