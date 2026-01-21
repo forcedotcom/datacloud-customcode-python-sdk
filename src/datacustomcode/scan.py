@@ -44,7 +44,6 @@ DATA_TRANSFORM_CONFIG_TEMPLATE = {
 }
 
 FUNCTION_CONFIG_TEMPLATE = {
-    "sdkVersion": get_version(),
     "entryPoint": "",
 }
 STANDARD_LIBS = set(sys.stdlib_module_names)

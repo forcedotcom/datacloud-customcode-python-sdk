@@ -496,6 +496,7 @@ class TestCreateDeployment:
             version="1.0.0",
             description="Test job",
             computeType="CPU_M",
+            codeType="script",
         )
 
         mock_make_api_call.return_value = {
@@ -519,6 +520,7 @@ class TestCreateDeployment:
             version="1.0.0",
             description="Test job",
             computeType="CPU_M",
+            codeType="script",
         )
 
         # Mock HTTP error with 409 Conflict
@@ -543,6 +545,7 @@ class TestCreateDeployment:
             description="Test job",
             computeType="CPU_M",
             functionInvokeOptions=["option1", "option2"],
+            codeType="function",
         )
 
         mock_make_api_call.return_value = {
@@ -663,6 +666,7 @@ class TestGetDeployments:
             version="1.0.0",
             description="Test job",
             computeType="CPU_M",
+            codeType="script",
         )
 
         mock_make_api_call.return_value = {"deploymentStatus": "Deployed"}
@@ -690,6 +694,7 @@ class TestWaitForDeployment:
             version="1.0.0",
             description="Test job",
             computeType="CPU_M",
+            codeType="script",
         )
         callback = MagicMock()
 
@@ -720,6 +725,7 @@ class TestWaitForDeployment:
             version="1.0.0",
             description="Test job",
             computeType="CPU_M",
+            codeType="script",
         )
 
         # Mock time to simulate timeout
@@ -800,6 +806,7 @@ class TestCreateDataTransform:
             version="1.0.0",
             description="Test job",
             computeType="CPU_M",
+            codeType="script",
         )
 
         data_transform_config = DataTransformConfig(
@@ -878,6 +885,7 @@ class TestDeployFull:
             version="1.0.0",
             description="Test job",
             computeType="CPU_M",
+            codeType="script",
         )
         callback = MagicMock()
 
@@ -918,6 +926,7 @@ class TestRunDataTransform:
             version="1.0.0",
             description="Test job",
             computeType="CPU_M",
+            codeType="script",
         )
 
         mock_make_api_call.return_value = {"status": "Running"}
@@ -962,6 +971,7 @@ class TestDeployFullWithDockerIntegration:
             version="1.0.0",
             description="Test job",
             computeType="CPU_M",
+            codeType="script",
         )
         callback = MagicMock()
 

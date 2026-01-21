@@ -190,16 +190,16 @@ def deploy(
         raise click.Abort()
 
     logger.debug(f"Deploying with CPU size: {cpu_size}")
-
+    base_directory = find_base_directory(path)
+    package_type = get_package_type(base_directory)
     metadata = CodeExtensionMetadata(
         name=name,
         version=version,
         description=description,
         computeType=COMPUTE_TYPES[cpu_size],
+        codeType=package_type,
     )
 
-    base_directory = find_base_directory(path)
-    package_type = get_package_type(base_directory)
     if package_type == "function":
         if not function_invoke_opt:
             click.secho(

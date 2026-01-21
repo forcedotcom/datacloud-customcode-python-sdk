@@ -61,6 +61,7 @@ class CodeExtensionMetadata(BaseModel):
     version: str
     description: str
     computeType: str
+    codeType: str
     functionInvokeOptions: Union[list[str], None] = None
 
     def __init__(self, **data):
@@ -161,6 +162,7 @@ def create_deployment(
             "description": metadata.description,
             "version": metadata.version,
             "computeType": metadata.computeType,
+            "codeType": metadata.codeType,
         }
     )
     if metadata.functionInvokeOptions:
@@ -294,11 +296,11 @@ DATA_TRANSFORM_REQUEST_TEMPLATE: dict[str, Any] = {
 
 
 class BaseConfig(BaseModel):
-    sdkVersion: str
     entryPoint: str
 
 
 class DataTransformConfig(BaseConfig):
+    sdkVersion: str
     dataspace: str
     permissions: Permissions
 
