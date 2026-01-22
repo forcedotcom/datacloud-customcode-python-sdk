@@ -36,6 +36,7 @@ import requests
 
 from datacustomcode.cmd import cmd_output
 from datacustomcode.credentials import AuthType
+from datacustomcode.scan import find_base_directory, get_package_type
 
 if TYPE_CHECKING:
     from datacustomcode.credentials import Credentials
@@ -56,11 +57,13 @@ COMPUTE_TYPES = {
 }
 
 
-class TransformationJobMetadata(BaseModel):
+class CodeExtensionMetadata(BaseModel):
     name: str
     version: str
     description: str
     computeType: str
+    codeType: str
+    functionInvokeOptions: Union[list[str], None] = None
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -158,17 +161,22 @@ class CreateDeploymentResponse(BaseModel):
 
 
 def create_deployment(
-    access_token: AccessTokenResponse, metadata: TransformationJobMetadata
+    access_token: AccessTokenResponse, metadata: CodeExtensionMetadata
 ) -> CreateDeploymentResponse:
     """Create a custom code deployment in the DataCloud."""
     url = _join_strip_url(access_token.instance_url, DATA_CUSTOM_CODE_PATH)
-    body = {
-        "label": metadata.name,
-        "name": metadata.name,
-        "description": metadata.description,
-        "version": metadata.version,
-        "computeType": metadata.computeType,
-    }
+    body = dict[str, Any](
+        {
+            "label": metadata.name,
+            "name": metadata.name,
+            "description": metadata.description,
+            "version": metadata.version,
+            "computeType": metadata.computeType,
+            "codeType": metadata.codeType,
+        }
+    )
+    if metadata.functionInvokeOptions:
+        body["functionInvokeOptions"] = metadata.functionInvokeOptions
     logger.debug(f"Creating deployment {metadata.name}...")
     try:
         response = _make_api_call(
@@ -247,7 +255,7 @@ class DeploymentsResponse(BaseModel):
 
 
 def get_deployments(
-    access_token: AccessTokenResponse, metadata: TransformationJobMetadata
+    access_token: AccessTokenResponse, metadata: CodeExtensionMetadata
 ) -> DeploymentsResponse:
     """Get all custom code deployments from the DataCloud."""
     url = _join_strip_url(
@@ -259,7 +267,7 @@ def get_deployments(
 
 def wait_for_deployment(
     access_token: AccessTokenResponse,
-    metadata: TransformationJobMetadata,
+    metadata: CodeExtensionMetadata,
     callback: Union[Callable[[str], None], None] = None,
 ) -> None:
     """Wait for deployment to complete.
@@ -297,11 +305,18 @@ DATA_TRANSFORM_REQUEST_TEMPLATE: dict[str, Any] = {
 }
 
 
-class DataTransformConfig(BaseModel):
-    sdkVersion: str
+class BaseConfig(BaseModel):
     entryPoint: str
+
+
+class DataTransformConfig(BaseConfig):
+    sdkVersion: str
     dataspace: str
     permissions: Permissions
+
+
+class FunctionConfig(BaseConfig):
+    pass
 
 
 class Permissions(BaseModel):
@@ -313,13 +328,20 @@ class DloPermission(BaseModel):
     dlo: list[str]
 
 
-def get_data_transform_config(directory: str) -> DataTransformConfig:
-    """Get the data transform config from the config.json file."""
+def get_config(directory: str) -> BaseConfig:
+    """Get the code extension config from the config.json file."""
     config_path = os.path.join(directory, "config.json")
     try:
         with open(config_path, "r") as f:
             config = json.loads(f.read())
+            base_directory = find_base_directory(config_path)
+            package_type = get_package_type(base_directory)
+        if package_type == "script":
             return DataTransformConfig(**config)
+        elif package_type == "function":
+            return FunctionConfig(**config)
+        else:
+            raise ValueError(f"Invalid package type: {package_type}")
     except FileNotFoundError as err:
         raise FileNotFoundError(f"config.json not found at {config_path}") from err
     except json.JSONDecodeError as err:
@@ -332,20 +354,14 @@ def get_data_transform_config(directory: str) -> DataTransformConfig:
         ) from err
 
 
-def verify_data_transform_config(directory: str) -> None:
-    """Verify the data transform config.json contents."""
-    get_data_transform_config(directory)
-    logger.debug(f"Verified data transform config in {directory}")
-
-
 def create_data_transform(
     directory: str,
     access_token: AccessTokenResponse,
-    metadata: TransformationJobMetadata,
+    metadata: CodeExtensionMetadata,
+    data_transform_config: DataTransformConfig,
 ) -> dict:
     """Create a data transform in the DataCloud."""
     script_name = metadata.name
-    data_transform_config = get_data_transform_config(directory)
     request_hydrated = DATA_TRANSFORM_REQUEST_TEMPLATE.copy()
 
     # Add nodes for each write DLO
@@ -446,7 +462,7 @@ def zip(
 
 def deploy_full(
     directory: str,
-    metadata: TransformationJobMetadata,
+    metadata: CodeExtensionMetadata,
     credentials: Credentials,
     docker_network: str,
     callback=None,
@@ -455,7 +471,7 @@ def deploy_full(
     access_token = _retrieve_access_token(credentials)
 
     # prepare payload
-    verify_data_transform_config(directory)
+    config = get_config(directory)
 
     # create deployment and upload payload
     deployment = create_deployment(access_token, metadata)
@@ -464,12 +480,14 @@ def deploy_full(
     wait_for_deployment(access_token, metadata, callback)
 
     # create data transform
-    create_data_transform(directory, access_token, metadata)
+
+    if isinstance(config, DataTransformConfig):
+        create_data_transform(directory, access_token, metadata, config)
     return access_token
 
 
 def run_data_transform(
-    access_token: AccessTokenResponse, metadata: TransformationJobMetadata
+    access_token: AccessTokenResponse, metadata: CodeExtensionMetadata
 ) -> dict:
     logger.debug(f"Triggering data transform {metadata.name}")
     url = _join_strip_url(

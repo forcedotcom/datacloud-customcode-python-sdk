@@ -21,6 +21,8 @@ from typing import List, Union
 import click
 from loguru import logger
 
+from datacustomcode.scan import find_base_directory, get_package_type
+
 
 @click.group()
 @click.option("--debug", is_flag=True)
@@ -156,6 +158,7 @@ def zip(path: str, network: str):
 
     Choose based on your workload requirements.""",
 )
+@click.option("--function-invoke-opt")
 def deploy(
     path: str,
     name: str,
@@ -164,9 +167,10 @@ def deploy(
     cpu_size: str,
     profile: str,
     network: str,
+    function_invoke_opt: str,
 ):
     from datacustomcode.credentials import Credentials
-    from datacustomcode.deploy import TransformationJobMetadata, deploy_full
+    from datacustomcode.deploy import CodeExtensionMetadata, deploy_full
 
     logger.debug("Deploying project")
 
@@ -182,13 +186,27 @@ def deploy(
         raise click.Abort()
 
     logger.debug(f"Deploying with CPU size: {cpu_size}")
-
-    metadata = TransformationJobMetadata(
+    base_directory = find_base_directory(path)
+    package_type = get_package_type(base_directory)
+    metadata = CodeExtensionMetadata(
         name=name,
         version=version,
         description=description,
         computeType=COMPUTE_TYPES[cpu_size],
+        codeType=package_type,
     )
+
+    if package_type == "function":
+        if not function_invoke_opt:
+            click.secho(
+                "Error: Function invoke options are required for function package type",
+                fg="red",
+            )
+            raise click.Abort()
+        else:
+            function_invoke_options = function_invoke_opt.split(",")
+            metadata.functionInvokeOptions = function_invoke_options
+
     try:
         credentials = Credentials.from_available(profile=profile)
     except ValueError as e:

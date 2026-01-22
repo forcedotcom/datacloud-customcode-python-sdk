@@ -5,6 +5,7 @@ from unittest.mock import mock_open, patch
 from click.testing import CliRunner
 
 from datacustomcode.cli import deploy, init
+from datacustomcode.scan import write_sdk_config
 
 
 class TestInit:
@@ -94,6 +95,30 @@ class TestDeploy:
             assert call_args[0][1].version == "1.0.0"
             assert call_args[0][1].description == "Custom Data Transform Code"
             assert call_args[0][2] == mock_creds  # credentials
+
+    @patch("datacustomcode.deploy.deploy_full")
+    @patch("datacustomcode.credentials.Credentials.from_available")
+    def test_deploy_command_function_invoke_options(
+        self, mock_credentials, mock_deploy_full
+    ):
+        """Test deploy command with function invoke options."""
+        runner = CliRunner()
+        with runner.isolated_filesystem():
+            # Create test payload directory
+            os.makedirs("payload", exist_ok=True)
+            sdk_config = {"type": "function"}
+            write_sdk_config(".", sdk_config)
+            result = runner.invoke(
+                deploy,
+                ["--name", "test-job", "--function-invoke-opt", "option1,option2"],
+            )
+
+            assert result.exit_code == 0
+            mock_deploy_full.assert_called_once()
+
+            # Check that deploy_full was called with function invoke options
+            call_args = mock_deploy_full.call_args
+            assert call_args[0][1].functionInvokeOptions == ["option1", "option2"]
 
     @patch("datacustomcode.credentials.Credentials.from_available")
     def test_deploy_command_credentials_error(self, mock_credentials):

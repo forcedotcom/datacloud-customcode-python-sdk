@@ -11,28 +11,30 @@ import pytest
 import requests
 
 from datacustomcode.credentials import AuthType, Credentials
-from datacustomcode.deploy import DloPermission, Permissions
+from datacustomcode.deploy import (
+    DloPermission,
+    Permissions,
+    get_config,
+)
 
 # Patch get_version before importing deploy module
 with patch("datacustomcode.version.get_version", return_value="1.2.3"):
     from datacustomcode.deploy import (
         AccessTokenResponse,
+        CodeExtensionMetadata,
         CreateDeploymentResponse,
         DataTransformConfig,
         DeploymentsResponse,
-        TransformationJobMetadata,
         _make_api_call,
         _retrieve_access_token,
         create_data_transform,
         create_deployment,
         deploy_full,
-        get_data_transform_config,
         get_deployments,
         has_nonempty_requirements_file,
         prepare_dependency_archive,
         run_data_transform,
         upload_zip,
-        verify_data_transform_config,
         wait_for_deployment,
         zip,
     )
@@ -515,11 +517,12 @@ class TestCreateDeployment:
         access_token = AccessTokenResponse(
             access_token="test_token", instance_url="https://instance.example.com"
         )
-        metadata = TransformationJobMetadata(
+        metadata = CodeExtensionMetadata(
             name="test_job",
             version="1.0.0",
             description="Test job",
             computeType="CPU_M",
+            codeType="script",
         )
 
         mock_make_api_call.return_value = {
@@ -538,11 +541,12 @@ class TestCreateDeployment:
         access_token = AccessTokenResponse(
             access_token="test_token", instance_url="https://instance.example.com"
         )
-        metadata = TransformationJobMetadata(
+        metadata = CodeExtensionMetadata(
             name="test_job",
             version="1.0.0",
             description="Test job",
             computeType="CPU_M",
+            codeType="script",
         )
 
         # Mock HTTP error with 409 Conflict
@@ -554,6 +558,31 @@ class TestCreateDeployment:
 
         with pytest.raises(ValueError, match="Deployment test_job exists"):
             create_deployment(access_token, metadata)
+
+    @patch("datacustomcode.deploy._make_api_call")
+    def test_create_deployment_function_invoke_options(self, mock_make_api_call):
+        """Test deployment creation with function invoke options."""
+        access_token = AccessTokenResponse(
+            access_token="test_token", instance_url="https://instance.example.com"
+        )
+        metadata = CodeExtensionMetadata(
+            name="test_job",
+            version="1.0.0",
+            description="Test job",
+            computeType="CPU_M",
+            functionInvokeOptions=["option1", "option2"],
+            codeType="function",
+        )
+
+        mock_make_api_call.return_value = {
+            "fileUploadUrl": "https://upload.example.com"
+        }
+
+        result = create_deployment(access_token, metadata)
+
+        mock_make_api_call.assert_called_once()
+        assert isinstance(result, CreateDeploymentResponse)
+        assert result.fileUploadUrl == "https://upload.example.com"
 
 
 class TestZip:
@@ -658,11 +687,12 @@ class TestGetDeployments:
         access_token = AccessTokenResponse(
             access_token="test_token", instance_url="https://instance.example.com"
         )
-        metadata = TransformationJobMetadata(
+        metadata = CodeExtensionMetadata(
             name="test_job",
             version="1.0.0",
             description="Test job",
             computeType="CPU_M",
+            codeType="script",
         )
 
         mock_make_api_call.return_value = {"deploymentStatus": "Deployed"}
@@ -685,11 +715,12 @@ class TestWaitForDeployment:
         access_token = AccessTokenResponse(
             access_token="test_token", instance_url="https://instance.example.com"
         )
-        metadata = TransformationJobMetadata(
+        metadata = CodeExtensionMetadata(
             name="test_job",
             version="1.0.0",
             description="Test job",
             computeType="CPU_M",
+            codeType="script",
         )
         callback = MagicMock()
 
@@ -715,11 +746,12 @@ class TestWaitForDeployment:
         access_token = AccessTokenResponse(
             access_token="test_token", instance_url="https://instance.example.com"
         )
-        metadata = TransformationJobMetadata(
+        metadata = CodeExtensionMetadata(
             name="test_job",
             version="1.0.0",
             description="Test job",
             computeType="CPU_M",
+            codeType="script",
         )
 
         # Mock time to simulate timeout
@@ -743,9 +775,9 @@ class TestDataTransformConfig:
             '"write": {"dlo": ["output_dlo"]}}}'
         ),
     )
-    def test_get_data_transform_config(self, mock_file):
+    def test_get_config(self, mock_file):
         """Test getting data transform config from config.json file."""
-        result = get_data_transform_config("/test/dir")
+        result = get_config("/test/dir")
         assert isinstance(result, DataTransformConfig)
         assert result.sdkVersion == "1.0.0"
         assert result.entryPoint == "entrypoint.py"
@@ -761,7 +793,7 @@ class TestDataTransformConfig:
             FileNotFoundError,
             match="config.json not found at /test/dir/payload/config.json",
         ):
-            verify_data_transform_config("/test/dir/payload")
+            get_config("/test/dir/payload")
 
     @patch("datacustomcode.deploy.os.path.exists")
     @patch("builtins.open", new_callable=mock_open, read_data='{"invalid": "json"')
@@ -772,7 +804,7 @@ class TestDataTransformConfig:
             ValueError,
             match="config.json at /test/dir/payload/config.json is not valid JSON",
         ):
-            verify_data_transform_config("/test/dir/payload")
+            get_config("/test/dir/payload")
 
     @patch("datacustomcode.deploy.os.path.exists")
     @patch("builtins.open", new_callable=mock_open, read_data='{"sdkVersion": "1.0.0"}')
@@ -784,25 +816,26 @@ class TestDataTransformConfig:
             match="config.json at /test/dir/payload/config.json is missing "
             "required fields: entryPoint, dataspace, permissions",
         ):
-            verify_data_transform_config("/test/dir/payload")
+            get_config("/test/dir/payload")
 
 
 class TestCreateDataTransform:
-    @patch("datacustomcode.deploy.get_data_transform_config")
+    @patch("datacustomcode.deploy.get_config")
     @patch("datacustomcode.deploy._make_api_call")
     def test_create_data_transform(self, mock_make_api_call, mock_get_config):
         """Test creating a data transform in DataCloud."""
         access_token = AccessTokenResponse(
             access_token="test_token", instance_url="https://instance.example.com"
         )
-        metadata = TransformationJobMetadata(
+        metadata = CodeExtensionMetadata(
             name="test_job",
             version="1.0.0",
             description="Test job",
             computeType="CPU_M",
+            codeType="script",
         )
 
-        mock_get_config.return_value = DataTransformConfig(
+        data_transform_config = DataTransformConfig(
             sdkVersion="1.0.0",
             entryPoint="entrypoint.py",
             dataspace="test_dataspace",
@@ -813,9 +846,10 @@ class TestCreateDataTransform:
         )
         mock_make_api_call.return_value = {"id": "transform_id"}
 
-        result = create_data_transform("/test/dir", access_token, metadata)
+        result = create_data_transform(
+            "/test/dir", access_token, metadata, data_transform_config
+        )
 
-        mock_get_config.assert_called_once_with("/test/dir")
         mock_make_api_call.assert_called_once()
 
         # Verify the request body structure
@@ -836,24 +870,34 @@ class TestCreateDataTransform:
 
 
 class TestDeployFull:
-    @patch("datacustomcode.deploy._retrieve_access_token")
-    @patch("datacustomcode.deploy.verify_data_transform_config")
-    @patch("datacustomcode.deploy.create_deployment")
-    @patch("datacustomcode.deploy.zip")
-    @patch("datacustomcode.deploy.upload_zip")
-    @patch("datacustomcode.deploy.wait_for_deployment")
+    @patch("datacustomcode.deploy.get_config")
     @patch("datacustomcode.deploy.create_data_transform")
+    @patch("datacustomcode.deploy.wait_for_deployment")
+    @patch("datacustomcode.deploy.upload_zip")
+    @patch("datacustomcode.deploy.zip")
+    @patch("datacustomcode.deploy.create_deployment")
+    @patch("datacustomcode.deploy._retrieve_access_token")
     def test_deploy_full(
         self,
-        mock_create_transform,
-        mock_wait,
-        mock_upload_zip,
-        mock_zip,
-        mock_create_deployment,
-        mock_verify_config,
         mock_retrieve_token,
+        mock_create_deployment,
+        mock_zip,
+        mock_upload_zip,
+        mock_wait,
+        mock_create_transform,
+        mock_get_config,
     ):
         """Test full deployment process."""
+        data_transform_config = DataTransformConfig(
+            sdkVersion="1.0.0",
+            entryPoint="entrypoint.py",
+            dataspace="test_dataspace",
+            permissions=Permissions(
+                read=DloPermission(dlo=["input_dlo"]),
+                write=DloPermission(dlo=["output_dlo"]),
+            ),
+        )
+        mock_get_config.return_value = data_transform_config
         credentials = Credentials(
             login_url="https://example.com",
             client_id="id",
@@ -861,11 +905,12 @@ class TestDeployFull:
             refresh_token="refresh",
             client_secret="secret",
         )
-        metadata = TransformationJobMetadata(
+        metadata = CodeExtensionMetadata(
             name="test_job",
             version="1.0.0",
             description="Test job",
             computeType="CPU_M",
+            codeType="script",
         )
         callback = MagicMock()
 
@@ -883,18 +928,18 @@ class TestDeployFull:
 
         # Assertions
         mock_retrieve_token.assert_called_once_with(credentials)
-        mock_verify_config.assert_called_once_with("/test/dir")
+        mock_get_config.assert_called_once_with("/test/dir")
         mock_create_deployment.assert_called_once_with(access_token, metadata)
         mock_zip.assert_called_once_with("/test/dir", "default")
         mock_upload_zip.assert_called_once_with("https://upload.example.com")
         mock_wait.assert_called_once_with(access_token, metadata, callback)
         mock_create_transform.assert_called_once_with(
-            "/test/dir", access_token, metadata
+            "/test/dir", access_token, metadata, data_transform_config
         )
         assert result == access_token
 
     @patch("datacustomcode.deploy._retrieve_access_token")
-    @patch("datacustomcode.deploy.verify_data_transform_config")
+    @patch("datacustomcode.deploy.get_config")
     @patch("datacustomcode.deploy.create_deployment")
     @patch("datacustomcode.deploy.zip")
     @patch("datacustomcode.deploy.upload_zip")
@@ -907,21 +952,32 @@ class TestDeployFull:
         mock_upload_zip,
         mock_zip,
         mock_create_deployment,
-        mock_verify_config,
+        mock_get_config,
         mock_retrieve_token,
     ):
         """Test full deployment process using client credentials auth."""
+        data_transform_config = DataTransformConfig(
+            sdkVersion="1.0.0",
+            entryPoint="entrypoint.py",
+            dataspace="test_dataspace",
+            permissions=Permissions(
+                read=DloPermission(dlo=["input_dlo"]),
+                write=DloPermission(dlo=["output_dlo"]),
+            ),
+        )
+        mock_get_config.return_value = data_transform_config
         credentials = Credentials(
             login_url="https://example.com",
             client_id="id",
             auth_type=AuthType.CLIENT_CREDENTIALS,
             client_secret="secret",
         )
-        metadata = TransformationJobMetadata(
+        metadata = CodeExtensionMetadata(
             name="test_job",
             version="1.0.0",
             description="Test job",
             computeType="CPU_M",
+            codeType="script",
         )
         callback = MagicMock()
 
@@ -936,13 +992,13 @@ class TestDeployFull:
         result = deploy_full("/test/dir", metadata, credentials, "default", callback)
 
         mock_retrieve_token.assert_called_once_with(credentials)
-        mock_verify_config.assert_called_once_with("/test/dir")
+        mock_get_config.assert_called_once_with("/test/dir")
         mock_create_deployment.assert_called_once_with(access_token, metadata)
         mock_zip.assert_called_once_with("/test/dir", "default")
         mock_upload_zip.assert_called_once_with("https://upload.example.com")
         mock_wait.assert_called_once_with(access_token, metadata, callback)
         mock_create_transform.assert_called_once_with(
-            "/test/dir", access_token, metadata
+            "/test/dir", access_token, metadata, data_transform_config
         )
         assert result == access_token
 
@@ -954,11 +1010,12 @@ class TestRunDataTransform:
         access_token = AccessTokenResponse(
             access_token="test_token", instance_url="https://instance.example.com"
         )
-        metadata = TransformationJobMetadata(
+        metadata = CodeExtensionMetadata(
             name="test_job",
             version="1.0.0",
             description="Test job",
             computeType="CPU_M",
+            codeType="script",
         )
 
         mock_make_api_call.return_value = {"status": "Running"}
@@ -971,22 +1028,22 @@ class TestRunDataTransform:
 
 class TestDeployFullWithDockerIntegration:
     @patch("datacustomcode.deploy._retrieve_access_token")
-    @patch("datacustomcode.deploy.verify_data_transform_config")
     @patch("datacustomcode.deploy.create_deployment")
     @patch("datacustomcode.deploy.zip")
     @patch("datacustomcode.deploy.upload_zip")
     @patch("datacustomcode.deploy.wait_for_deployment")
     @patch("datacustomcode.deploy.create_data_transform")
+    @patch("datacustomcode.deploy.get_config")
     @patch("datacustomcode.deploy.has_nonempty_requirements_file")
     def test_deploy_full_happy_path(
         self,
         mock_has_requirements,
+        mock_get_config,
         mock_create_transform,
         mock_wait,
         mock_upload_zip,
         mock_zip,
         mock_create_deployment,
-        mock_verify_config,
         mock_retrieve_token,
     ):
         """Test full deployment process with Docker dependency building."""
@@ -997,14 +1054,25 @@ class TestDeployFullWithDockerIntegration:
             refresh_token="refresh",
             client_secret="secret",
         )
-        metadata = TransformationJobMetadata(
+        metadata = CodeExtensionMetadata(
             name="test_job",
             version="1.0.0",
             description="Test job",
             computeType="CPU_M",
+            codeType="script",
         )
         callback = MagicMock()
 
+        data_transform_config = DataTransformConfig(
+            sdkVersion="1.0.0",
+            entryPoint="entrypoint.py",
+            dataspace="test_dataspace",
+            permissions=Permissions(
+                read=DloPermission(dlo=["input_dlo"]),
+                write=DloPermission(dlo=["output_dlo"]),
+            ),
+        )
+        mock_get_config.return_value = data_transform_config
         # Setup mocks
         access_token = AccessTokenResponse(
             access_token="test_token", instance_url="https://instance.example.com"
@@ -1016,18 +1084,26 @@ class TestDeployFullWithDockerIntegration:
 
         # Mock that requirements.txt exists and has dependencies
         mock_has_requirements.return_value = True
-
+        data_transform_config = DataTransformConfig(
+            sdkVersion="1.0.0",
+            entryPoint="entrypoint.py",
+            dataspace="test_dataspace",
+            permissions=Permissions(
+                read=DloPermission(dlo=["input_dlo"]),
+                write=DloPermission(dlo=["output_dlo"]),
+            ),
+        )
         # Call function
         result = deploy_full("/test/dir", metadata, credentials, "default", callback)
 
         # Assertions
         mock_retrieve_token.assert_called_once_with(credentials)
-        mock_verify_config.assert_called_once_with("/test/dir")
+        mock_get_config.assert_called_once_with("/test/dir")
         mock_create_deployment.assert_called_once_with(access_token, metadata)
         mock_zip.assert_called_once_with("/test/dir", "default")
         mock_upload_zip.assert_called_once_with("https://upload.example.com")
         mock_wait.assert_called_once_with(access_token, metadata, callback)
         mock_create_transform.assert_called_once_with(
-            "/test/dir", access_token, metadata
+            "/test/dir", access_token, metadata, data_transform_config
         )
         assert result == access_token
