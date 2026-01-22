@@ -103,6 +103,30 @@ class TestCredentials:
                 assert creds.client_secret == "ini_secret"
                 assert creds.refresh_token == "ini_refresh_token"
 
+    def test_from_ini_client_credentials(self):
+        """Test loading client credentials auth from an INI file."""
+        ini_content = """
+        [default]
+        auth_type = client_credentials
+        login_url = https://ini.login.url
+        client_id = ini_client_id
+        client_secret = ini_secret
+        """
+
+        with (
+            patch("os.path.exists", return_value=True),
+            patch("builtins.open", mock_open(read_data=ini_content)),
+        ):
+            mock_config = configparser.ConfigParser()
+            mock_config.read_string(ini_content)
+
+            with patch.object(configparser, "ConfigParser", return_value=mock_config):
+                creds = Credentials.from_ini(profile="default", ini_file="fake_path")
+                assert creds.auth_type == AuthType.CLIENT_CREDENTIALS
+                assert creds.client_id == "ini_client_id"
+                assert creds.client_secret == "ini_secret"
+                assert creds.login_url == "https://ini.login.url"
+
     def test_oauth_tokens_missing_refresh_token(self):
         """Test that OAuth Tokens auth requires refresh token."""
         with pytest.raises(ValueError, match="refresh_token"):
@@ -123,92 +147,27 @@ class TestCredentials:
                 refresh_token="test_refresh_token",
             )
 
-    # ============== Username/Password Tests ==============
-
-    def test_from_env_username_password(self):
-        """Test loading username/password credentials from environment variables."""
-        env_vars = {
-            "SFDC_LOGIN_URL": "https://test.login.url",
-            "SFDC_CLIENT_ID": "test_client_id",
-            "SFDC_AUTH_TYPE": "username_password",
-            "SFDC_USERNAME": "test_user",
-            "SFDC_PASSWORD": "test_pass",
-            "SFDC_CLIENT_SECRET": "test_secret",
-        }
-
-        with patch.dict(os.environ, env_vars, clear=True):
-            creds = Credentials.from_env()
-
-            assert creds.auth_type == AuthType.USERNAME_PASSWORD
-            assert creds.username == "test_user"
-            assert creds.password == "test_pass"
-            assert creds.client_id == "test_client_id"
-            assert creds.client_secret == "test_secret"
-            assert creds.login_url == "https://test.login.url"
-
     def test_from_env_missing_vars(self):
         """Test that missing environment variables raise appropriate error."""
         with patch.dict(os.environ, {}, clear=True):
             with pytest.raises(ValueError, match="SFDC_LOGIN_URL and SFDC_CLIENT_ID"):
                 Credentials.from_env()
 
-    def test_from_ini_username_password(self):
-        """Test loading username/password credentials from an INI file."""
-        ini_content = """
-        [default]
-        auth_type = username_password
-        login_url = https://ini.login.url
-        client_id = ini_client_id
-        username = ini_user
-        password = ini_pass
-        client_secret = ini_secret
+    def test_from_env_client_credentials(self):
+        """Test loading client credentials auth from environment variables."""
+        env_vars = {
+            "SFDC_LOGIN_URL": "https://test.login.url",
+            "SFDC_CLIENT_ID": "test_client_id",
+            "SFDC_AUTH_TYPE": "client_credentials",
+            "SFDC_CLIENT_SECRET": "test_secret",
+        }
 
-        [other_profile]
-        auth_type = username_password
-        login_url = https://other.login.url
-        client_id = other_client_id
-        username = other_user
-        password = other_pass
-        client_secret = other_secret
-        """
+        with patch.dict(os.environ, env_vars, clear=True):
+            creds = Credentials.from_env()
 
-        with (
-            patch("os.path.exists", return_value=True),
-            patch("builtins.open", mock_open(read_data=ini_content)),
-        ):
-            mock_config = configparser.ConfigParser()
-            mock_config.read_string(ini_content)
-
-            with patch.object(configparser, "ConfigParser", return_value=mock_config):
-                # Test default profile
-                creds = Credentials.from_ini(profile="default", ini_file="fake_path")
-                assert creds.auth_type == AuthType.USERNAME_PASSWORD
-                assert creds.username == "ini_user"
-                assert creds.password == "ini_pass"
-                assert creds.client_id == "ini_client_id"
-                assert creds.client_secret == "ini_secret"
-                assert creds.login_url == "https://ini.login.url"
-
-                # Test other profile
-                creds = Credentials.from_ini(
-                    profile="other_profile", ini_file="fake_path"
-                )
-                assert creds.username == "other_user"
-                assert creds.password == "other_pass"
-                assert creds.client_id == "other_client_id"
-                assert creds.client_secret == "other_secret"
-                assert creds.login_url == "https://other.login.url"
-
-    def test_username_password_missing_username(self):
-        """Test that Username/Password auth requires username."""
-        with pytest.raises(ValueError, match="username"):
-            Credentials(
-                login_url="https://test.login.url",
-                client_id="test_client_id",
-                auth_type=AuthType.USERNAME_PASSWORD,
-                password="test_pass",
-                client_secret="test_secret",
-            )
+            assert creds.auth_type == AuthType.CLIENT_CREDENTIALS
+            assert creds.client_id == "test_client_id"
+            assert creds.client_secret == "test_secret"
 
     # ============== from_available Tests ==============
 
@@ -314,24 +273,20 @@ class TestCredentials:
                 assert mock_config["default"]["core_token"] == "new_core_token"
                 assert mock_config["default"]["login_url"] == "https://new.login.url"
 
-    def test_update_ini_username_password(self):
-        """Test updating username/password credentials in an INI file."""
+    def test_update_ini_client_credentials(self):
+        """Test updating client credentials auth in an INI file."""
         ini_content = """
         [default]
-        auth_type = username_password
+        auth_type = client_credentials
         login_url = https://old.login.url
         client_id = old_client_id
-        username = old_user
-        password = old_pass
         client_secret = old_secret
         """
 
         creds = Credentials(
             login_url="https://new.login.url",
             client_id="new_client_id",
-            auth_type=AuthType.USERNAME_PASSWORD,
-            username="new_user",
-            password="new_pass",
+            auth_type=AuthType.CLIENT_CREDENTIALS,
             client_secret="new_secret",
         )
 
@@ -350,9 +305,7 @@ class TestCredentials:
                 creds.update_ini(profile="default", ini_file="~/fake_path")
 
                 mock_file.assert_called_with("/fake/expanded/path", "w")
-                assert mock_config["default"]["auth_type"] == "username_password"
-                assert mock_config["default"]["username"] == "new_user"
-                assert mock_config["default"]["password"] == "new_pass"
+                assert mock_config["default"]["auth_type"] == "client_credentials"
                 assert mock_config["default"]["client_id"] == "new_client_id"
                 assert mock_config["default"]["client_secret"] == "new_secret"
                 assert mock_config["default"]["login_url"] == "https://new.login.url"
@@ -451,8 +404,8 @@ class TestCredentials:
 
     def test_auth_type_values(self):
         """Test AuthType enum values."""
-        assert AuthType.USERNAME_PASSWORD.value == "username_password"
         assert AuthType.OAUTH_TOKENS.value == "oauth_tokens"
+        assert AuthType.CLIENT_CREDENTIALS.value == "client_credentials"
 
     def test_invalid_auth_type_from_env(self):
         """Test that invalid auth type from env raises error."""
