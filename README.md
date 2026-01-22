@@ -214,7 +214,7 @@ Instead of using `datacustomcode configure`, you can also set credentials via en
 |----------|-------------|
 | `SFDC_CLIENT_SECRET` | External Client App Client Secret |
 | `SFDC_REFRESH_TOKEN` | OAuth refresh token |
-| `SFDC_CORE_TOKEN` | (Optional) OAuth core/access token |
+| `SFDC_ACCESS_TOKEN` | (Optional) OAuth core/access token |
 
 Example usage:
 ```bash
@@ -367,68 +367,7 @@ You now have all fields necessary for the `datacustomcode configure` command.
 
 ### Obtaining Refresh Token and Core Token
 
-If you're using OAuth Tokens authentication (instead of Username/Password), follow these steps to obtain your refresh token and core token (access token).
-
-#### Step 1: Note External Client App Details
-
-From your External Client App, note down the following:
-- **Client ID**
-- **Client Secret**
-- **Callback URL** (e.g., `http://localhost:55555/callback`)
-
-#### Step 2: Obtain Authorization Code
-
-1. Open a browser and navigate to the following URL (replace placeholders with your values):
-
-   ```
-   <LOGIN_URL>/services/oauth2/authorize?response_type=code&client_id=<CLIENT_ID>&redirect_uri=<CALLBACK_URL>
-   ```
-
-2. After authenticating, you'll be redirected to your callback URL. The redirected URL will be in the form:
-   ```
-   <CALLBACK_URL>?code=<CODE>
-   ```
-
-3. Extract the `<CODE>` from the address bar. If the address bar doesn't show it, check the **Network tab** in your browser's developer tools.
-
-#### Step 3: Exchange Code for Tokens
-
-Make a POST request to exchange the authorization code for tokens. You can use `curl` or Postman:
-
-```bash
-curl --location --request POST '<LOGIN_URL>/services/oauth2/token' \
-  --header 'Content-Type: application/x-www-form-urlencoded' \
-  --data-urlencode 'grant_type=authorization_code' \
-  --data-urlencode 'code=<CODE>' \
-  --data-urlencode 'client_id=<CLIENT_ID>' \
-  --data-urlencode 'client_secret=<CLIENT_SECRET>' \
-  --data-urlencode 'redirect_uri=<CALLBACK_URL>'
-```
-
-The response will be a JSON object containing:
-
-```json
-{
-  "access_token": "<access_token>",
-  "refresh_token": "<refresh_token>",
-  "signature": "<signature>",
-  "scope": "refresh_token cdp_query_api api cdp_profile_api cdp_api full",
-  "id_token": "<id_token>",
-  "instance_url": "https://your-instance.my.salesforce.com",
-  "id": "https://login.salesforce.com/id/00DSB.../005SB...",
-  "token_type": "Bearer",
-  "issued_at": "1767743916187"
-}
-```
-
-The key fields you need are:
-| Field | Description |
-|-------|-------------|
-| `access_token` | The **core token** (also called access token) |
-| `refresh_token` | The **refresh token** for obtaining new access tokens |
-| `instance_url` | Your Salesforce instance URL |
-
-Use the `refresh_token` value when running `datacustomcode configure` with OAuth Tokens authentication.
+If you're using OAuth Tokens authentication, the initial configure will retrieve and store tokens. Run `datacustomcode auth` to refresh these when they expire.
 
 ## Other docs
 

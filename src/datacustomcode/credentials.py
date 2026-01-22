@@ -32,23 +32,6 @@ class AuthType(str, Enum):
     CLIENT_CREDENTIALS = "client_credentials"
 
 
-# Environment variable mappings for each auth type
-ENV_CREDENTIALS_COMMON = {
-    "login_url": "SFDC_LOGIN_URL",
-    "client_id": "SFDC_CLIENT_ID",
-}
-
-ENV_CREDENTIALS_OAUTH_TOKENS = {
-    "client_secret": "SFDC_CLIENT_SECRET",
-    "refresh_token": "SFDC_REFRESH_TOKEN",
-    "core_token": "SFDC_CORE_TOKEN",
-}
-
-ENV_CREDENTIALS_CLIENT_CREDENTIALS = {
-    "client_secret": "SFDC_CLIENT_SECRET",
-}
-
-
 @dataclass
 class Credentials:
     """Flexible credentials supporting multiple authentication methods.
@@ -61,14 +44,13 @@ class Credentials:
     # Required for all auth types
     login_url: str
     client_id: str
+    client_secret: str
     auth_type: AuthType = field(default=AuthType.OAUTH_TOKENS)
 
-    # Common field
-    client_secret: Optional[str] = None
-
     # OAuth Tokens flow fields
-    core_token: Optional[str] = None
+    access_token: Optional[str] = None
     refresh_token: Optional[str] = None
+    redirect_uri: Optional[str] = None
 
     def __post_init__(self):
         """Validate credentials based on auth_type."""
@@ -135,10 +117,11 @@ class Credentials:
             login_url=section["login_url"],
             client_id=section["client_id"],
             auth_type=auth_type,
-            client_secret=section.get("client_secret"),
+            client_secret=section["client_secret"],
             # OAuth Tokens fields
-            core_token=section.get("core_token"),
+            access_token=section.get("access_token"),
             refresh_token=section.get("refresh_token"),
+            redirect_uri=section.get("redirect_uri"),
         )
 
     @classmethod
@@ -154,7 +137,7 @@ class Credentials:
             For oauth_tokens (default):
                 SFDC_CLIENT_SECRET: External Client App client secret
                 SFDC_REFRESH_TOKEN: OAuth refresh token
-                SFDC_CORE_TOKEN: OAuth core/access token (optional)
+                SFDC_ACCESS_TOKEN: OAuth access token (optional)
 
         Returns:
             Credentials instance loaded from environment variables
@@ -185,10 +168,11 @@ class Credentials:
             login_url=login_url,
             client_id=client_id,
             auth_type=auth_type,
-            client_secret=os.environ.get("SFDC_CLIENT_SECRET"),
+            client_secret=os.environ["SFDC_CLIENT_SECRET"],
             # OAuth Tokens fields
-            core_token=os.environ.get("SFDC_CORE_TOKEN"),
+            access_token=os.environ.get("SFDC_ACCESS_TOKEN"),
             refresh_token=os.environ.get("SFDC_REFRESH_TOKEN"),
+            redirect_uri=os.environ.get("SFDC_REDIRECT_URI"),
         )
 
     @classmethod
@@ -245,21 +229,26 @@ class Credentials:
         config[profile]["auth_type"] = self.auth_type.value
         config[profile]["login_url"] = self.login_url
         config[profile]["client_id"] = self.client_id
-
+        config[profile]["client_secret"] = self.client_secret
         # Save fields based on auth type
         if self.auth_type == AuthType.OAUTH_TOKENS:
-            config[profile]["client_secret"] = self.client_secret or ""
             config[profile]["refresh_token"] = self.refresh_token or ""
-            if self.core_token:
-                config[profile]["core_token"] = self.core_token
+            config[profile]["redirect_uri"] = self.redirect_uri or ""
+            if self.access_token:
+                config[profile]["access_token"] = self.access_token
             # Remove fields from other auth types
             for key in ["username", "password"]:
                 config[profile].pop(key, None)
 
         elif self.auth_type == AuthType.CLIENT_CREDENTIALS:
-            config[profile]["client_secret"] = self.client_secret or ""
             # Remove fields from other auth types
-            for key in ["username", "password", "refresh_token", "core_token"]:
+            for key in [
+                "username",
+                "password",
+                "refresh_token",
+                "access_token",
+                "redirect_uri",
+            ]:
                 config[profile].pop(key, None)
 
         with open(expanded_ini_file, "w") as f:

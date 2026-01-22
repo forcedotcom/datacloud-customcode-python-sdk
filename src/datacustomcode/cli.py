@@ -12,27 +12,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import http.server
 from importlib import metadata
 import json
 import os
-import queue
-import socketserver
 import sys
-import threading
-import time
-from typing import (
-    Any,
-    List,
-    Union,
-)
-from urllib.parse import parse_qs, urlparse
-import webbrowser
+from typing import List, Union
 
 import click
 from loguru import logger
-import requests
 
+from datacustomcode import AuthType
+from datacustomcode.auth import configure_oauth_tokens
 from datacustomcode.scan import find_base_directory, get_package_type
 
 
@@ -55,243 +45,6 @@ def version():
         click.echo(f"salesforce-data-customcode version: {version}")
     except metadata.PackageNotFoundError:
         click.echo("Version information not available")
-
-
-class OAuthCallbackHandler(http.server.SimpleHTTPRequestHandler):
-    """HTTP request handler to capture OAuth callback."""
-
-    def __init__(self, *args, auth_code_queue=None, **kwargs):
-        self.auth_code_queue = auth_code_queue
-        super().__init__(*args, **kwargs)
-
-    def do_GET(self):
-        """Handle GET request from OAuth callback."""
-        parsed_path = urlparse(self.path)
-        query_params = parse_qs(parsed_path.query)
-
-        if "code" in query_params:
-            auth_code = query_params["code"][0]
-            self.auth_code_queue.put(auth_code)
-            self.send_response(200)
-            self.send_header("Content-type", "text/html")
-            self.end_headers()
-            self.wfile.write(
-                b"<html><body><h1>Authentication successful!</h1>"
-                b"<p>You can close this window and return to the terminal.</p>"
-                b"</body></html>"
-            )
-        elif "error" in query_params:
-            error = query_params["error"][0]
-            error_description = query_params.get("error_description", [""])[0]
-            self.auth_code_queue.put(f"ERROR:{error}:{error_description}")
-            self.send_response(400)
-            self.send_header("Content-type", "text/html")
-            self.end_headers()
-            self.wfile.write(
-                f"<html><body><h1>Authentication failed</h1>"
-                f"<p>Error: {error}</p>"
-                f"<p>{error_description}</p></body></html>".encode()
-            )
-        else:
-            self.send_response(400)
-            self.send_header("Content-type", "text/html")
-            self.end_headers()
-            self.wfile.write(b"<html><body><h1>Invalid callback</h1></body></html>")
-
-    def log_message(self, format, *args):
-        """Suppress default logging."""
-
-
-def _run_oauth_callback_server(
-    redirect_uri: str, auth_code_queue: "queue.Queue[str]"
-) -> tuple[socketserver.TCPServer, int]:
-    """Start a local HTTP server to catch OAuth callback.
-
-    Args:
-        redirect_uri: The redirect URI configured in the OAuth app
-        auth_code_queue: Queue to put the authorization code in
-
-    Returns:
-        Tuple of (server instance, actual port number)
-    """
-    parsed_uri = urlparse(redirect_uri)
-    host = parsed_uri.hostname or "localhost"
-    port = parsed_uri.port or 5555
-
-    # Create a custom handler factory
-    def handler_factory(*args, **kwargs):
-        return OAuthCallbackHandler(*args, auth_code_queue=auth_code_queue, **kwargs)
-
-    server = socketserver.TCPServer((host, port), handler_factory)
-    server.allow_reuse_address = True
-
-    def serve():
-        server.serve_forever()
-
-    server_thread = threading.Thread(target=serve, daemon=True)
-    server_thread.start()
-
-    # Wait a moment for server to start
-    time.sleep(0.5)
-
-    return server, port
-
-
-def _exchange_code_for_tokens(
-    login_url: str,
-    client_id: str,
-    client_secret: str,
-    redirect_uri: str,
-    auth_code: str,
-) -> Any:
-    """Exchange authorization code for access and refresh tokens.
-
-    Args:
-        login_url: Salesforce login URL
-        client_id: OAuth client ID
-        client_secret: OAuth client secret
-        redirect_uri: Redirect URI used in authorization
-        auth_code: Authorization code from callback
-
-    Returns:
-        Dictionary containing access_token and refresh_token
-
-    Raises:
-        click.ClickException: If token exchange fails
-    """
-    token_url = f"{login_url.rstrip('/')}/services/oauth2/token"
-    data = {
-        "grant_type": "authorization_code",
-        "code": auth_code,
-        "client_id": client_id,
-        "client_secret": client_secret,
-        "redirect_uri": redirect_uri,
-    }
-
-    try:
-        response = requests.post(token_url, data=data, timeout=30)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        raise click.ClickException(
-            f"Failed to exchange authorization code for tokens: {e}"
-        ) from e
-
-
-def _perform_oauth_browser_flow(
-    login_url: str, client_id: str, client_secret: str, redirect_uri: str
-) -> tuple[str, str]:
-    """Perform OAuth browser flow to obtain tokens.
-
-    Args:
-        login_url: Salesforce login URL
-        client_id: OAuth client ID
-        client_secret: OAuth client secret
-        redirect_uri: Redirect URI configured in OAuth app
-
-    Returns:
-        Tuple of (refresh_token, access_token)
-
-    Raises:
-        click.ClickException: If OAuth flow fails
-    """
-    # Parse redirect_uri and ensure it has a port
-    parsed_redirect = urlparse(redirect_uri)
-    if not parsed_redirect.port:
-        # If no port specified, default to 5555 and update redirect_uri
-        default_port = 5555
-        redirect_uri = f"{parsed_redirect.scheme}://{parsed_redirect.hostname}:{default_port}{parsed_redirect.path}"
-
-    # Create queue for communication between server and main thread
-    auth_code_queue: queue.Queue[str] = queue.Queue()
-
-    # Start callback server
-    click.echo(f"\nStarting local callback server on {redirect_uri}...")
-    server, actual_port = _run_oauth_callback_server(redirect_uri, auth_code_queue)
-
-    # Build authorization URL with final redirect_uri
-    auth_url = (
-        f"{login_url.rstrip('/')}/services/oauth2/authorize"
-        f"?response_type=code"
-        f"&client_id={client_id}"
-        f"&redirect_uri={redirect_uri}"
-    )
-
-    # Open browser
-    click.echo("Opening browser for authentication...")
-    click.echo(f"If the browser doesn't open automatically, visit:\n{auth_url}\n")
-    webbrowser.open(auth_url)
-
-    # Wait for callback (with timeout)
-    click.echo("Waiting for authentication...")
-    try:
-        result = auth_code_queue.get(timeout=60)  # 1 minute timeout
-    except queue.Empty:
-        server.shutdown()
-        raise click.ClickException(
-            "Authentication timeout. Please try again."
-        ) from None
-
-    # Shutdown server
-    server.shutdown()
-
-    # Check for errors
-    if result.startswith("ERROR:"):
-        _, error, error_description = result.split(":", 2)
-        raise click.ClickException(f"OAuth error: {error}. {error_description}")
-
-    auth_code = result
-
-    # Exchange code for tokens
-    click.echo("Exchanging authorization code for tokens...")
-    token_response = _exchange_code_for_tokens(
-        login_url, client_id, client_secret, redirect_uri, auth_code
-    )
-
-    refresh_token = token_response.get("refresh_token")
-    access_token = token_response.get("access_token")
-
-    if not refresh_token:
-        raise click.ClickException(
-            "No refresh_token in response. Please check your OAuth app configuration."
-        )
-
-    return refresh_token, access_token
-
-
-def _configure_oauth_tokens(
-    login_url: str,
-    client_id: str,
-    profile: str,
-) -> None:
-    """Configure credentials for OAuth Tokens authentication."""
-    from datacustomcode.credentials import AuthType, Credentials
-
-    client_secret = click.prompt("Client Secret", hide_input=True)
-    redirect_uri = click.prompt("Redirect URI")
-
-    # Perform OAuth browser flow
-    try:
-        refresh_token, access_token = _perform_oauth_browser_flow(
-            login_url, client_id, client_secret, redirect_uri
-        )
-    except click.ClickException as e:
-        click.secho(f"Error: {e}", fg="red")
-        raise click.Abort() from None
-
-    credentials = Credentials(
-        login_url=login_url,
-        client_id=client_id,
-        auth_type=AuthType.OAUTH_TOKENS,
-        client_secret=client_secret,
-        refresh_token=refresh_token,
-        core_token=access_token,
-    )
-    credentials.update_ini(profile=profile)
-    click.secho(
-        f"OAuth Tokens credentials saved to profile '{profile}' successfully",
-        fg="green",
-    )
 
 
 def _configure_client_credentials(
@@ -341,9 +94,35 @@ def configure(profile: str, auth_type: str) -> None:
 
     # Route to appropriate handler based on auth type
     if auth_type == AuthType.OAUTH_TOKENS.value:
-        _configure_oauth_tokens(login_url, client_id, profile)
+        client_secret = click.prompt("Client Secret", hide_input=True)
+        redirect_uri = click.prompt("Redirect URI")
+        configure_oauth_tokens(
+            login_url, client_id, client_secret, redirect_uri, profile
+        )
     elif auth_type == AuthType.CLIENT_CREDENTIALS.value:
         _configure_client_credentials(login_url, client_id, profile)
+
+
+@cli.command()
+@click.option("--profile", default="default", help="Credential profile name")
+def auth(profile: str):
+    from datacustomcode.credentials import Credentials
+
+    credentials = Credentials.from_available(profile=profile)
+    if not credentials.redirect_uri:
+        click.secho(
+            "Error: Redirect URI is required for OAuth Tokens authentication",
+            fg="red",
+        )
+        raise click.Abort()
+    if credentials.auth_type == AuthType.OAUTH_TOKENS:
+        configure_oauth_tokens(
+            login_url=credentials.login_url,
+            client_id=credentials.client_id,
+            client_secret=credentials.client_secret,
+            redirect_uri=credentials.redirect_uri,
+            profile=profile,
+        )
 
 
 @cli.command()

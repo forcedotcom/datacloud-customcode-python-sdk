@@ -21,7 +21,7 @@ class TestCredentials:
             "SFDC_CLIENT_ID": "test_client_id",
             "SFDC_CLIENT_SECRET": "test_secret",
             "SFDC_REFRESH_TOKEN": "test_refresh_token",
-            "SFDC_CORE_TOKEN": "test_core_token",
+            "SFDC_ACCESS_TOKEN": "test_access_token",
         }
 
         with patch.dict(os.environ, env_vars, clear=True):
@@ -30,7 +30,7 @@ class TestCredentials:
             assert creds.auth_type == AuthType.OAUTH_TOKENS
             assert creds.client_secret == "test_secret"
             assert creds.refresh_token == "test_refresh_token"
-            assert creds.core_token == "test_core_token"
+            assert creds.access_token == "test_access_token"
             assert creds.client_id == "test_client_id"
             assert creds.login_url == "https://test.login.url"
 
@@ -60,7 +60,7 @@ class TestCredentials:
         client_id = oauth_client_id
         client_secret = oauth_secret
         refresh_token = oauth_refresh_token
-        core_token = oauth_core_token
+        access_token = oauth_access_token
         """
 
         with (
@@ -77,7 +77,7 @@ class TestCredentials:
                 assert creds.auth_type == AuthType.OAUTH_TOKENS
                 assert creds.client_secret == "oauth_secret"
                 assert creds.refresh_token == "oauth_refresh_token"
-                assert creds.core_token == "oauth_core_token"
+                assert creds.access_token == "oauth_access_token"
                 assert creds.client_id == "oauth_client_id"
 
     def test_from_ini_default_auth_type(self):
@@ -139,7 +139,7 @@ class TestCredentials:
 
     def test_oauth_tokens_missing_client_secret(self):
         """Test that OAuth Tokens auth requires client secret."""
-        with pytest.raises(ValueError, match="client_secret"):
+        with pytest.raises(TypeError, match="client_secret"):
             Credentials(
                 login_url="https://test.login.url",
                 client_id="test_client_id",
@@ -248,7 +248,7 @@ class TestCredentials:
             auth_type=AuthType.OAUTH_TOKENS,
             client_secret="new_secret",
             refresh_token="new_refresh_token",
-            core_token="new_core_token",
+            access_token="new_access_token",
         )
 
         mock_file = mock_open(read_data=ini_content)
@@ -270,7 +270,7 @@ class TestCredentials:
                 assert mock_config["default"]["client_id"] == "new_client_id"
                 assert mock_config["default"]["client_secret"] == "new_secret"
                 assert mock_config["default"]["refresh_token"] == "new_refresh_token"
-                assert mock_config["default"]["core_token"] == "new_core_token"
+                assert mock_config["default"]["access_token"] == "new_access_token"
                 assert mock_config["default"]["login_url"] == "https://new.login.url"
 
     def test_update_ini_client_credentials(self):
