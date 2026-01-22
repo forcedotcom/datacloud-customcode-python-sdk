@@ -939,7 +939,7 @@ class TestDeployFull:
         assert result == access_token
 
     @patch("datacustomcode.deploy._retrieve_access_token")
-    @patch("datacustomcode.deploy.verify_data_transform_config")
+    @patch("datacustomcode.deploy.get_config")
     @patch("datacustomcode.deploy.create_deployment")
     @patch("datacustomcode.deploy.zip")
     @patch("datacustomcode.deploy.upload_zip")
@@ -952,21 +952,32 @@ class TestDeployFull:
         mock_upload_zip,
         mock_zip,
         mock_create_deployment,
-        mock_verify_config,
+        mock_get_config,
         mock_retrieve_token,
     ):
         """Test full deployment process using client credentials auth."""
+        data_transform_config = DataTransformConfig(
+            sdkVersion="1.0.0",
+            entryPoint="entrypoint.py",
+            dataspace="test_dataspace",
+            permissions=Permissions(
+                read=DloPermission(dlo=["input_dlo"]),
+                write=DloPermission(dlo=["output_dlo"]),
+            ),
+        )
+        mock_get_config.return_value = data_transform_config
         credentials = Credentials(
             login_url="https://example.com",
             client_id="id",
             auth_type=AuthType.CLIENT_CREDENTIALS,
             client_secret="secret",
         )
-        metadata = TransformationJobMetadata(
+        metadata = CodeExtensionMetadata(
             name="test_job",
             version="1.0.0",
             description="Test job",
             computeType="CPU_M",
+            codeType="script",
         )
         callback = MagicMock()
 
@@ -981,13 +992,13 @@ class TestDeployFull:
         result = deploy_full("/test/dir", metadata, credentials, "default", callback)
 
         mock_retrieve_token.assert_called_once_with(credentials)
-        mock_verify_config.assert_called_once_with("/test/dir")
+        mock_get_config.assert_called_once_with("/test/dir")
         mock_create_deployment.assert_called_once_with(access_token, metadata)
         mock_zip.assert_called_once_with("/test/dir", "default")
         mock_upload_zip.assert_called_once_with("https://upload.example.com")
         mock_wait.assert_called_once_with(access_token, metadata, callback)
         mock_create_transform.assert_called_once_with(
-            "/test/dir", access_token, metadata
+            "/test/dir", access_token, metadata, data_transform_config
         )
         assert result == access_token
 

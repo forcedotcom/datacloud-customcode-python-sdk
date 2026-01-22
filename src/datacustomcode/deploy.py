@@ -35,8 +35,8 @@ from pydantic import BaseModel
 import requests
 
 from datacustomcode.cmd import cmd_output
-from datacustomcode.scan import find_base_directory, get_package_type
 from datacustomcode.credentials import AuthType
+from datacustomcode.scan import find_base_directory, get_package_type
 
 if TYPE_CHECKING:
     from datacustomcode.credentials import Credentials
