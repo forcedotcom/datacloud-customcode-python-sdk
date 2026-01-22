@@ -265,4 +265,11 @@ class Credentials:
         with open(expanded_ini_file, "w") as f:
             config.write(f)
 
+        # Set secure file permissions (0o600 - readable/writable by owner only)
+        try:
+            os.chmod(expanded_ini_file, 0o600)
+        except OSError:
+            # Ignore errors if we can't set file permissions (e.g., on Windows)
+            pass
+
         logger.debug(f"Saved credentials to {expanded_ini_file} [{profile}]")
