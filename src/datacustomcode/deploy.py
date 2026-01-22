@@ -36,6 +36,7 @@ import requests
 
 from datacustomcode.cmd import cmd_output
 from datacustomcode.scan import find_base_directory, get_package_type
+from datacustomcode.credentials import AuthType
 
 if TYPE_CHECKING:
     from datacustomcode.credentials import Credentials
@@ -130,18 +131,27 @@ class AccessTokenResponse(BaseModel):
 
 
 def _retrieve_access_token(credentials: Credentials) -> AccessTokenResponse:
-    """Get a token for the Salesforce API."""
+    """Get an access token for the Salesforce API."""
     logger.debug("Getting oauth token...")
 
     url = f"{credentials.login_url.rstrip('/')}/{AUTH_PATH.lstrip('/')}"
 
-    data = {
-        "grant_type": "password",
-        "username": credentials.username,
-        "password": credentials.password,
-        "client_id": credentials.client_id,
-        "client_secret": credentials.client_secret,
-    }
+    if credentials.auth_type == AuthType.OAUTH_TOKENS:
+        data = {
+            "grant_type": "refresh_token",
+            "refresh_token": credentials.refresh_token,
+            "client_id": credentials.client_id,
+            "client_secret": credentials.client_secret,
+        }
+    elif credentials.auth_type == AuthType.CLIENT_CREDENTIALS:
+        data = {
+            "grant_type": "client_credentials",
+            "client_id": credentials.client_id,
+            "client_secret": credentials.client_secret,
+        }
+    else:
+        raise ValueError(f"Unsupported auth_type: {credentials.auth_type}")
+
     response = _make_api_call(url, "POST", data=data)
     return AccessTokenResponse(**response)
 

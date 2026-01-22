@@ -465,9 +465,8 @@ class TestRetrieveAccessToken:
         credentials = Credentials(
             login_url="https://example.com",
             client_id="id",
-            auth_type=AuthType.USERNAME_PASSWORD,
-            username="user",
-            password="pass",
+            auth_type=AuthType.OAUTH_TOKENS,
+            refresh_token="refresh",
             client_secret="secret",
         )
 
@@ -479,6 +478,33 @@ class TestRetrieveAccessToken:
         result = _retrieve_access_token(credentials)
 
         mock_make_api_call.assert_called_once()
+        call_args = mock_make_api_call.call_args
+        assert call_args.kwargs["data"]["grant_type"] == "refresh_token"
+        assert call_args.kwargs["data"]["refresh_token"] == "refresh"
+        assert isinstance(result, AccessTokenResponse)
+        assert result.access_token == "test_token"
+        assert result.instance_url == "https://instance.example.com"
+
+    @patch("datacustomcode.deploy._make_api_call")
+    def test_retrieve_access_token_client_credentials(self, mock_make_api_call):
+        """Test retrieving access token with client credentials flow."""
+        credentials = Credentials(
+            login_url="https://example.com",
+            client_id="id",
+            auth_type=AuthType.CLIENT_CREDENTIALS,
+            client_secret="secret",
+        )
+
+        mock_make_api_call.return_value = {
+            "access_token": "test_token",
+            "instance_url": "https://instance.example.com",
+        }
+
+        result = _retrieve_access_token(credentials)
+
+        mock_make_api_call.assert_called_once()
+        call_args = mock_make_api_call.call_args
+        assert call_args.kwargs["data"]["grant_type"] == "client_credentials"
         assert isinstance(result, AccessTokenResponse)
         assert result.access_token == "test_token"
         assert result.instance_url == "https://instance.example.com"
@@ -875,9 +901,8 @@ class TestDeployFull:
         credentials = Credentials(
             login_url="https://example.com",
             client_id="id",
-            auth_type=AuthType.USERNAME_PASSWORD,
-            username="user",
-            password="pass",
+            auth_type=AuthType.OAUTH_TOKENS,
+            refresh_token="refresh",
             client_secret="secret",
         )
         metadata = CodeExtensionMetadata(
@@ -910,6 +935,59 @@ class TestDeployFull:
         mock_wait.assert_called_once_with(access_token, metadata, callback)
         mock_create_transform.assert_called_once_with(
             "/test/dir", access_token, metadata, data_transform_config
+        )
+        assert result == access_token
+
+    @patch("datacustomcode.deploy._retrieve_access_token")
+    @patch("datacustomcode.deploy.verify_data_transform_config")
+    @patch("datacustomcode.deploy.create_deployment")
+    @patch("datacustomcode.deploy.zip")
+    @patch("datacustomcode.deploy.upload_zip")
+    @patch("datacustomcode.deploy.wait_for_deployment")
+    @patch("datacustomcode.deploy.create_data_transform")
+    def test_deploy_full_client_credentials(
+        self,
+        mock_create_transform,
+        mock_wait,
+        mock_upload_zip,
+        mock_zip,
+        mock_create_deployment,
+        mock_verify_config,
+        mock_retrieve_token,
+    ):
+        """Test full deployment process using client credentials auth."""
+        credentials = Credentials(
+            login_url="https://example.com",
+            client_id="id",
+            auth_type=AuthType.CLIENT_CREDENTIALS,
+            client_secret="secret",
+        )
+        metadata = TransformationJobMetadata(
+            name="test_job",
+            version="1.0.0",
+            description="Test job",
+            computeType="CPU_M",
+        )
+        callback = MagicMock()
+
+        access_token = AccessTokenResponse(
+            access_token="test_token", instance_url="https://instance.example.com"
+        )
+        mock_retrieve_token.return_value = access_token
+        mock_create_deployment.return_value = CreateDeploymentResponse(
+            fileUploadUrl="https://upload.example.com"
+        )
+
+        result = deploy_full("/test/dir", metadata, credentials, "default", callback)
+
+        mock_retrieve_token.assert_called_once_with(credentials)
+        mock_verify_config.assert_called_once_with("/test/dir")
+        mock_create_deployment.assert_called_once_with(access_token, metadata)
+        mock_zip.assert_called_once_with("/test/dir", "default")
+        mock_upload_zip.assert_called_once_with("https://upload.example.com")
+        mock_wait.assert_called_once_with(access_token, metadata, callback)
+        mock_create_transform.assert_called_once_with(
+            "/test/dir", access_token, metadata
         )
         assert result == access_token
 
@@ -961,9 +1039,8 @@ class TestDeployFullWithDockerIntegration:
         credentials = Credentials(
             login_url="https://example.com",
             client_id="id",
-            auth_type=AuthType.USERNAME_PASSWORD,
-            username="user",
-            password="pass",
+            auth_type=AuthType.OAUTH_TOKENS,
+            refresh_token="refresh",
             client_secret="secret",
         )
         metadata = CodeExtensionMetadata(

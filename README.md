@@ -12,7 +12,7 @@ Use of this project with Salesforce is subject to the [TERMS OF USE](./TERMS_OF_
 - [Azul Zulu OpenJDK 17.x](https://www.azul.com/downloads/?version=java-17-lts&package=jdk#zulu)
 - Docker support like [Docker Desktop](https://docs.docker.com/desktop/)
 - A salesforce org with some DLOs or DMOs with data and this feature enabled (it is not GA)
-- A [connected app](#creating-a-connected-app)
+- An [External Client App](#creating-an-external-client-app)
 
 ## Installation
 The SDK can be downloaded directly from PyPI with `pip`:
@@ -58,7 +58,7 @@ This will yield all necessary files to get started:
   * `config.json` – This config defines permissions on the back and can be generated programmatically with `scan` CLI method.
   * `entrypoint.py` – The script that defines the data transformation logic.
 
-A functional entrypoint.py is provided so you can run once you've configured your connected app:
+A functional entrypoint.py is provided so you can run once you've configured your External Client App:
 ```zsh
 cd my_package
 datacustomcode configure
@@ -175,25 +175,25 @@ Display the current version of the package.
 Configure credentials for connecting to Data Cloud.
 
 **Prerequisites:**
-- A [connected app](#creating-a-connected-app) with OAuth settings configured
+- An [External Client App](#creating-an-external-client-app) with OAuth settings configured
 - For OAuth Tokens authentication: [refresh token and core token](#obtaining-refresh-token-and-core-token)
 
 Options:
 - `--profile TEXT`: Credential profile name (default: "default")
-- `--auth-type TEXT`: Authentication method (`oauth_tokens` or `username_password`, default: `oauth_tokens`)
+- `--auth-type TEXT`: Authentication method (default: `oauth_tokens`)
+  - `oauth_tokens` - OAuth tokens with refresh_token
+  - `client_credentials` - Server-to-server using client_id/secret only
 - `--login-url TEXT`: Salesforce login URL
 
-For Username/Password authentication:
-- `--username TEXT`: Salesforce username
-- `--password TEXT`: Salesforce password
-- `--client-id TEXT`: Connected App Client ID
-- `--client-secret TEXT`: Connected App Client Secret
-
 For OAuth Tokens authentication:
-- `--client-id TEXT`: Connected App Client ID
-- `--client-secret TEXT`: Connected App Client Secret
+- `--client-id TEXT`: External Client App Client ID
+- `--client-secret TEXT`: External Client App Client Secret
 - `--refresh-token TEXT`: OAuth refresh token (see [Obtaining Refresh Token](#obtaining-refresh-token-and-core-token))
 - `--core-token TEXT`: (Optional) OAuth core/access token - if not provided, it will be obtained using the refresh token
+
+For Client Credentials authentication (server-to-server):
+- `--client-id TEXT`: External Client App Client ID
+- `--client-secret TEXT`: External Client App Client Secret
 
 ##### Using Environment Variables (Alternative)
 
@@ -207,7 +207,7 @@ Instead of using `datacustomcode configure`, you can also set credentials via en
 |----------|-------------|
 | `SFDC_LOGIN_URL` | Salesforce login URL (e.g., `https://login.salesforce.com`) |
 | `SFDC_CLIENT_ID` | External Client App Client ID |
-| `SFDC_AUTH_TYPE` | Authentication type: `oauth_tokens` (default) or `username_password` |
+| `SFDC_AUTH_TYPE` | Authentication type: `oauth_tokens` (default) or `client_credentials` |
 
 **For OAuth Tokens authentication (`SFDC_AUTH_TYPE=oauth_tokens`):**
 | Variable | Description |
@@ -215,13 +215,6 @@ Instead of using `datacustomcode configure`, you can also set credentials via en
 | `SFDC_CLIENT_SECRET` | External Client App Client Secret |
 | `SFDC_REFRESH_TOKEN` | OAuth refresh token |
 | `SFDC_CORE_TOKEN` | (Optional) OAuth core/access token |
-
-**For Username/Password authentication (`SFDC_AUTH_TYPE=username_password`):**
-| Variable | Description |
-|----------|-------------|
-| `SFDC_USERNAME` | Salesforce username |
-| `SFDC_PASSWORD` | Salesforce password |
-| `SFDC_CLIENT_SECRET` | External Client App Client Secret |
 
 Example usage:
 ```bash
@@ -376,9 +369,9 @@ You now have all fields necessary for the `datacustomcode configure` command.
 
 If you're using OAuth Tokens authentication (instead of Username/Password), follow these steps to obtain your refresh token and core token (access token).
 
-#### Step 1: Note Connected App Details
+#### Step 1: Note External Client App Details
 
-From your connected app, note down the following:
+From your External Client App, note down the following:
 - **Client ID**
 - **Client Secret**
 - **Callback URL** (e.g., `http://localhost:55555/callback`)
