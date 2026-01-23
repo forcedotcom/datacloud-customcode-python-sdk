@@ -83,8 +83,10 @@ def _run_oauth_callback_server(
         Tuple of (server instance, actual port number)
     """
     parsed_uri = urlparse(redirect_uri)
-    host = parsed_uri.hostname or "localhost"
-    port = parsed_uri.port or 5555
+    host = parsed_uri.hostname
+    port = parsed_uri.port
+    if not host or not port:
+        raise ValueError(f"Invalid redirect URI: {redirect_uri}")
 
     # Create a custom handler factory
     def handler_factory(*args, **kwargs):
@@ -146,7 +148,7 @@ def _exchange_code_for_tokens(
         ) from e
 
 
-def perform_oauth_browser_flow(
+def do_oauth_browser_flow(
     login_url: str, client_id: str, client_secret: str, redirect_uri: str
 ) -> tuple[str, str]:
     """Perform OAuth browser flow to obtain tokens.
@@ -163,13 +165,6 @@ def perform_oauth_browser_flow(
     Raises:
         click.ClickException: If OAuth flow fails
     """
-    # Parse redirect_uri and ensure it has a port
-    parsed_redirect = urlparse(redirect_uri)
-    if not parsed_redirect.port:
-        # If no port specified, default to 5555 and update redirect_uri
-        default_port = 5555
-        redirect_uri = f"{parsed_redirect.scheme}://{parsed_redirect.hostname}:{default_port}{parsed_redirect.path}"
-
     # Create queue for communication between server and main thread
     auth_code_queue: queue.Queue[str] = queue.Queue()
 
@@ -239,7 +234,7 @@ def configure_oauth_tokens(
 
     # Perform OAuth browser flow
     try:
-        refresh_token, access_token = perform_oauth_browser_flow(
+        refresh_token, access_token = do_oauth_browser_flow(
             login_url, client_id, client_secret, redirect_uri
         )
     except click.ClickException as e:
