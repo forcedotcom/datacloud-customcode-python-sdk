@@ -21,6 +21,8 @@ from typing import List, Union
 import click
 from loguru import logger
 
+from datacustomcode import AuthType
+from datacustomcode.auth import configure_oauth_tokens
 from datacustomcode.scan import find_base_directory, get_package_type
 
 
@@ -43,37 +45,6 @@ def version():
         click.echo(f"salesforce-data-customcode version: {version}")
     except metadata.PackageNotFoundError:
         click.echo("Version information not available")
-
-
-def _configure_oauth_tokens(
-    login_url: str,
-    client_id: str,
-    profile: str,
-) -> None:
-    """Configure credentials for OAuth Tokens authentication."""
-    from datacustomcode.credentials import AuthType, Credentials
-
-    client_secret = click.prompt("Client Secret")
-    refresh_token = click.prompt("Refresh Token")
-    core_token = click.prompt(
-        "Core Token (optional, press Enter to skip)",
-        default="",
-        show_default=False,
-    )
-
-    credentials = Credentials(
-        login_url=login_url,
-        client_id=client_id,
-        auth_type=AuthType.OAUTH_TOKENS,
-        client_secret=client_secret,
-        refresh_token=refresh_token,
-        core_token=core_token if core_token else None,
-    )
-    credentials.update_ini(profile=profile)
-    click.secho(
-        f"OAuth Tokens credentials saved to profile '{profile}' successfully",
-        fg="green",
-    )
 
 
 def _configure_client_credentials(
@@ -123,9 +94,35 @@ def configure(profile: str, auth_type: str) -> None:
 
     # Route to appropriate handler based on auth type
     if auth_type == AuthType.OAUTH_TOKENS.value:
-        _configure_oauth_tokens(login_url, client_id, profile)
+        client_secret = click.prompt("Client Secret", hide_input=True)
+        redirect_uri = click.prompt("Redirect URI")
+        configure_oauth_tokens(
+            login_url, client_id, client_secret, redirect_uri, profile
+        )
     elif auth_type == AuthType.CLIENT_CREDENTIALS.value:
         _configure_client_credentials(login_url, client_id, profile)
+
+
+@cli.command()
+@click.option("--profile", default="default", help="Credential profile name")
+def auth(profile: str):
+    from datacustomcode.credentials import Credentials
+
+    credentials = Credentials.from_available(profile=profile)
+    if not credentials.redirect_uri:
+        click.secho(
+            "Error: Redirect URI is required for OAuth Tokens authentication",
+            fg="red",
+        )
+        raise click.Abort()
+    if credentials.auth_type == AuthType.OAUTH_TOKENS:
+        configure_oauth_tokens(
+            login_url=credentials.login_url,
+            client_id=credentials.client_id,
+            client_secret=credentials.client_secret,
+            redirect_uri=credentials.redirect_uri,
+            profile=profile,
+        )
 
 
 @cli.command()
