@@ -96,9 +96,9 @@ def _make_api_call(
 
     response = requests.request(method=method, url=url, headers=headers, **kwargs)
     if response.status_code >= 400:
-        logger.debug(f"Error Response Status: {response.status_code}")
+        logger.warning(f"Error Response Status: {response.status_code}")
         logger.debug(f"Error Response Headers: {response.headers}")
-        logger.debug(f"Error Response Text: {response.text[:500]}")
+        logger.warning(f"Error Response Text: {response.text[:500]}")
 
     if not response.text or response.text.strip() == "":
         response.raise_for_status()
@@ -276,7 +276,7 @@ def wait_for_deployment(
         callback: Optional callback function that receives the deployment status
     """
     start_time = time.time()
-    logger.debug("Waiting for deployment to complete")
+    logger.info("Waiting for deployment to complete")
 
     while True:
         deployment_status = get_deployments(access_token, metadata)
@@ -287,7 +287,7 @@ def wait_for_deployment(
         if callback:
             callback(status)
         if status == "Deployed":
-            logger.debug(
+            logger.info(
                 f"Deployment completed.\nElapsed time: {time.time() - start_time}"
             )
             break
