@@ -74,13 +74,14 @@ def _configure_client_credentials(
 @click.option("--profile", default="default", help="Credential profile name")
 @click.option(
     "--auth-type",
-    type=click.Choice(["oauth_tokens", "client_credentials"]),
+    type=click.Choice(["oauth_tokens", "client_credentials", "sf_cli"]),
     default="oauth_tokens",
     help="""Authentication method to use.
 
     \b
     oauth_tokens       - OAuth tokens (refresh_token) authentication (default)
     client_credentials - Server-to-server using client_id/secret only
+    sf_cli             - Use Salesforce CLI for token management
     """,
 )
 def configure(profile: str, auth_type: str) -> None:
@@ -89,18 +90,74 @@ def configure(profile: str, auth_type: str) -> None:
 
     # Common fields for all auth types
     click.echo(f"\nConfiguring {auth_type} authentication for profile '{profile}':\n")
-    login_url = click.prompt("Login URL")
-    client_id = click.prompt("Client ID")
 
-    # Route to appropriate handler based on auth type
-    if auth_type == AuthType.OAUTH_TOKENS.value:
-        client_secret = click.prompt("Client Secret", hide_input=True)
-        redirect_uri = click.prompt("Redirect URI")
-        configure_oauth_tokens(
-            login_url, client_id, client_secret, redirect_uri, profile
-        )
-    elif auth_type == AuthType.CLIENT_CREDENTIALS.value:
-        _configure_client_credentials(login_url, client_id, profile)
+    if auth_type == AuthType.SF_CLI.value:
+        from datacustomcode.credentials import Credentials
+
+        click.echo("Configuring Salesforce CLI authentication...\n")
+        click.echo("This auth method uses SF CLI to fetch fresh tokens automatically.")
+        click.echo("Make sure your org is authenticated with: sf org login web --alias <alias>\n")
+
+        org_alias = click.prompt("Enter Salesforce org alias (from 'sf org list')")
+
+        try:
+            result = os.popen(f"sf org display --target-org {org_alias} --json").read()
+            if not result:
+                click.secho(f"Error: Failed to get org info for '{org_alias}'", fg="red")
+                click.echo("Make sure the org is authenticated with: sf org login web --alias <alias>")
+                raise click.Abort()
+
+            org_data = json.loads(result)
+
+            if org_data.get("status") != 0:
+                click.secho(f"Error: {org_data.get('message', 'Unknown error')}", fg="red")
+                raise click.Abort()
+
+            org_result = org_data.get("result", {})
+            instance_url = org_result.get("instanceUrl")
+            username = org_result.get("username")
+
+            if not instance_url:
+                click.secho("Error: Could not extract instance URL from SF CLI", fg="red")
+                raise click.Abort()
+
+            click.echo(f"\n✓ Verified SF CLI org '{org_alias}'")
+            click.echo(f"  Instance URL: {instance_url}")
+            click.echo(f"  Username: {username}")
+            click.echo(f"\nTokens will be fetched dynamically from SF CLI during runtime.\n")
+
+            credentials = Credentials(
+                login_url=instance_url,
+                client_id="SalesforceCLI",
+                client_secret="",
+                auth_type=AuthType.SF_CLI,
+                sf_org_alias=org_alias,
+            )
+            credentials.update_ini(profile=profile)
+            click.secho(
+                f"SF CLI credentials saved to profile '{profile}' successfully",
+                fg="green",
+            )
+
+        except json.JSONDecodeError:
+            click.secho("Error: Failed to parse SF CLI output. Make sure 'sf' CLI is installed.", fg="red")
+            raise click.Abort()
+        except Exception as e:
+            click.secho(f"Error extracting credentials from SF CLI: {e}", fg="red")
+            raise click.Abort()
+
+    else:
+        login_url = click.prompt("Login URL")
+        client_id = click.prompt("Client ID")
+
+        if auth_type == AuthType.OAUTH_TOKENS.value:
+            client_secret = click.prompt("Client Secret", hide_input=True)
+            redirect_uri = click.prompt("Redirect URI", default="http://localhost:5555/callback")
+            configure_oauth_tokens(
+                login_url, client_id, client_secret, redirect_uri, profile
+            )
+        elif auth_type == AuthType.CLIENT_CREDENTIALS.value:
+            _configure_client_credentials(login_url, client_id, profile)
 
 
 @cli.command()
@@ -140,7 +197,8 @@ def zip(path: str, network: str):
 @click.option("--name", required=True)
 @click.option("--version", default="0.0.1")
 @click.option("--description", default="Custom Data Transform Code")
-@click.option("--profile", default="default")
+@click.option("--profile", default="default", help="Credential profile name from credentials.ini")
+@click.option("--sf-org", default=None, help="Salesforce org alias from SF CLI (bypasses credentials.ini)")
 @click.option("--network", default="default")
 @click.option(
     "--cpu-size",
@@ -163,6 +221,7 @@ def deploy(
     description: str,
     cpu_size: str,
     profile: str,
+    sf_org: Union[str, None],
     network: str,
     function_invoke_opt: str,
 ):
@@ -204,8 +263,15 @@ def deploy(
             function_invoke_options = function_invoke_opt.split(",")
             metadata.functionInvokeOptions = function_invoke_options
 
+    if sf_org and profile != "default":
+        click.secho("Error: Cannot use both --profile and --sf-org options", fg="red")
+        raise click.Abort()
+
     try:
-        credentials = Credentials.from_available(profile=profile)
+        if sf_org:
+            credentials = Credentials.from_sf_cli(sf_org)
+        else:
+            credentials = Credentials.from_available(profile=profile)
     except ValueError as e:
         click.secho(
             f"Error: {e}",
@@ -293,13 +359,19 @@ def scan(filename: str, config: str, dry_run: bool, no_requirements: bool):
 @click.argument("entrypoint")
 @click.option("--config-file", default=None)
 @click.option("--dependencies", default=[], multiple=True)
-@click.option("--profile", default="default")
+@click.option("--profile", default="default", help="Credential profile name from credentials.ini")
+@click.option("--sf-org", default=None, help="Salesforce org alias from SF CLI (bypasses credentials.ini)")
 def run(
     entrypoint: str,
     config_file: Union[str, None],
     dependencies: List[str],
     profile: str,
+    sf_org: Union[str, None],
 ):
     from datacustomcode.run import run_entrypoint
 
-    run_entrypoint(entrypoint, config_file, dependencies, profile)
+    if sf_org and profile != "default":
+        click.secho("Error: Cannot use both --profile and --sf-org options", fg="red")
+        raise click.Abort()
+
+    run_entrypoint(entrypoint, config_file, dependencies, profile, sf_org)

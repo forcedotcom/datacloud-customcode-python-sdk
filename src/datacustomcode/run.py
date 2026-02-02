@@ -40,6 +40,7 @@ def run_entrypoint(
     config_file: Union[str, None],
     dependencies: List[str],
     profile: str,
+    sf_org: Union[str, None] = None,
 ) -> None:
     """Run the entrypoint script with the given config and dependencies.
 
@@ -48,6 +49,7 @@ def run_entrypoint(
         config_file: The config file to use.
         dependencies: The dependencies to import.
         profile: The credentials profile to use.
+        sf_org: Optional SF CLI org alias (bypasses profile).
     """
     add_py_folder(entrypoint)
 
@@ -84,7 +86,10 @@ def run_entrypoint(
     _set_config_option(config.reader_config, "dataspace", dataspace)
     _set_config_option(config.writer_config, "dataspace", dataspace)
 
-    if profile != "default":
+    if sf_org:
+        _set_config_option(config.reader_config, "org_alias", sf_org)
+        _set_config_option(config.writer_config, "org_alias", sf_org)
+    elif profile != "default":
         _set_config_option(config.reader_config, "credentials_profile", profile)
         _set_config_option(config.writer_config, "credentials_profile", profile)
     for dependency in dependencies:

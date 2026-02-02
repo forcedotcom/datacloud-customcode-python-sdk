@@ -118,6 +118,10 @@ def _make_api_call(
             f"Response: {response.text[:200]}"
         ) from e
 
+    if response.status_code >= 400:
+        logger.error(f"API Error: {response.status_code}")
+        logger.error(f"Response: {json.dumps(json_response, indent=2)}")
+
     response.raise_for_status()
     assert isinstance(
         json_response, dict
@@ -133,6 +137,54 @@ class AccessTokenResponse(BaseModel):
 def _retrieve_access_token(credentials: Credentials) -> AccessTokenResponse:
     """Get an access token for the Salesforce API."""
     logger.debug("Getting oauth token...")
+
+    if credentials.auth_type == AuthType.SF_CLI:
+        import json
+        import subprocess
+
+        logger.debug(f"Fetching token from SF CLI for org '{credentials.sf_org_alias}'")
+        try:
+            result = subprocess.run(
+                ["sf", "org", "display", "--target-org", credentials.sf_org_alias, "--json"],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=30,
+            )
+            org_data = json.loads(result.stdout)
+
+            if org_data.get("status") != 0:
+                raise RuntimeError(
+                    f"SF CLI error: {org_data.get('message', 'Unknown error')}"
+                )
+
+            org_result = org_data.get("result", {})
+            access_token = org_result.get("accessToken")
+            instance_url = org_result.get("instanceUrl")
+
+            if not access_token or not instance_url:
+                raise RuntimeError(
+                    "SF CLI did not return access token or instance URL"
+                )
+
+            return AccessTokenResponse(
+                access_token=access_token,
+                instance_url=instance_url,
+                token_type="Bearer",
+            )
+
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(
+                f"SF CLI command failed: {e.stderr or e.stdout}"
+            )
+        except json.JSONDecodeError as e:
+            raise RuntimeError(
+                f"Failed to parse SF CLI output: {e}"
+            )
+        except FileNotFoundError:
+            raise RuntimeError(
+                "SF CLI ('sf' command) not found. Please install Salesforce CLI."
+            )
 
     url = f"{credentials.login_url.rstrip('/')}/{AUTH_PATH.lstrip('/')}"
 

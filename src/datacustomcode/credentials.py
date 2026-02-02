@@ -30,6 +30,7 @@ class AuthType(str, Enum):
 
     OAUTH_TOKENS = "oauth_tokens"
     CLIENT_CREDENTIALS = "client_credentials"
+    SF_CLI = "sf_cli"
 
 
 @dataclass
@@ -52,6 +53,9 @@ class Credentials:
     refresh_token: Optional[str] = None
     redirect_uri: Optional[str] = None
 
+    # SF CLI auth fields
+    sf_org_alias: Optional[str] = None
+
     def __post_init__(self):
         """Validate credentials based on auth_type."""
         self._validate()
@@ -70,6 +74,10 @@ class Credentials:
         elif self.auth_type == AuthType.CLIENT_CREDENTIALS:
             if not self.client_secret:
                 raise ValueError("Client Credentials auth requires: client_secret")
+
+        elif self.auth_type == AuthType.SF_CLI:
+            if not self.sf_org_alias:
+                raise ValueError("SF CLI auth requires: sf_org_alias")
 
     @classmethod
     def from_ini(
@@ -114,14 +122,16 @@ class Credentials:
             ) from exc
 
         return cls(
-            login_url=section["login_url"],
-            client_id=section["client_id"],
+            login_url=section.get("login_url", ""),
+            client_id=section.get("client_id", ""),
             auth_type=auth_type,
-            client_secret=section["client_secret"],
+            client_secret=section.get("client_secret", ""),
             # OAuth Tokens fields
             access_token=section.get("access_token"),
             refresh_token=section.get("refresh_token"),
             redirect_uri=section.get("redirect_uri"),
+            # SF CLI fields
+            sf_org_alias=section.get("sf_org_alias"),
         )
 
     @classmethod
@@ -168,12 +178,78 @@ class Credentials:
             login_url=login_url,
             client_id=client_id,
             auth_type=auth_type,
-            client_secret=os.environ["SFDC_CLIENT_SECRET"],
+            client_secret=os.environ.get("SFDC_CLIENT_SECRET", ""),
             # OAuth Tokens fields
             access_token=os.environ.get("SFDC_ACCESS_TOKEN"),
             refresh_token=os.environ.get("SFDC_REFRESH_TOKEN"),
             redirect_uri=os.environ.get("SFDC_REDIRECT_URI"),
+            # SF CLI fields
+            sf_org_alias=os.environ.get("SFDC_SF_ORG_ALIAS"),
         )
+
+    @classmethod
+    def from_sf_cli(cls, org_alias: str) -> Credentials:
+        """Load credentials directly from SF CLI.
+
+        Args:
+            org_alias: Salesforce org alias from SF CLI (e.g., from 'sf org list')
+
+        Returns:
+            Credentials instance with SF_CLI auth type
+
+        Raises:
+            RuntimeError: If SF CLI command fails
+        """
+        import json
+        import subprocess
+
+        logger.debug(f"Loading credentials from SF CLI for org '{org_alias}'")
+
+        try:
+            result = subprocess.run(
+                ["sf", "org", "display", "--target-org", org_alias, "--json"],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=30,
+            )
+            org_data = json.loads(result.stdout)
+
+            if org_data.get("status") != 0:
+                raise RuntimeError(
+                    f"SF CLI error: {org_data.get('message', 'Unknown error')}"
+                )
+
+            org_result = org_data.get("result", {})
+            instance_url = org_result.get("instanceUrl")
+
+            if not instance_url:
+                raise RuntimeError(
+                    f"SF CLI did not return instance URL for org '{org_alias}'"
+                )
+
+            logger.debug(f"Loaded credentials from SF CLI: {instance_url}")
+
+            return cls(
+                login_url=instance_url,
+                client_id="SalesforceCLI",
+                client_secret="",
+                auth_type=AuthType.SF_CLI,
+                sf_org_alias=org_alias,
+            )
+
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(
+                f"SF CLI command failed: {e.stderr or e.stdout}"
+            )
+        except json.JSONDecodeError as e:
+            raise RuntimeError(
+                f"Failed to parse SF CLI output: {e}"
+            )
+        except FileNotFoundError:
+            raise RuntimeError(
+                "SF CLI ('sf' command) not found. Please install Salesforce CLI."
+            )
 
     @classmethod
     def from_available(cls, profile: str = "default") -> Credentials:
@@ -237,7 +313,7 @@ class Credentials:
             if self.access_token:
                 config[profile]["access_token"] = self.access_token
             # Remove fields from other auth types
-            for key in ["username", "password"]:
+            for key in ["username", "password", "sf_org_alias"]:
                 config[profile].pop(key, None)
 
         elif self.auth_type == AuthType.CLIENT_CREDENTIALS:
@@ -248,6 +324,20 @@ class Credentials:
                 "refresh_token",
                 "access_token",
                 "redirect_uri",
+                "sf_org_alias",
+            ]:
+                config[profile].pop(key, None)
+
+        elif self.auth_type == AuthType.SF_CLI:
+            config[profile]["sf_org_alias"] = self.sf_org_alias or ""
+            # Remove fields from other auth types
+            for key in [
+                "username",
+                "password",
+                "refresh_token",
+                "access_token",
+                "redirect_uri",
+                "client_secret",
             ]:
                 config[profile].pop(key, None)
 

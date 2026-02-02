@@ -45,6 +45,7 @@ class PrintDataCloudWriter(BaseDataCloudWriter):
         reader: Optional[QueryAPIDataCloudReader] = None,
         credentials_profile: str = "default",
         dataspace: Optional[str] = None,
+        org_alias: Optional[str] = None,
     ) -> None:
         """Initialize PrintDataCloudWriter.
 
@@ -57,20 +58,16 @@ class PrintDataCloudWriter(BaseDataCloudWriter):
                 The profile determines which credentials to load and which
                 authentication method to use.
             dataspace: Optional dataspace identifier for multi-tenant queries.
+            org_alias: Optional SF CLI org alias (bypasses credentials_profile).
         """
         super().__init__(spark)
         if reader is None:
-            if dataspace is not None:
-                self.reader = QueryAPIDataCloudReader(
-                    self.spark,
-                    credentials_profile=credentials_profile,
-                    dataspace=dataspace,
-                )
-            else:
-                self.reader = QueryAPIDataCloudReader(
-                    self.spark,
-                    credentials_profile=credentials_profile,
-                )
+            self.reader = QueryAPIDataCloudReader(
+                self.spark,
+                credentials_profile=credentials_profile,
+                dataspace=dataspace,
+                org_alias=org_alias,
+            )
         else:
             self.reader = reader
 
