@@ -33,6 +33,7 @@ if TYPE_CHECKING:
 
     from datacustomcode.io.reader.base import BaseDataCloudReader
     from datacustomcode.io.writer.base import BaseDataCloudWriter, WriteMode
+    from datacustomcode.proxy.client.base import BaseProxyClient
     from datacustomcode.spark.base import BaseSparkSessionProvider
 
 
@@ -106,12 +107,14 @@ class Client:
     _reader: BaseDataCloudReader
     _writer: BaseDataCloudWriter
     _file: DefaultFindFilePath
+    _proxy: BaseProxyClient
     _data_layer_history: dict[DataCloudObjectType, set[str]]
 
     def __new__(
         cls,
         reader: Optional[BaseDataCloudReader] = None,
         writer: Optional["BaseDataCloudWriter"] = None,
+        proxy: Optional[BaseProxyClient] = None,
         spark_provider: Optional["BaseSparkSessionProvider"] = None,
     ) -> Client:
         if cls._instance is None:
@@ -143,9 +146,21 @@ class Client:
             elif reader is None or (
                 config.reader_config is not None and config.reader_config.force
             ):
+                if config.proxy_config is None:
+                    raise ValueError(
+                        "Proxy config is required when reader is built from config"
+                    )
+                proxy_init = config.proxy_config.to_object(spark)
+                print(f"chuy1 reader, proxy_init: {proxy_init}")
+
                 reader_init = config.reader_config.to_object(spark)  # type: ignore
+                print(f"chuy2 reader, reader_init: {reader_init}, spark: {spark}")
             else:
+                print("chuy2 reader")
                 reader_init = reader
+                if config.proxy_config is None:
+                    raise ValueError("Proxy config is required when reader is provided")
+                proxy_init = config.proxy_config.to_object(spark)
             if config.writer_config is None and writer is None:
                 raise ValueError(
                     "Writer config is required when writer is not provided"
@@ -159,6 +174,7 @@ class Client:
             cls._instance._reader = reader_init
             cls._instance._writer = writer_init
             cls._instance._file = DefaultFindFilePath()
+            cls._instance._proxy = proxy_init
             cls._instance._data_layer_history = {
                 DataCloudObjectType.DLO: set(),
                 DataCloudObjectType.DMO: set(),
@@ -216,6 +232,9 @@ class Client:
         """
         self._validate_data_layer_history_does_not_contain(DataCloudObjectType.DLO)
         return self._writer.write_to_dmo(name, dataframe, write_mode, **kwargs)
+
+    def call_llm_gateway(self, LLM_MODEL_ID: str, prompt: str, maxTokens: int):
+        self._proxy.call_llm_gateway(LLM_MODEL_ID, prompt, maxTokens)
 
     def find_file_path(self, file_name: str) -> Path:
         """Return a file path"""

@@ -21,6 +21,7 @@ import sys
 from typing import List, Union
 
 from datacustomcode.config import config
+from datacustomcode.scan import get_package_type
 
 
 def _set_config_option(config_obj, key: str, value: str) -> None:
@@ -60,6 +61,12 @@ def run_entrypoint(
             f"config.json not found at {config_json_path}. config.json is required."
         )
 
+    package_type = get_package_type(entrypoint_dir)
+    print(
+        f"Chuy entrypoint: {entrypoint} directory: {entrypoint_dir} "
+        f"package type: {package_type}"
+    )
+
     try:
         with open(config_json_path, "r") as f:
             config_json = json.load(f)
@@ -68,21 +75,23 @@ def run_entrypoint(
             f"config.json at {config_json_path} is not valid JSON"
         ) from err
 
-    # Require dataspace to be present in config.json
-    dataspace = config_json.get("dataspace")
-    if not dataspace:
-        raise ValueError(
-            f"config.json at {config_json_path} is missing required field 'dataspace'. "
-            f"Please ensure config.json contains a 'dataspace' field."
-        )
+    if package_type == "script":
+        # Require dataspace to be present in config.json
+        dataspace = config_json.get("dataspace")
+        if not dataspace:
+            raise ValueError(
+                f"config.json at {config_json_path} is missing required "
+                f"field 'dataspace'. "
+                f"Please ensure config.json contains a 'dataspace' field."
+            )
 
-    # Load config file first
-    if config_file:
-        config.load(config_file)
+        # Load config file first
+        if config_file:
+            config.load(config_file)
 
-    # Add dataspace to reader and writer config options
-    _set_config_option(config.reader_config, "dataspace", dataspace)
-    _set_config_option(config.writer_config, "dataspace", dataspace)
+        # Add dataspace to reader and writer config options
+        _set_config_option(config.reader_config, "dataspace", dataspace)
+        _set_config_option(config.writer_config, "dataspace", dataspace)
 
     if profile != "default":
         _set_config_option(config.reader_config, "credentials_profile", profile)

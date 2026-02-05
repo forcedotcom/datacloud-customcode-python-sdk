@@ -17,11 +17,13 @@ from datacustomcode.client import Client
 from datacustomcode.credentials import AuthType, Credentials
 from datacustomcode.io.reader.query_api import QueryAPIDataCloudReader
 from datacustomcode.io.writer.print import PrintDataCloudWriter
+from datacustomcode.proxy.client.local_proxy_client import LocalProxyClientProvider
 
 __all__ = [
     "AuthType",
     "Client",
     "Credentials",
+    "LocalProxyClientProvider",
     "PrintDataCloudWriter",
     "QueryAPIDataCloudReader",
 ]
