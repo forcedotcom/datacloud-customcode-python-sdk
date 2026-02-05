@@ -154,7 +154,6 @@ class Client:
                 print(f"chuy1 reader, proxy_init: {proxy_init}")
 
                 reader_init = config.reader_config.to_object(spark)  # type: ignore
-                print(f"chuy2 reader, reader_init: {reader_init}, spark: {spark}")
             else:
                 print("chuy2 reader")
                 reader_init = reader
