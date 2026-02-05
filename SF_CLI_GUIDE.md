@@ -20,8 +20,8 @@ npm install -g @salesforce/cli
 # Login to your Salesforce production org
 sf org login web --alias myorg
 # for OrgFarm org:
-sf org login web --alias myorg -r orgfarm_org_url 
-for example : sf org login web --alias myorg -r https://orgfarm-ebc419d8e7.test1.my.pc-rnd.salesforce.com/ 
+sf org login web --alias myorg -r orgfarm_org_url
+for example : sf org login web --alias myorg -r https://orgfarm-ebc419d8e7.test1.my.pc-rnd.salesforce.com/
 
 # Verify authentication
 sf org display --target-org myorg

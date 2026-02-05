@@ -18,7 +18,7 @@ from typing import Optional
 
 from pyspark.sql import DataFrame as PySparkDataFrame, SparkSession
 
-from datacustomcode.io.reader.query_api import QueryAPIDataCloudReader
+from datacustomcode.io.reader.local import LocalDataCloudReader
 from datacustomcode.io.writer.base import BaseDataCloudWriter, WriteMode
 
 
@@ -42,34 +42,16 @@ class PrintDataCloudWriter(BaseDataCloudWriter):
     def __init__(
         self,
         spark: SparkSession,
-        reader: Optional[QueryAPIDataCloudReader] = None,
-        credentials_profile: str = "default",
-        dataspace: Optional[str] = None,
-        org_alias: Optional[str] = None,
+        reader: Optional[LocalDataCloudReader] = None,
     ) -> None:
         """Initialize PrintDataCloudWriter.
 
         Args:
             spark: SparkSession instance for DataFrame operations.
-            reader: Optional QueryAPIDataCloudReader instance for schema validation.
-                If not provided, a new reader will be created using the
-                credentials_profile and dataspace.
-            credentials_profile: Credentials profile name (default: "default").
-                The profile determines which credentials to load and which
-                authentication method to use.
-            dataspace: Optional dataspace identifier for multi-tenant queries.
-            org_alias: Optional SF CLI org alias (bypasses credentials_profile).
+            reader: Optional LocalDataCloudReader instance for schema validation.
         """
         super().__init__(spark)
-        if reader is None:
-            self.reader = QueryAPIDataCloudReader(
-                self.spark,
-                credentials_profile=credentials_profile,
-                dataspace=dataspace,
-                org_alias=org_alias,
-            )
-        else:
-            self.reader = reader
+        self.reader = reader
 
     def validate_dataframe_columns_against_dlo(
         self,
@@ -82,13 +64,14 @@ class PrintDataCloudWriter(BaseDataCloudWriter):
         Args:
             dataframe (PySparkDataFrame): The DataFrame to validate.
             dlo_name (str): The name of the DLO to check against.
-            reader (QueryAPIDataCloudReader): The reader to use for schema retrieval.
 
         Raises:
             ValueError: If any columns in the dataframe are not present in the DLO
             schema.
         """
         # Get DLO schema (no data, just schema)
+        if self.reader is None:
+            raise ValueError("Reader is not set")
         dlo_df = self.reader.read_dlo(dlo_name, row_limit=0)
         dlo_columns = set(dlo_df.columns)
         df_columns = set(dataframe.columns)

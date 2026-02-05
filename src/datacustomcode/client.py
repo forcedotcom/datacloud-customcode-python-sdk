@@ -24,6 +24,7 @@ from typing import (
 from datacustomcode.config import config
 from datacustomcode.file.path.default import DefaultFindFilePath
 from datacustomcode.io.reader.base import BaseDataCloudReader
+from datacustomcode.io.writer.print import PrintDataCloudWriter
 from datacustomcode.spark.default import DefaultSparkSessionProvider
 
 if TYPE_CHECKING:
@@ -156,6 +157,8 @@ class Client:
                 writer_init = config.writer_config.to_object(spark)  # type: ignore
             else:
                 writer_init = writer
+            if isinstance(writer_init, PrintDataCloudWriter):
+                writer_init.reader = reader_init  # type: ignore
             cls._instance._reader = reader_init
             cls._instance._writer = writer_init
             cls._instance._file = DefaultFindFilePath()

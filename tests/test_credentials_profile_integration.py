@@ -89,41 +89,6 @@ class TestCredentialsProfileIntegration:
                     client_secret="client_secret",
                 )
 
-    def test_print_writer_with_custom_profile(self):
-        """Test PrintDataCloudWriter uses custom credentials profile."""
-        mock_spark = MagicMock()
-
-        with patch(
-            "datacustomcode.credentials.Credentials.from_available"
-        ) as mock_from_available:
-            # Mock credentials for custom profile
-            mock_credentials = MagicMock()
-            mock_credentials.auth_type = AuthType.OAUTH_TOKENS
-            mock_credentials.login_url = "https://custom.salesforce.com"
-            mock_credentials.client_id = "custom_client_id"
-            mock_credentials.client_secret = "custom_secret"
-            mock_credentials.refresh_token = "custom_refresh"
-            mock_from_available.return_value = mock_credentials
-
-            # Mock the SalesforceCDPConnection
-            with patch(
-                "datacustomcode.io.reader.query_api.SalesforceCDPConnection"
-            ) as mock_conn_class:
-                mock_conn = MagicMock()
-                mock_conn_class.return_value = mock_conn
-
-                # Test with custom profile
-                writer = PrintDataCloudWriter(
-                    mock_spark, credentials_profile="custom_profile"
-                )
-
-                # Verify the correct profile was used
-                mock_from_available.assert_called_with(profile="custom_profile")
-
-                # Verify the writer has the reader with custom credentials
-                assert writer.reader is not None
-                assert isinstance(writer.reader, QueryAPIDataCloudReader)
-
     def test_config_override_with_environment_variable(self):
         """Test that environment variable overrides config credentials profile."""
         # Set environment variable
@@ -209,12 +174,10 @@ class TestCredentialsProfileIntegration:
                 reader = QueryAPIDataCloudReader(
                     mock_spark, credentials_profile=test_profile
                 )
-                writer = PrintDataCloudWriter(
-                    mock_spark, credentials_profile=test_profile
-                )
+                writer = PrintDataCloudWriter(mock_spark, reader=reader)
 
                 # Verify both used the same profile
-                assert mock_from_available.call_count == 2
+                assert mock_from_available.call_count == 1
                 for call in mock_from_available.call_args_list:
                     assert call[1]["profile"] == test_profile
 

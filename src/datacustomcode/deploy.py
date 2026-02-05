@@ -118,10 +118,6 @@ def _make_api_call(
             f"Response: {response.text[:200]}"
         ) from e
 
-    if response.status_code >= 400:
-        logger.error(f"API Error: {response.status_code}")
-        logger.error(f"Response: {json.dumps(json_response, indent=2)}")
-
     response.raise_for_status()
     assert isinstance(
         json_response, dict
@@ -137,15 +133,25 @@ class AccessTokenResponse(BaseModel):
 def _retrieve_access_token(credentials: Credentials) -> AccessTokenResponse:
     """Get an access token for the Salesforce API."""
     logger.debug("Getting oauth token...")
-
+    url = f"{credentials.login_url.rstrip('/')}/{AUTH_PATH.lstrip('/')}"
     if credentials.auth_type == AuthType.SF_CLI:
         import json
         import subprocess
 
-        logger.debug(f"Fetching token from SF CLI for org '{credentials.sf_org_alias}'")
+        alias = credentials.sf_org_alias
+        if not alias:
+            raise ValueError("SF CLI auth requires: sf_org_alias")
+        logger.debug(f"Fetching token from SF CLI for org '{alias}'")
         try:
             result = subprocess.run(
-                ["sf", "org", "display", "--target-org", credentials.sf_org_alias, "--json"],
+                [
+                    "sf",
+                    "org",
+                    "display",
+                    "--target-org",
+                    alias,
+                    "--json",
+                ],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -163,9 +169,7 @@ def _retrieve_access_token(credentials: Credentials) -> AccessTokenResponse:
             instance_url = org_result.get("instanceUrl")
 
             if not access_token or not instance_url:
-                raise RuntimeError(
-                    "SF CLI did not return access token or instance URL"
-                )
+                raise RuntimeError("SF CLI did not return access token or instance URL")
 
             return AccessTokenResponse(
                 access_token=access_token,
@@ -174,21 +178,15 @@ def _retrieve_access_token(credentials: Credentials) -> AccessTokenResponse:
             )
 
         except subprocess.CalledProcessError as e:
-            raise RuntimeError(
-                f"SF CLI command failed: {e.stderr or e.stdout}"
-            )
+            raise RuntimeError(f"SF CLI command failed: {e.stderr or e.stdout}") from e
         except json.JSONDecodeError as e:
-            raise RuntimeError(
-                f"Failed to parse SF CLI output: {e}"
-            )
-        except FileNotFoundError:
+            raise RuntimeError(f"Failed to parse SF CLI output: {e}") from e
+        except FileNotFoundError as e:
             raise RuntimeError(
                 "SF CLI ('sf' command) not found. Please install Salesforce CLI."
-            )
+            ) from e
 
-    url = f"{credentials.login_url.rstrip('/')}/{AUTH_PATH.lstrip('/')}"
-
-    if credentials.auth_type == AuthType.OAUTH_TOKENS:
+    elif credentials.auth_type == AuthType.OAUTH_TOKENS:
         data = {
             "grant_type": "refresh_token",
             "refresh_token": credentials.refresh_token,

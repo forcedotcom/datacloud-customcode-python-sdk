@@ -17,11 +17,15 @@ from __future__ import annotations
 import json
 import logging
 import subprocess
-from typing import TYPE_CHECKING, Final, Optional, Union
+from typing import (
+    TYPE_CHECKING,
+    Final,
+    Optional,
+    Union,
+)
 
 import pandas as pd
 import pandas.api.types as pd_types
-import requests
 from pyspark.sql.types import (
     BooleanType,
     DoubleType,
@@ -31,6 +35,7 @@ from pyspark.sql.types import (
     StructType,
     TimestampType,
 )
+import requests
 
 from datacustomcode.io.reader.base import BaseDataCloudReader
 
@@ -87,14 +92,16 @@ class SFCLIDataCloudReader(BaseDataCloudReader):
 
         Args:
             spark: SparkSession instance for creating DataFrames.
-            org_alias: Salesforce org alias as configured in SF CLI (e.g., from 'sf org list').
+            org_alias: Salesforce org alias as configured in SF CLI
             dataspace: Optional dataspace identifier. If provided and not "default",
                 queries will be executed within that dataspace.
                 When None or "default", uses the default dataspace.
         """
         self.spark = spark
         self.org_alias = org_alias
-        self.dataspace = dataspace if dataspace and dataspace != "default" else "default"
+        self.dataspace = (
+            dataspace if dataspace and dataspace != "default" else "default"
+        )
         logger.debug(f"Initialized SFCLIDataCloudReader for org alias '{org_alias}'")
 
     def _get_sf_cli_token(self) -> tuple[str, str]:
@@ -126,31 +133,23 @@ class SFCLIDataCloudReader(BaseDataCloudReader):
             instance_url = org_result.get("instanceUrl")
 
             if not access_token or not instance_url:
-                raise RuntimeError(
-                    "SF CLI did not return access token or instance URL"
-                )
+                raise RuntimeError("SF CLI did not return access token or instance URL")
 
-            logger.debug(
-                f"Fetched fresh token from SF CLI for org '{self.org_alias}'"
-            )
+            logger.debug(f"Fetched fresh token from SF CLI for org '{self.org_alias}'")
             return access_token, instance_url
 
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired as e:
             raise RuntimeError(
                 f"SF CLI command timed out for org '{self.org_alias}'"
-            )
+            ) from e
         except subprocess.CalledProcessError as e:
-            raise RuntimeError(
-                f"SF CLI command failed: {e.stderr or e.stdout}"
-            )
+            raise RuntimeError(f"SF CLI command failed: {e.stderr or e.stdout}") from e
         except json.JSONDecodeError as e:
-            raise RuntimeError(
-                f"Failed to parse SF CLI output: {e}"
-            )
-        except FileNotFoundError:
+            raise RuntimeError(f"Failed to parse SF CLI output: {e}") from e
+        except FileNotFoundError as e:
             raise RuntimeError(
                 "SF CLI ('sf' command) not found. Please install Salesforce CLI."
-            )
+            ) from e
 
     def _execute_query(self, sql: str, row_limit: int = 1000) -> pd.DataFrame:
         """Execute a SQL query against Data Cloud using REST API.
@@ -178,11 +177,7 @@ class SFCLIDataCloudReader(BaseDataCloudReader):
 
         try:
             response = requests.post(
-                url,
-                json=body,
-                params=params,
-                headers=headers,
-                timeout=120
+                url, json=body, params=params, headers=headers, timeout=120
             )
 
             if response.status_code >= 300:
@@ -210,7 +205,7 @@ class SFCLIDataCloudReader(BaseDataCloudReader):
             return pd.DataFrame(rows, columns=column_names)
 
         except requests.RequestException as e:
-            raise RuntimeError(f"Failed to execute Data Cloud query: {e}")
+            raise RuntimeError(f"Failed to execute Data Cloud query: {e}") from e
 
     def read_dlo(
         self,
