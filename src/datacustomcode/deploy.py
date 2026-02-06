@@ -36,6 +36,7 @@ import requests
 
 from datacustomcode.cmd import cmd_output
 from datacustomcode.credentials import AuthType
+from datacustomcode.io.reader.sf_cli import SFCLIDataCloudReader
 from datacustomcode.scan import find_base_directory, get_package_type
 
 if TYPE_CHECKING:
@@ -135,57 +136,17 @@ def _retrieve_access_token(credentials: Credentials) -> AccessTokenResponse:
     logger.debug("Getting oauth token...")
     url = f"{credentials.login_url.rstrip('/')}/{AUTH_PATH.lstrip('/')}"
     if credentials.auth_type == AuthType.SF_CLI:
-        import json
-        import subprocess
-
         alias = credentials.sf_org_alias
         if not alias:
             raise ValueError("SF CLI auth requires: sf_org_alias")
         logger.debug(f"Fetching token from SF CLI for org '{alias}'")
-        try:
-            result = subprocess.run(
-                [
-                    "sf",
-                    "org",
-                    "display",
-                    "--target-org",
-                    alias,
-                    "--json",
-                ],
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=30,
-            )
-            org_data = json.loads(result.stdout)
+        access_token, instance_url = SFCLIDataCloudReader.get_access_token(alias)
 
-            if org_data.get("status") != 0:
-                raise RuntimeError(
-                    f"SF CLI error: {org_data.get('message', 'Unknown error')}"
-                )
-
-            org_result = org_data.get("result", {})
-            access_token = org_result.get("accessToken")
-            instance_url = org_result.get("instanceUrl")
-
-            if not access_token or not instance_url:
-                raise RuntimeError("SF CLI did not return access token or instance URL")
-
-            return AccessTokenResponse(
-                access_token=access_token,
-                instance_url=instance_url,
-                token_type="Bearer",
-            )
-
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"SF CLI command failed: {e.stderr or e.stdout}") from e
-        except json.JSONDecodeError as e:
-            raise RuntimeError(f"Failed to parse SF CLI output: {e}") from e
-        except FileNotFoundError as e:
-            raise RuntimeError(
-                "SF CLI ('sf' command) not found. Please install Salesforce CLI."
-            ) from e
-
+        return AccessTokenResponse(
+            access_token=access_token,
+            instance_url=instance_url,
+            token_type="Bearer",
+        )
     elif credentials.auth_type == AuthType.OAUTH_TOKENS:
         data = {
             "grant_type": "refresh_token",

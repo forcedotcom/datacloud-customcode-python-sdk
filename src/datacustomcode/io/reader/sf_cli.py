@@ -37,6 +37,7 @@ from pyspark.sql.types import (
 )
 import requests
 
+from datacustomcode.credentials import Credentials
 from datacustomcode.io.reader.base import BaseDataCloudReader
 
 if TYPE_CHECKING:
@@ -75,7 +76,7 @@ class SFCLIDataCloudReader(BaseDataCloudReader):
     This reader uses the Salesforce CLI (sf) to fetch fresh access tokens
     dynamically and queries Data Cloud using the REST API directly.
 
-    Unlike the standard QueryAPIDataCloudReader which uses salesforcecdpconnector,
+    Unlike the QueryAPIDataCloudReader which uses salesforcecdpconnector,
     this reader uses SF CLI tokens directly with Data Cloud REST endpoints,
     bypassing the CDP token exchange that requires special scopes.
     """
@@ -85,7 +86,7 @@ class SFCLIDataCloudReader(BaseDataCloudReader):
     def __init__(
         self,
         spark: SparkSession,
-        org_alias: str,
+        credentials_profile: str = "default",
         dataspace: Optional[str] = None,
     ) -> None:
         """Initialize SFCLIDataCloudReader.
@@ -98,13 +99,16 @@ class SFCLIDataCloudReader(BaseDataCloudReader):
                 When None or "default", uses the default dataspace.
         """
         self.spark = spark
+        credentials = Credentials.from_available(profile=credentials_profile)
+        org_alias = credentials.sf_org_alias
         self.org_alias = org_alias
         self.dataspace = (
             dataspace if dataspace and dataspace != "default" else "default"
         )
         logger.debug(f"Initialized SFCLIDataCloudReader for org alias '{org_alias}'")
 
-    def _get_sf_cli_token(self) -> tuple[str, str]:
+    @staticmethod
+    def get_access_token(org_alias: str) -> tuple[str, str]:
         """Fetch access token and instance URL from SF CLI.
 
         Returns:
@@ -113,9 +117,10 @@ class SFCLIDataCloudReader(BaseDataCloudReader):
         Raises:
             RuntimeError: If SF CLI command fails or returns invalid data
         """
+
         try:
             result = subprocess.run(
-                ["sf", "org", "display", "--target-org", self.org_alias, "--json"],
+                ["sf", "org", "display", "--target-org", org_alias, "--json"],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -135,13 +140,11 @@ class SFCLIDataCloudReader(BaseDataCloudReader):
             if not access_token or not instance_url:
                 raise RuntimeError("SF CLI did not return access token or instance URL")
 
-            logger.debug(f"Fetched fresh token from SF CLI for org '{self.org_alias}'")
+            logger.debug(f"Fetched fresh token from SF CLI for org '{org_alias}'")
             return access_token, instance_url
 
         except subprocess.TimeoutExpired as e:
-            raise RuntimeError(
-                f"SF CLI command timed out for org '{self.org_alias}'"
-            ) from e
+            raise RuntimeError(f"SF CLI command timed out for org '{org_alias}'") from e
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f"SF CLI command failed: {e.stderr or e.stdout}") from e
         except json.JSONDecodeError as e:
@@ -164,7 +167,11 @@ class SFCLIDataCloudReader(BaseDataCloudReader):
         Raises:
             RuntimeError: If query execution fails
         """
-        access_token, instance_url = self._get_sf_cli_token()
+        if not self.org_alias:
+            raise ValueError("SF CLI org alias is not set")
+        access_token, instance_url = SFCLIDataCloudReader.get_access_token(
+            self.org_alias
+        )
 
         headers = {"Authorization": f"Bearer {access_token}"}
         url = f"{instance_url}/services/data/{API_VERSION}/ssot/query-sql"

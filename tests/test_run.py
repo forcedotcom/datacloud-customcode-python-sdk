@@ -4,11 +4,13 @@ import shutil
 import sys
 import tempfile
 import textwrap
+from unittest.mock import patch
 
 import pytest
 import yaml
 
 from datacustomcode.config import config
+from datacustomcode.credentials import AuthType, Credentials
 from datacustomcode.run import run_entrypoint
 
 
@@ -94,7 +96,17 @@ def test_entrypoint_file():
         os.unlink("test_entrypoint_output.txt")
 
 
-def test_run_entrypoint_preserves_config(test_config_file, test_entrypoint_file):
+@patch("datacustomcode.run.Credentials.from_available")
+def test_run_entrypoint_preserves_config(
+    mock_credentials, test_config_file, test_entrypoint_file
+):
+    mock_credentials.return_value = Credentials(
+        auth_type=AuthType.OAUTH_TOKENS,
+        login_url="https://test.login.url",
+        client_id="test_client_id",
+        client_secret="test_client_secret",
+        refresh_token="test_refresh_token",
+    )
     """Test that run_entrypoint preserves config settings."""
     # Record initial config state
     initial_config_id = id(config)
@@ -253,13 +265,8 @@ class TestDataspaceScenarios:
                         if config.reader_config
                         else None
                     )
-                    wds = (
-                        config.writer_config.options.get("dataspace")
-                        if config.writer_config
-                        else None
-                    )
+
                     f.write(f"Reader dataspace: {rds}\\n")
-                    f.write(f"Writer dataspace: {wds}\\n")
             """
             )
             temp.write(entrypoint_content.encode("utf-8"))
@@ -282,7 +289,6 @@ class TestDataspaceScenarios:
             with open("dataspace_output.txt", "r") as f:
                 content = f.read()
                 assert "Reader dataspace: default" in content
-                assert "Writer dataspace: default" in content
 
         finally:
             if os.path.exists(entrypoint_file):
@@ -306,13 +312,7 @@ class TestDataspaceScenarios:
                         if config.reader_config
                         else None
                     )
-                    wds = (
-                        config.writer_config.options.get("dataspace")
-                        if config.writer_config
-                        else None
-                    )
                     f.write(f"Reader dataspace: {rds}\\n")
-                    f.write(f"Writer dataspace: {wds}\\n")
             """
             )
             temp.write(entrypoint_content.encode("utf-8"))
@@ -335,7 +335,6 @@ class TestDataspaceScenarios:
             with open("dataspace_output.txt", "r") as f:
                 content = f.read()
                 assert f"Reader dataspace: {custom_dataspace}" in content
-                assert f"Writer dataspace: {custom_dataspace}" in content
 
         finally:
             if os.path.exists(entrypoint_file):

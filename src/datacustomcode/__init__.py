@@ -16,6 +16,7 @@
 from datacustomcode.client import Client
 from datacustomcode.credentials import AuthType, Credentials
 from datacustomcode.io.reader.query_api import QueryAPIDataCloudReader
+from datacustomcode.io.reader.sf_cli import SFCLIDataCloudReader
 from datacustomcode.io.writer.print import PrintDataCloudWriter
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "Credentials",
     "PrintDataCloudWriter",
     "QueryAPIDataCloudReader",
+    "SFCLIDataCloudReader",
 ]
