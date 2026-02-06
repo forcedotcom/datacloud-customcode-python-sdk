@@ -120,6 +120,7 @@ class Client:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
 
+            spark = None
             # Initialize Readers and Writers from config
             # and/or provided reader and writer
             if reader is None or writer is None:
@@ -138,6 +139,22 @@ class Client:
                     provider = DefaultSparkSessionProvider()
 
                 spark = provider.get_session(config.spark_config)
+            elif (
+                proxy is None
+                and config.proxy_config is not None
+                and config.spark_config is not None
+            ):
+                # Both reader and writer provided; we still need spark for proxy init
+                provider = (
+                    spark_provider
+                    if spark_provider is not None
+                    else (
+                        config.spark_provider_config.to_object()
+                        if config.spark_provider_config is not None
+                        else DefaultSparkSessionProvider()
+                    )
+                )
+                spark = provider.get_session(config.spark_config)
 
             if config.reader_config is None and reader is None:
                 raise ValueError(
@@ -155,9 +172,12 @@ class Client:
                 reader_init = config.reader_config.to_object(spark)  # type: ignore
             else:
                 reader_init = reader
-                if config.proxy_config is None:
+                if proxy is not None:
+                    proxy_init = proxy
+                elif config.proxy_config is None:
                     raise ValueError("Proxy config is required when reader is provided")
-                proxy_init = config.proxy_config.to_object(spark)
+                else:
+                    proxy_init = config.proxy_config.to_object(spark)
             if config.writer_config is None and writer is None:
                 raise ValueError(
                     "Writer config is required when writer is not provided"
