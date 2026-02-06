@@ -33,6 +33,7 @@ if TYPE_CHECKING:
 
     from datacustomcode.io.reader.base import BaseDataCloudReader
     from datacustomcode.io.writer.base import BaseDataCloudWriter, WriteMode
+    from datacustomcode.proxy.client.base import BaseProxyClient
     from datacustomcode.spark.base import BaseSparkSessionProvider
 
 
@@ -106,17 +107,20 @@ class Client:
     _reader: BaseDataCloudReader
     _writer: BaseDataCloudWriter
     _file: DefaultFindFilePath
+    _proxy: BaseProxyClient
     _data_layer_history: dict[DataCloudObjectType, set[str]]
 
     def __new__(
         cls,
         reader: Optional[BaseDataCloudReader] = None,
         writer: Optional["BaseDataCloudWriter"] = None,
+        proxy: Optional[BaseProxyClient] = None,
         spark_provider: Optional["BaseSparkSessionProvider"] = None,
     ) -> Client:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
 
+            spark = None
             # Initialize Readers and Writers from config
             # and/or provided reader and writer
             if reader is None or writer is None:
@@ -135,6 +139,22 @@ class Client:
                     provider = DefaultSparkSessionProvider()
 
                 spark = provider.get_session(config.spark_config)
+            elif (
+                proxy is None
+                and config.proxy_config is not None
+                and config.spark_config is not None
+            ):
+                # Both reader and writer provided; we still need spark for proxy init
+                provider = (
+                    spark_provider
+                    if spark_provider is not None
+                    else (
+                        config.spark_provider_config.to_object()
+                        if config.spark_provider_config is not None
+                        else DefaultSparkSessionProvider()
+                    )
+                )
+                spark = provider.get_session(config.spark_config)
 
             if config.reader_config is None and reader is None:
                 raise ValueError(
@@ -143,9 +163,28 @@ class Client:
             elif reader is None or (
                 config.reader_config is not None and config.reader_config.force
             ):
-                reader_init = config.reader_config.to_object(spark)  # type: ignore
+                if config.proxy_config is None:
+                    raise ValueError(
+                        "Proxy config is required when reader is built from config"
+                    )
+                assert (
+                    spark is not None
+                )  # set in "reader is None or writer is None" branch
+                assert config.reader_config is not None  # ensured by branch condition
+                proxy_init = config.proxy_config.to_object(spark)
+
+                reader_init = config.reader_config.to_object(spark)
             else:
                 reader_init = reader
+                if proxy is not None:
+                    proxy_init = proxy
+                elif config.proxy_config is None:
+                    raise ValueError("Proxy config is required when reader is provided")
+                else:
+                    assert (
+                        spark is not None
+                    )  # set in "both provided; proxy from config" branch
+                    proxy_init = config.proxy_config.to_object(spark)
             if config.writer_config is None and writer is None:
                 raise ValueError(
                     "Writer config is required when writer is not provided"
@@ -153,12 +192,15 @@ class Client:
             elif writer is None or (
                 config.writer_config is not None and config.writer_config.force
             ):
-                writer_init = config.writer_config.to_object(spark)  # type: ignore
+                assert spark is not None  # set when reader or writer from config
+                assert config.writer_config is not None  # ensured by branch condition
+                writer_init = config.writer_config.to_object(spark)
             else:
                 writer_init = writer
             cls._instance._reader = reader_init
             cls._instance._writer = writer_init
             cls._instance._file = DefaultFindFilePath()
+            cls._instance._proxy = proxy_init
             cls._instance._data_layer_history = {
                 DataCloudObjectType.DLO: set(),
                 DataCloudObjectType.DMO: set(),
@@ -216,6 +258,9 @@ class Client:
         """
         self._validate_data_layer_history_does_not_contain(DataCloudObjectType.DLO)
         return self._writer.write_to_dmo(name, dataframe, write_mode, **kwargs)
+
+    def call_llm_gateway(self, LLM_MODEL_ID: str, prompt: str, maxTokens: int) -> str:
+        return self._proxy.call_llm_gateway(LLM_MODEL_ID, prompt, maxTokens)
 
     def find_file_path(self, file_name: str) -> Path:
         """Return a file path"""

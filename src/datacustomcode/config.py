@@ -38,6 +38,7 @@ from datacustomcode.io import *  # noqa: F403
 from datacustomcode.io.base import BaseDataAccessLayer
 from datacustomcode.io.reader.base import BaseDataCloudReader  # noqa: TCH001
 from datacustomcode.io.writer.base import BaseDataCloudWriter  # noqa: TCH001
+from datacustomcode.proxy.client.base import BaseProxyClient  # noqa: TCH001
 from datacustomcode.spark.base import BaseSparkSessionProvider
 
 DEFAULT_CONFIG_NAME = "config.yaml"
@@ -109,6 +110,7 @@ class SparkProviderConfig(ForceableConfig, Generic[_P]):
 class ClientConfig(BaseModel):
     reader_config: Union[AccessLayerObjectConfig[BaseDataCloudReader], None] = None
     writer_config: Union[AccessLayerObjectConfig[BaseDataCloudWriter], None] = None
+    proxy_config: Union[AccessLayerObjectConfig[BaseProxyClient], None] = None
     spark_config: Union[SparkConfig, None] = None
     spark_provider_config: Union[
         SparkProviderConfig[BaseSparkSessionProvider], None
@@ -136,6 +138,7 @@ class ClientConfig(BaseModel):
 
         self.reader_config = merge(self.reader_config, other.reader_config)
         self.writer_config = merge(self.writer_config, other.writer_config)
+        self.proxy_config = merge(self.proxy_config, other.proxy_config)
         self.spark_config = merge(self.spark_config, other.spark_config)
         self.spark_provider_config = merge(
             self.spark_provider_config, other.spark_provider_config

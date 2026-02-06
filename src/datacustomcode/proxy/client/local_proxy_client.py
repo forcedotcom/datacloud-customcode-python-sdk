@@ -12,18 +12,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
-from datacustomcode.client import Client
-from datacustomcode.credentials import AuthType, Credentials
-from datacustomcode.io.reader.query_api import QueryAPIDataCloudReader
-from datacustomcode.io.writer.print import PrintDataCloudWriter
-from datacustomcode.proxy.client.local_proxy_client import LocalProxyClientProvider
+from datacustomcode.proxy.client.base import BaseProxyClient
 
-__all__ = [
-    "AuthType",
-    "Client",
-    "Credentials",
-    "LocalProxyClientProvider",
-    "PrintDataCloudWriter",
-    "QueryAPIDataCloudReader",
-]
+
+class LocalProxyClientProvider(BaseProxyClient):
+    """Default proxy client provider."""
+
+    CONFIG_NAME = "LocalProxyClientProvider"
+
+    def call_llm_gateway(self, llmModelId: str, prompt: str, maxTokens: int) -> str:
+        return f"Hello, thanks for using {llmModelId}. So many tokens: {maxTokens}"
