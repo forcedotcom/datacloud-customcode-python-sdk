@@ -22,5 +22,5 @@ class LocalProxyClientProvider(BaseProxyClient):
 
     CONFIG_NAME = "LocalProxyClientProvider"
 
-    def call_llm_gateway(self, llmModelId: str, prompt: str, maxTokens: int):
-        print("Hello, from LocalProxyClientProvider call_llm_gateway() World!")
+    def call_llm_gateway(self, llmModelId: str, prompt: str, maxTokens: int) -> str:
+        return f"Hello, thanks for using {llmModelId}. So many tokens: {maxTokens}"

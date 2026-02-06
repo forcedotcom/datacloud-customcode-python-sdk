@@ -151,11 +151,9 @@ class Client:
                         "Proxy config is required when reader is built from config"
                     )
                 proxy_init = config.proxy_config.to_object(spark)
-                print(f"chuy1 reader, proxy_init: {proxy_init}")
 
                 reader_init = config.reader_config.to_object(spark)  # type: ignore
             else:
-                print("chuy2 reader")
                 reader_init = reader
                 if config.proxy_config is None:
                     raise ValueError("Proxy config is required when reader is provided")
@@ -232,8 +230,8 @@ class Client:
         self._validate_data_layer_history_does_not_contain(DataCloudObjectType.DLO)
         return self._writer.write_to_dmo(name, dataframe, write_mode, **kwargs)
 
-    def call_llm_gateway(self, LLM_MODEL_ID: str, prompt: str, maxTokens: int):
-        self._proxy.call_llm_gateway(LLM_MODEL_ID, prompt, maxTokens)
+    def call_llm_gateway(self, LLM_MODEL_ID: str, prompt: str, maxTokens: int) -> str:
+        return self._proxy.call_llm_gateway(LLM_MODEL_ID, prompt, maxTokens)
 
     def find_file_path(self, file_name: str) -> Path:
         """Return a file path"""

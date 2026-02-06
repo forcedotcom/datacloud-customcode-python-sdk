@@ -62,10 +62,6 @@ def run_entrypoint(
         )
 
     package_type = get_package_type(entrypoint_dir)
-    print(
-        f"Chuy entrypoint: {entrypoint} directory: {entrypoint_dir} "
-        f"package type: {package_type}"
-    )
 
     try:
         with open(config_json_path, "r") as f:
