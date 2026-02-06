@@ -167,9 +167,13 @@ class Client:
                     raise ValueError(
                         "Proxy config is required when reader is built from config"
                     )
+                assert (
+                    spark is not None
+                )  # set in "reader is None or writer is None" branch
+                assert config.reader_config is not None  # ensured by branch condition
                 proxy_init = config.proxy_config.to_object(spark)
 
-                reader_init = config.reader_config.to_object(spark)  # type: ignore
+                reader_init = config.reader_config.to_object(spark)
             else:
                 reader_init = reader
                 if proxy is not None:
@@ -177,6 +181,9 @@ class Client:
                 elif config.proxy_config is None:
                     raise ValueError("Proxy config is required when reader is provided")
                 else:
+                    assert (
+                        spark is not None
+                    )  # set in "both provided; proxy from config" branch
                     proxy_init = config.proxy_config.to_object(spark)
             if config.writer_config is None and writer is None:
                 raise ValueError(
@@ -185,7 +192,9 @@ class Client:
             elif writer is None or (
                 config.writer_config is not None and config.writer_config.force
             ):
-                writer_init = config.writer_config.to_object(spark)  # type: ignore
+                assert spark is not None  # set when reader or writer from config
+                assert config.writer_config is not None  # ensured by branch condition
+                writer_init = config.writer_config.to_object(spark)
             else:
                 writer_init = writer
             cls._instance._reader = reader_init

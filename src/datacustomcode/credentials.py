@@ -192,8 +192,6 @@ class Credentials:
         Raises:
             ValueError: If no credentials are found in any source
         """
-        # print(f"Chuy profile: {profile}")
-
         # Check environment variables first
         if os.environ.get("SFDC_LOGIN_URL"):
             logger.debug("Loading credentials from environment variables")
