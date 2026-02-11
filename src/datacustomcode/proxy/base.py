@@ -19,6 +19,6 @@ from abc import ABC
 from datacustomcode.mixin import UserExtendableNamedConfigMixin
 
 
-class BaseDataAccessLayer(ABC, UserExtendableNamedConfigMixin):
+class BaseProxyAccessLayer(ABC, UserExtendableNamedConfigMixin):
     def __init__(self):
         pass

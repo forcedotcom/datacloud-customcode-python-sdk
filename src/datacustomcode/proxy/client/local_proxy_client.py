@@ -20,7 +20,11 @@ from datacustomcode.proxy.client.base import BaseProxyClient
 class LocalProxyClientProvider(BaseProxyClient):
     """Default proxy client provider."""
 
-    CONFIG_NAME = "LocalProxyClientProvider"
+    CONFIG_NAME = "LocalProxyClient"
+
+    def __init__(self, credentials_profile: str = "default", **kwargs: object) -> None:
+        super().__init__()
+        self.credentials_profile = credentials_profile
 
     def call_llm_gateway(self, llmModelId: str, prompt: str, maxTokens: int) -> str:
         return f"Hello, thanks for using {llmModelId}. So many tokens: {maxTokens}"

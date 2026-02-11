@@ -38,6 +38,7 @@ from datacustomcode.io import *  # noqa: F403
 from datacustomcode.io.base import BaseDataAccessLayer
 from datacustomcode.io.reader.base import BaseDataCloudReader  # noqa: TCH001
 from datacustomcode.io.writer.base import BaseDataCloudWriter  # noqa: TCH001
+from datacustomcode.proxy.base import BaseProxyAccessLayer
 from datacustomcode.proxy.client.base import BaseProxyClient  # noqa: TCH001
 from datacustomcode.spark.base import BaseSparkSessionProvider
 
@@ -93,6 +94,23 @@ class SparkConfig(ForceableConfig):
 
 _P = TypeVar("_P", bound=BaseSparkSessionProvider)
 
+_PX = TypeVar("_PX", bound=BaseProxyAccessLayer)
+
+
+class ProxyAccessLayerObjectConfig(ForceableConfig, Generic[_PX]):
+    """Config for proxy clients that take no constructor args (e.g. no spark)."""
+
+    model_config = ConfigDict(validate_default=True, extra="forbid")
+    type_base: ClassVar[Type[BaseProxyAccessLayer]] = BaseProxyAccessLayer
+    type_config_name: str = Field(
+        description="CONFIG_NAME of the proxy client (e.g. 'LocalProxyClient').",
+    )
+    options: dict[str, Any] = Field(default_factory=dict)
+
+    def to_object(self) -> _PX:
+        type_ = self.type_base.subclass_from_config_name(self.type_config_name)
+        return cast(_PX, type_(**self.options))
+
 
 class SparkProviderConfig(ForceableConfig, Generic[_P]):
     model_config = ConfigDict(validate_default=True, extra="forbid")
@@ -110,7 +128,7 @@ class SparkProviderConfig(ForceableConfig, Generic[_P]):
 class ClientConfig(BaseModel):
     reader_config: Union[AccessLayerObjectConfig[BaseDataCloudReader], None] = None
     writer_config: Union[AccessLayerObjectConfig[BaseDataCloudWriter], None] = None
-    proxy_config: Union[AccessLayerObjectConfig[BaseProxyClient], None] = None
+    proxy_config: Union[ProxyAccessLayerObjectConfig[BaseProxyClient], None] = None
     spark_config: Union[SparkConfig, None] = None
     spark_provider_config: Union[
         SparkProviderConfig[BaseSparkSessionProvider], None
