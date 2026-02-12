@@ -22,9 +22,8 @@ class LocalProxyClientProvider(BaseProxyClient):
 
     CONFIG_NAME = "LocalProxyClientProvider"
 
-    def __init__(self, credentials_profile: str = "default", **kwargs: object) -> None:
-        super().__init__()
-        self.credentials_profile = credentials_profile
+    def __init__(self, **kwargs: object) -> None:
+        pass
 
     def call_llm_gateway(self, llmModelId: str, prompt: str, maxTokens: int) -> str:
         return f"Hello, thanks for using {llmModelId}. So many tokens: {maxTokens}"
