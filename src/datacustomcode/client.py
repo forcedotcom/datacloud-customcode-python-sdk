@@ -120,9 +120,7 @@ class Client:
         spark_provider: Optional["BaseSparkSessionProvider"] = None,
         code_type: str = "script",
     ) -> Client:
-        print(f"Chuy client new client: {code_type}")
         if "function" in code_type:
-            print("Chuy111 client new function client")
             return cls._new_function_client()
 
         if cls._instance is None:
@@ -180,11 +178,19 @@ class Client:
 
     @classmethod
     def _new_function_client(cls) -> Client:
-        print(f"Chuy config: {config}")
-
-        importlib.import_module(
-            "datacustomcoderemote.proxy.client.client.ProxyClientProvider"
-        )
+        for dependency in config.dependencies:
+            try:
+                importlib.import_module(dependency)
+            except ModuleNotFoundError as exc:
+                try:
+                    if "." in dependency:
+                        module_name, object_name = dependency.rsplit(".", 1)
+                        module = importlib.import_module(module_name)
+                        getattr(module, object_name)
+                    else:
+                        raise exc
+                except AttributeError as inner_exc:
+                    raise inner_exc from exc
 
         cls._instance = super().__new__(cls)
         cls._instance._proxy = (
