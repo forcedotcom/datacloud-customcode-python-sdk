@@ -19,6 +19,6 @@ spark_config:
     spark.driver.extraJavaOptions: -Djava.security.manager=allow
 
 proxy_config:
-  type_config_name: LocalProxyClient
+  type_config_name: LocalProxyClientProvider
   options:
     credentials_profile: default

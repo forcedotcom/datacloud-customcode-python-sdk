@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 from enum import Enum
-import pprint
+import importlib
 from typing import (
     TYPE_CHECKING,
     ClassVar,
@@ -110,6 +110,7 @@ class Client:
     _file: DefaultFindFilePath
     _proxy: Optional[BaseProxyClient]
     _data_layer_history: dict[DataCloudObjectType, set[str]]
+    _code_type: str
 
     def __new__(
         cls,
@@ -117,31 +118,23 @@ class Client:
         writer: Optional["BaseDataCloudWriter"] = None,
         proxy: Optional[BaseProxyClient] = None,
         spark_provider: Optional["BaseSparkSessionProvider"] = None,
+        code_type: str = "script",
     ) -> Client:
-        print("Chuy client start 2 config:")
-        pprint.pprint(str(config), indent=4)
+        print(f"Chuy client new client: {code_type}")
+        if "function" in code_type:
+            print("Chuy111 client new function client")
+            return cls._new_function_client()
 
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-
-            print("Chuy client here")
-
             # Initialize Readers and Writers from config
             # and/or provided reader and writer
             if reader is None or writer is None:
                 # We need a spark because we will initialize readers and writers
                 if config.spark_config is None:
-                    # Assume BYOC Function
-                    # cls._instance._reader = None
-                    # cls._instance._writer = None
-                    cls._instance._file = DefaultFindFilePath()
-                    # cls._instance._data_layer_history = None
-                    cls._instance._proxy = (
-                        config.proxy_config.to_object()  # type: ignore
-                        if config.proxy_config is not None
-                        else None
+                    raise ValueError(
+                        "Spark config is required when reader/writer is not provided"
                     )
-                    return cls._instance
 
                 provider: BaseSparkSessionProvider
                 if spark_provider is not None:
@@ -173,15 +166,9 @@ class Client:
                 writer_init = config.writer_config.to_object(spark)  # type: ignore
             else:
                 writer_init = writer
-            proxy_init: Optional["BaseProxyClient"] = None
-            if proxy is not None:
-                proxy_init = proxy
-            elif config.proxy_config is not None:
-                proxy_init = config.proxy_config.to_object()  # type: ignore
 
             cls._instance._reader = reader_init
             cls._instance._writer = writer_init
-            cls._instance._proxy = proxy_init
             cls._instance._file = DefaultFindFilePath()
             cls._instance._data_layer_history = {
                 DataCloudObjectType.DLO: set(),
@@ -189,6 +176,22 @@ class Client:
             }
         elif (reader is not None or writer is not None) and cls._instance is not None:
             raise ValueError("Cannot set reader or writer after client is initialized")
+        return cls._instance
+
+    @classmethod
+    def _new_function_client(cls) -> Client:
+        print(f"Chuy config: {config}")
+
+        importlib.import_module(
+            "datacustomcoderemote.proxy.client.client.ProxyClientProvider"
+        )
+
+        cls._instance = super().__new__(cls)
+        cls._instance._proxy = (
+            config.proxy_config.to_object()  # type: ignore
+            if config.proxy_config is not None
+            else None
+        )
         return cls._instance
 
     def read_dlo(self, name: str) -> PySparkDataFrame:
