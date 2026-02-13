@@ -133,13 +133,6 @@ class ClientConfig(BaseModel):
     spark_provider_config: Union[
         SparkProviderConfig[BaseSparkSessionProvider], None
     ] = None
-    dependencies: list[str] = Field(
-        default_factory=list,
-        description="""
-        Extra modules to import before running the entrypoint
-         (merged with --dependencies from CLI).
-        """,
-    )
 
     def update(self, other: ClientConfig) -> ClientConfig:
         """Merge this ClientConfig with another, respecting force flags.
@@ -168,7 +161,6 @@ class ClientConfig(BaseModel):
         self.spark_provider_config = merge(
             self.spark_provider_config, other.spark_provider_config
         )
-        self.dependencies = list(dict.fromkeys(self.dependencies + other.dependencies))
         return self
 
     def load(self, config_path: str) -> ClientConfig:

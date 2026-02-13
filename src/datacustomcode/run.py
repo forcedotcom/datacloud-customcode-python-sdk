@@ -52,13 +52,6 @@ def run_entrypoint(
     """
     add_py_folder(entrypoint)
 
-    # Load config file (so we can merge config.dependencies with CLI deps)
-    if config_file:
-        config.load(config_file)
-
-    # Merge dependencies from config and CLI (config first, then CLI, deduped)
-    merged_dependencies = list(dict.fromkeys(config.dependencies + list(dependencies)))
-
     # Read dataspace from config.json (required)
     entrypoint_dir = os.path.dirname(entrypoint)
     config_json_path = os.path.join(entrypoint_dir, "config.json")
@@ -88,6 +81,10 @@ def run_entrypoint(
                 f"Please ensure config.json contains a 'dataspace' field."
             )
 
+        # Load config file first
+        if config_file:
+            config.load(config_file)
+
         # Add dataspace to reader and writer config options
         _set_config_option(config.reader_config, "dataspace", dataspace)
         _set_config_option(config.writer_config, "dataspace", dataspace)
@@ -95,7 +92,7 @@ def run_entrypoint(
     if profile != "default":
         _set_config_option(config.reader_config, "credentials_profile", profile)
         _set_config_option(config.writer_config, "credentials_profile", profile)
-    for dependency in merged_dependencies:
+    for dependency in dependencies:
         try:
             importlib.import_module(dependency)
         except ModuleNotFoundError as exc:

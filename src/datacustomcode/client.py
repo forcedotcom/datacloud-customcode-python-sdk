@@ -15,7 +15,6 @@
 from __future__ import annotations
 
 from enum import Enum
-import importlib
 from typing import (
     TYPE_CHECKING,
     ClassVar,
@@ -178,20 +177,6 @@ class Client:
 
     @classmethod
     def _new_function_client(cls) -> Client:
-        for dependency in config.dependencies:
-            try:
-                importlib.import_module(dependency)
-            except ModuleNotFoundError as exc:
-                try:
-                    if "." in dependency:
-                        module_name, object_name = dependency.rsplit(".", 1)
-                        module = importlib.import_module(module_name)
-                        getattr(module, object_name)
-                    else:
-                        raise exc
-                except AttributeError as inner_exc:
-                    raise inner_exc from exc
-
         cls._instance = super().__new__(cls)
         cls._instance._proxy = (
             config.proxy_config.to_object()  # type: ignore
