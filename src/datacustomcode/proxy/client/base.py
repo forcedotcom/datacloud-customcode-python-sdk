@@ -16,13 +16,12 @@ from __future__ import annotations
 
 from abc import abstractmethod
 
-from datacustomcode.io.base import BaseDataAccessLayer
+from datacustomcode.proxy.base import BaseProxyAccessLayer
 
 
-class BaseProxyClient(BaseDataAccessLayer):
-    def __init__(self, spark=None, **kwargs):
-        if spark is not None:
-            super().__init__(spark)
+class BaseProxyClient(BaseProxyAccessLayer):
+    def __init__(self):
+        pass
 
     @abstractmethod
     def call_llm_gateway(self, llmModelId: str, prompt: str, maxTokens: int) -> str: ...
