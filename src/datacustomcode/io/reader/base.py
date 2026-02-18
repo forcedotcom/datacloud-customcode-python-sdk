@@ -15,12 +15,13 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 from datacustomcode.io.base import BaseDataAccessLayer
 
 if TYPE_CHECKING:
     from pyspark.sql import DataFrame as PySparkDataFrame, SparkSession
+    from pyspark.sql.types import AtomicType, StructType
 
 
 class BaseDataCloudReader(BaseDataAccessLayer):
@@ -28,7 +29,17 @@ class BaseDataCloudReader(BaseDataAccessLayer):
         self.spark = spark
 
     @abstractmethod
-    def read_dlo(self, name: str) -> PySparkDataFrame: ...
+    def read_dlo(
+        self,
+        name: str,
+        schema: Union[AtomicType, StructType, str, None] = None,
+        row_limit: int = 1000,
+    ) -> PySparkDataFrame: ...
 
     @abstractmethod
-    def read_dmo(self, name: str) -> PySparkDataFrame: ...
+    def read_dmo(
+        self,
+        name: str,
+        schema: Union[AtomicType, StructType, str, None] = None,
+        row_limit: int = 1000,
+    ) -> PySparkDataFrame: ...

@@ -185,29 +185,31 @@ class Client:
         )
         return cls._instance
 
-    def read_dlo(self, name: str) -> PySparkDataFrame:
+    def read_dlo(self, name: str, row_limit: int = 1000) -> PySparkDataFrame:
         """Read a DLO from Data Cloud.
 
         Args:
             name: The name of the DLO to read.
+            row_limit: Maximum number of rows to fetch (default: 1000).
 
         Returns:
             A PySpark DataFrame containing the DLO data.
         """
         self._record_dlo_access(name)
-        return self._reader.read_dlo(name)
+        return self._reader.read_dlo(name, row_limit=row_limit)
 
-    def read_dmo(self, name: str) -> PySparkDataFrame:
+    def read_dmo(self, name: str, row_limit: int = 1000) -> PySparkDataFrame:
         """Read a DMO from Data Cloud.
 
         Args:
             name: The name of the DMO to read.
+            row_limit: Maximum number of rows to fetch (default: 1000).
 
         Returns:
             A PySpark DataFrame containing the DMO data.
         """
         self._record_dmo_access(name)
-        return self._reader.read_dmo(name)
+        return self._reader.read_dmo(name, row_limit=row_limit)
 
     def write_to_dlo(
         self, name: str, dataframe: PySparkDataFrame, write_mode: WriteMode, **kwargs
