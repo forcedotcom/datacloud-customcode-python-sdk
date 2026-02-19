@@ -9,7 +9,7 @@ Use of this project with Salesforce is subject to the [TERMS OF USE](./TERMS_OF_
 ## Prerequisites
 
 - **Python 3.11 only** (currently supported version - if your system version is different, we recommend using [pyenv](https://github.com/pyenv/pyenv) to configure 3.11)
-- [Azul Zulu OpenJDK 17.x](https://www.azul.com/downloads/?version=java-17-lts&package=jdk#zulu)
+- JDK 17
 - Docker support like [Docker Desktop](https://docs.docker.com/desktop/)
 - A salesforce org with some DLOs or DMOs with data and this feature enabled (it is not GA)
 - An [External Client App](#creating-an-external-client-app)
