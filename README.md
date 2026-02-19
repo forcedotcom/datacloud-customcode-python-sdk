@@ -12,7 +12,10 @@ Use of this project with Salesforce is subject to the [TERMS OF USE](./TERMS_OF_
 - JDK 17
 - Docker support like [Docker Desktop](https://docs.docker.com/desktop/)
 - A salesforce org with some DLOs or DMOs with data and this feature enabled (it is not GA)
-- An [External Client App](#creating-an-external-client-app)
+- **One of the following** for authentication:
+  - A Salesforce org already authenticated via the [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli)
+    (simplest — no External Client App needed)
+  - An [External Client App](#creating-an-external-client-app) configured with OAuth settings
 
 ## Installation
 The SDK can be downloaded directly from PyPI with `pip`:
@@ -64,6 +67,13 @@ cd my_package
 datacustomcode configure
 datacustomcode run ./payload/entrypoint.py
 ```
+
+> [!TIP]
+> **Already using the Salesforce CLI?** If you have authenticated an org with `sf org login web
+> --alias myorg`, you can skip `datacustomcode configure` entirely:
+> ```zsh
+> datacustomcode run ./payload/entrypoint.py --sf-cli-org myorg
+> ```
 
 > [!IMPORTANT]
 > The example entrypoint.py requires a `Account_std__dll` DLO to be present.  And in order to deploy the script (next step), the output DLO (which is `Account_std_copy__dll` in the example entrypoint.py) also needs to exist and be in the same dataspace as `Account_std__dll`.
@@ -183,17 +193,19 @@ Options:
 - `--auth-type TEXT`: Authentication method (default: `oauth_tokens`)
   - `oauth_tokens` - OAuth tokens with refresh_token
   - `client_credentials` - Server-to-server using client_id/secret only
-- `--login-url TEXT`: Salesforce login URL
 
-For OAuth Tokens authentication:
-- `--client-id TEXT`: External Client App Client ID
-- `--client-secret TEXT`: External Client App Client Secret
-- `--refresh-token TEXT`: OAuth refresh token (see [Obtaining Refresh Token](#obtaining-refresh-token-and-core-token))
-- `--core-token TEXT`: (Optional) OAuth core/access token - if not provided, it will be obtained using the refresh token
+You will be prompted for the following depending on auth type:
 
-For Client Credentials authentication (server-to-server):
-- `--client-id TEXT`: External Client App Client ID
-- `--client-secret TEXT`: External Client App Client Secret
+*Common to all auth types:*
+- **Login URL**: Salesforce login URL
+- **Client ID**: External Client App Client ID
+
+*For OAuth Tokens authentication:*
+- **Client Secret**: External Client App Client Secret
+- **Redirect URI**: OAuth redirect URI
+
+*For Client Credentials authentication:*
+- **Client Secret**: External Client App Client Secret
 
 ##### Using Environment Variables (Alternative)
 
@@ -255,6 +267,9 @@ Options:
 - `--config-file TEXT`: Path to configuration file
 - `--dependencies TEXT`: Additional dependencies (can be specified multiple times)
 - `--profile TEXT`: Credential profile name (default: "default")
+- `--sf-cli-org TEXT`: Salesforce CLI org alias or username (e.g. `dev1`). Fetches
+  credentials via `sf org display` — no `datacustomcode configure` step needed.
+  Takes precedence over `--profile` if both are supplied.
 
 
 #### `datacustomcode zip`
@@ -277,7 +292,7 @@ Options:
 - `--version TEXT`: Version of the transformation job (default: "0.0.1")
 - `--description TEXT`: Description of the transformation job (default: "")
 - `--network TEXT`: docker network (default: "default")
-- `--cpu-size TEXT`: CPU size for the deployment (default: "CPU_XL"). Available options: CPU_L(Large), CPU_XL(Extra Large), CPU_2XL(2X Large), CPU_4XL(4X Large)
+- `--cpu-size TEXT`: CPU size for the deployment (default: `CPU_2XL`). Available options: CPU_L(Large), CPU_XL(Extra Large), CPU_2XL(2X Large), CPU_4XL(4X Large)
 
 
 ## Docker usage
@@ -364,6 +379,54 @@ You can read more about Jupyter Notebooks here: https://jupyter.org/
 11. Use the URL of the login page as the `login_url` value when setting up the SDK
 
 You now have all fields necessary for the `datacustomcode configure` command.
+
+### Using the Salesforce CLI for authentication
+
+The [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli) (`sf`) lets you authenticate an org once and then reference it by alias across tools — including this SDK via `--sf-cli-org`.
+
+#### Installing the Salesforce CLI
+
+Follow the [official install guide](https://developer.salesforce.com/docs/atlas.en-us.sfdx_setup.meta/sfdx_setup/sfdx_setup_install_cli.htm), or use a package manager:
+
+```zsh
+# macOS (Homebrew)
+brew install sf
+
+# npm (all platforms)
+npm install --global @salesforce/cli
+```
+
+Verify the install:
+```zsh
+sf --version
+```
+
+#### Authenticating an org
+
+**Browser-based (recommended for developer orgs and sandboxes):**
+```zsh
+# Production / Developer Edition
+sf org login web --alias myorg
+
+# Sandbox
+sf org login web --alias mysandbox --instance-url https://test.salesforce.com
+
+# Custom domain
+sf org login web --alias myorg --instance-url https://mycompany.my.salesforce.com
+```
+
+Each command opens a browser tab. After you log in and approve access, the CLI stores the session locally.
+
+**Verify the stored org and confirm the alias:**
+```zsh
+sf org list
+sf org display --target-org myorg
+```
+
+Once authenticated, pass the alias directly to `datacustomcode run`:
+```zsh
+datacustomcode run ./payload/entrypoint.py --sf-cli-org myorg
+```
 
 ### Obtaining Refresh Token and Core Token
 
