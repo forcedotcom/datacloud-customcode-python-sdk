@@ -277,3 +277,27 @@ class TestQueryAPIDataCloudReader:
         reader_without_init.spark.createDataFrame.assert_called_once()
         args, _ = reader_without_init.spark.createDataFrame.call_args
         assert args[1] is custom_schema
+
+    def test_read_dlo_with_custom_row_limit(
+        self, reader_without_init, mock_connection, mock_pandas_dataframe
+    ):
+        """Test read_dlo method with custom row_limit."""
+        reader_without_init._conn = mock_connection
+
+        reader_without_init.read_dlo("test_dlo", row_limit=50)
+
+        mock_connection.get_pandas_dataframe.assert_called_once_with(
+            SQL_QUERY_TEMPLATE.format("test_dlo", 50)
+        )
+
+    def test_read_dmo_with_custom_row_limit(
+        self, reader_without_init, mock_connection, mock_pandas_dataframe
+    ):
+        """Test read_dmo method with custom row_limit."""
+        reader_without_init._conn = mock_connection
+
+        reader_without_init.read_dmo("test_dmo", row_limit=25)
+
+        mock_connection.get_pandas_dataframe.assert_called_once_with(
+            SQL_QUERY_TEMPLATE.format("test_dmo", 25)
+        )
