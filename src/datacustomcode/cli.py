@@ -16,7 +16,11 @@ from importlib import metadata
 import json
 import os
 import sys
-from typing import List, Union
+from typing import (
+    List,
+    Optional,
+    Union,
+)
 
 import click
 from loguru import logger
@@ -294,12 +298,20 @@ def scan(filename: str, config: str, dry_run: bool, no_requirements: bool):
 @click.option("--config-file", default=None)
 @click.option("--dependencies", default=[], multiple=True)
 @click.option("--profile", default="default")
+@click.option(
+    "--sf-cli-org",
+    default=None,
+    help="SF CLI org alias or username. Fetches credentials via `sf org display`.",
+)
 def run(
     entrypoint: str,
     config_file: Union[str, None],
     dependencies: List[str],
     profile: str,
+    sf_cli_org: Optional[str],
 ):
     from datacustomcode.run import run_entrypoint
 
-    run_entrypoint(entrypoint, config_file, dependencies, profile)
+    run_entrypoint(
+        entrypoint, config_file, dependencies, profile, sf_cli_org=sf_cli_org
+    )

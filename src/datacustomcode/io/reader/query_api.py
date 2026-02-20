@@ -22,50 +22,21 @@ from typing import (
     Union,
 )
 
-import pandas.api.types as pd_types
-from pyspark.sql.types import (
-    BooleanType,
-    DoubleType,
-    LongType,
-    StringType,
-    StructField,
-    StructType,
-    TimestampType,
-)
 from salesforcecdpconnector.connection import SalesforceCDPConnection
 
 from datacustomcode.credentials import AuthType, Credentials
 from datacustomcode.io.reader.base import BaseDataCloudReader
+from datacustomcode.io.reader.sf_cli import SFCLIDataCloudReader
+from datacustomcode.io.reader.utils import _pandas_to_spark_schema
 
 if TYPE_CHECKING:
-    import pandas
     from pyspark.sql import DataFrame as PySparkDataFrame, SparkSession
-    from pyspark.sql.types import AtomicType
+    from pyspark.sql.types import AtomicType, StructType
 
 logger = logging.getLogger(__name__)
 
 
 SQL_QUERY_TEMPLATE: Final = "SELECT * FROM {} LIMIT {}"
-PANDAS_TYPE_MAPPING = {
-    "object": StringType(),
-    "int64": LongType(),
-    "float64": DoubleType(),
-    "bool": BooleanType(),
-}
-
-
-def _pandas_to_spark_schema(
-    pandas_df: pandas.DataFrame, nullable: bool = True
-) -> StructType:
-    fields = []
-    for column, dtype in pandas_df.dtypes.items():
-        spark_type: AtomicType
-        if pd_types.is_datetime64_any_dtype(dtype):
-            spark_type = TimestampType()
-        else:
-            spark_type = PANDAS_TYPE_MAPPING.get(str(dtype), StringType())
-        fields.append(StructField(column, spark_type, nullable))
-    return StructType(fields)
 
 
 def create_cdp_connection(
@@ -136,6 +107,7 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
     Supports multiple authentication methods:
     - OAuth Tokens (default, needs client_id/secret with refresh_token)
     - Client Credentials (server-to-server, needs client_id/secret only)
+    - SF CLI (uses ``sf org display`` access token via the REST API directly)
 
     Supports dataspace configuration for querying data within specific dataspaces.
     When a dataspace is provided (and not "default"), queries are executed within
@@ -149,6 +121,7 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
         spark: SparkSession,
         credentials_profile: str = "default",
         dataspace: Optional[str] = None,
+        sf_cli_org: Optional[str] = None,
     ) -> None:
         """Initialize QueryAPIDataCloudReader.
 
@@ -160,14 +133,30 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
             dataspace: Optional dataspace identifier. If provided and not "default",
                 the connection will be configured for the specified dataspace.
                 When None or "default", uses the default dataspace.
+            sf_cli_org: Optional SF CLI org alias or username.  When set, the
+                reader delegates to :class:`SFCLIDataCloudReader` which calls
+                the Data Cloud REST API directly using the token obtained from
+                ``sf org display``, bypassing the CDP token-exchange flow.
         """
         self.spark = spark
-        credentials = Credentials.from_available(profile=credentials_profile)
-        logger.debug(
-            "Initializing QueryAPIDataCloudReader with "
-            f"auth_type={credentials.auth_type.value}"
-        )
-        self._conn = create_cdp_connection(credentials, dataspace)
+        if sf_cli_org:
+            logger.debug(
+                f"Initializing QueryAPIDataCloudReader with SF CLI org '{sf_cli_org}'"
+            )
+            self._sf_cli_reader: Optional[SFCLIDataCloudReader] = SFCLIDataCloudReader(
+                spark=spark,
+                sf_cli_org=sf_cli_org,
+                dataspace=dataspace,
+            )
+            self._conn = None
+        else:
+            self._sf_cli_reader = None
+            credentials = Credentials.from_available(profile=credentials_profile)
+            logger.debug(
+                "Initializing QueryAPIDataCloudReader with "
+                f"auth_type={credentials.auth_type.value}"
+            )
+            self._conn = create_cdp_connection(credentials, dataspace)
 
     def read_dlo(
         self,
@@ -186,8 +175,15 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
         Returns:
             PySparkDataFrame: The PySpark DataFrame.
         """
+        sf_cli_reader: Optional[SFCLIDataCloudReader] = getattr(
+            self, "_sf_cli_reader", None
+        )
+        if sf_cli_reader is not None:
+            return sf_cli_reader.read_dlo(name, schema, row_limit)
+
         query = SQL_QUERY_TEMPLATE.format(name, row_limit)
 
+        assert self._conn is not None
         pandas_df = self._conn.get_pandas_dataframe(query)
 
         # Convert pandas DataFrame to Spark DataFrame
@@ -214,8 +210,15 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
         Returns:
             PySparkDataFrame: The PySpark DataFrame.
         """
+        sf_cli_reader: Optional[SFCLIDataCloudReader] = getattr(
+            self, "_sf_cli_reader", None
+        )
+        if sf_cli_reader is not None:
+            return sf_cli_reader.read_dmo(name, schema, row_limit)
+
         query = SQL_QUERY_TEMPLATE.format(name, row_limit)
 
+        assert self._conn is not None
         pandas_df = self._conn.get_pandas_dataframe(query)
 
         # Convert pandas DataFrame to Spark DataFrame
