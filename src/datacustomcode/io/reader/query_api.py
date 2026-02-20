@@ -22,51 +22,21 @@ from typing import (
     Union,
 )
 
-import pandas.api.types as pd_types
-from pyspark.sql.types import (
-    BooleanType,
-    DoubleType,
-    LongType,
-    StringType,
-    StructField,
-    StructType,
-    TimestampType,
-)
 from salesforcecdpconnector.connection import SalesforceCDPConnection
 
 from datacustomcode.credentials import AuthType, Credentials
 from datacustomcode.io.reader.base import BaseDataCloudReader
 from datacustomcode.io.reader.sf_cli import SFCLIDataCloudReader
+from datacustomcode.io.reader.utils import _pandas_to_spark_schema
 
 if TYPE_CHECKING:
-    import pandas
     from pyspark.sql import DataFrame as PySparkDataFrame, SparkSession
-    from pyspark.sql.types import AtomicType
+    from pyspark.sql.types import AtomicType, StructType
 
 logger = logging.getLogger(__name__)
 
 
 SQL_QUERY_TEMPLATE: Final = "SELECT * FROM {} LIMIT {}"
-PANDAS_TYPE_MAPPING = {
-    "object": StringType(),
-    "int64": LongType(),
-    "float64": DoubleType(),
-    "bool": BooleanType(),
-}
-
-
-def _pandas_to_spark_schema(
-    pandas_df: pandas.DataFrame, nullable: bool = True
-) -> StructType:
-    fields = []
-    for column, dtype in pandas_df.dtypes.items():
-        spark_type: AtomicType
-        if pd_types.is_datetime64_any_dtype(dtype):
-            spark_type = TimestampType()
-        else:
-            spark_type = PANDAS_TYPE_MAPPING.get(str(dtype), StringType())
-        fields.append(StructField(column, spark_type, nullable))
-    return StructType(fields)
 
 
 def create_cdp_connection(

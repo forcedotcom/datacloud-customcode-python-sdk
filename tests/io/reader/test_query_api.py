@@ -21,8 +21,8 @@ import pytest
 from datacustomcode.io.reader.query_api import (
     SQL_QUERY_TEMPLATE,
     QueryAPIDataCloudReader,
-    _pandas_to_spark_schema,
 )
+from datacustomcode.io.reader.utils import _pandas_to_spark_schema
 
 
 class TestPandasToSparkSchema:
