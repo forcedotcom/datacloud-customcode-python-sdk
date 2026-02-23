@@ -318,7 +318,7 @@ def dc_config_json_from_file(file_path: str, type: str) -> dict[str, Any]:
         config = DATA_TRANSFORM_CONFIG_TEMPLATE.copy()
     elif type == "function":
         config = FUNCTION_CONFIG_TEMPLATE.copy()
-    config["entryPoint"] = file_path.rpartition("/")[-1]
+    config["entryPoint"] = os.path.basename(file_path)
     return config
 
 
