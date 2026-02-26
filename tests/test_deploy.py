@@ -1,5 +1,6 @@
 """Tests for the deploy module."""
 
+import json
 from unittest.mock import (
     MagicMock,
     mock_open,
@@ -27,6 +28,7 @@ with patch("datacustomcode.version.get_version", return_value="1.2.3"):
         DeploymentsResponse,
         _make_api_call,
         _retrieve_access_token,
+        _retrieve_access_token_from_sf_cli,
         create_data_transform,
         create_deployment,
         deploy_full,
@@ -1106,4 +1108,145 @@ class TestDeployFullWithDockerIntegration:
         mock_create_transform.assert_called_once_with(
             "/test/dir", access_token, metadata, data_transform_config
         )
+        assert result == access_token
+
+
+class TestRetrieveAccessTokenFromSFCLI:
+    """Tests for _retrieve_access_token_from_sf_cli."""
+
+    SF_CLI_OUTPUT = json.dumps(
+        {
+            "status": 0,
+            "result": {
+                "accessToken": "sf_access_token",
+                "instanceUrl": "https://sf.salesforce.com",
+            },
+        }
+    )
+
+    @patch("datacustomcode.deploy.subprocess.run")
+    def test_happy_path(self, mock_run):
+        """Successful sf org display returns AccessTokenResponse."""
+        mock_run.return_value = MagicMock(stdout=self.SF_CLI_OUTPUT, returncode=0)
+
+        result = _retrieve_access_token_from_sf_cli("my-org")
+
+        assert result.access_token == "sf_access_token"
+        assert result.instance_url == "https://sf.salesforce.com"
+        mock_run.assert_called_once_with(
+            ["sf", "org", "display", "--target-org", "my-org", "--json"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=30,
+        )
+
+    @patch("datacustomcode.deploy.subprocess.run")
+    def test_file_not_found(self, mock_run):
+        """FileNotFoundError raised when sf CLI is not installed."""
+        mock_run.side_effect = FileNotFoundError("No such file or directory: 'sf'")
+
+        with pytest.raises(RuntimeError, match="'sf' command was not found"):
+            _retrieve_access_token_from_sf_cli("my-org")
+
+    @patch("datacustomcode.deploy.subprocess.run")
+    def test_timeout_expired(self, mock_run):
+        """TimeoutExpired raised when sf CLI times out."""
+        import subprocess
+
+        mock_run.side_effect = subprocess.TimeoutExpired(cmd="sf", timeout=30)
+
+        with pytest.raises(RuntimeError, match="timed out"):
+            _retrieve_access_token_from_sf_cli("my-org")
+
+    @patch("datacustomcode.deploy.subprocess.run")
+    def test_called_process_error(self, mock_run):
+        """CalledProcessError raised when sf CLI exits non-zero."""
+        import subprocess
+
+        mock_run.side_effect = subprocess.CalledProcessError(
+            returncode=1, cmd="sf", stderr="Org not found"
+        )
+
+        with pytest.raises(RuntimeError, match="failed for org"):
+            _retrieve_access_token_from_sf_cli("my-org")
+
+    @patch("datacustomcode.deploy.subprocess.run")
+    def test_json_decode_error(self, mock_run):
+        """RuntimeError raised when output is not valid JSON."""
+        mock_run.return_value = MagicMock(stdout="not-json", returncode=0)
+
+        with pytest.raises(RuntimeError, match="Failed to parse"):
+            _retrieve_access_token_from_sf_cli("my-org")
+
+    @patch("datacustomcode.deploy.subprocess.run")
+    def test_nonzero_status_in_json(self, mock_run):
+        """RuntimeError raised when JSON status field is non-zero."""
+        output = json.dumps({"status": 1, "message": "org not found"})
+        mock_run.return_value = MagicMock(stdout=output, returncode=0)
+
+        with pytest.raises(RuntimeError, match="SF CLI error"):
+            _retrieve_access_token_from_sf_cli("my-org")
+
+    @patch("datacustomcode.deploy.subprocess.run")
+    def test_missing_access_token(self, mock_run):
+        """RuntimeError raised when accessToken is absent."""
+        output = json.dumps(
+            {"status": 0, "result": {"instanceUrl": "https://sf.salesforce.com"}}
+        )
+        mock_run.return_value = MagicMock(stdout=output, returncode=0)
+
+        with pytest.raises(RuntimeError, match="did not return"):
+            _retrieve_access_token_from_sf_cli("my-org")
+
+    @patch("datacustomcode.deploy.subprocess.run")
+    def test_missing_instance_url(self, mock_run):
+        """RuntimeError raised when instanceUrl is absent."""
+        output = json.dumps({"status": 0, "result": {"accessToken": "sf_access_token"}})
+        mock_run.return_value = MagicMock(stdout=output, returncode=0)
+
+        with pytest.raises(RuntimeError, match="did not return"):
+            _retrieve_access_token_from_sf_cli("my-org")
+
+
+class TestDeployFullWithAccessTokenResponse:
+    """Test deploy_full when passed an AccessTokenResponse directly."""
+
+    @patch("datacustomcode.deploy.create_data_transform")
+    @patch("datacustomcode.deploy.wait_for_deployment")
+    @patch("datacustomcode.deploy.upload_zip")
+    @patch("datacustomcode.deploy.zip")
+    @patch("datacustomcode.deploy.create_deployment")
+    @patch("datacustomcode.deploy.get_config")
+    @patch("datacustomcode.deploy._retrieve_access_token")
+    def test_deploy_full_with_access_token_response_skips_token_exchange(
+        self,
+        mock_retrieve_token,
+        mock_get_config,
+        mock_create_deployment,
+        mock_zip,
+        mock_upload_zip,
+        mock_wait,
+        mock_create_transform,
+    ):
+        """deploy_full skips token exchange when given an AccessTokenResponse."""
+        access_token = AccessTokenResponse(
+            access_token="direct_token", instance_url="https://instance.example.com"
+        )
+        metadata = CodeExtensionMetadata(
+            name="test",
+            version="1.0.0",
+            description="desc",
+            computeType="CPU_M",
+            codeType="script",
+        )
+        mock_get_config.return_value = MagicMock(spec=[])  # not DataTransformConfig
+        mock_create_deployment.return_value = CreateDeploymentResponse(
+            fileUploadUrl="https://upload.example.com"
+        )
+
+        result = deploy_full("/test/dir", metadata, access_token, "default")
+
+        mock_retrieve_token.assert_not_called()
+        mock_create_deployment.assert_called_once_with(access_token, metadata)
         assert result == access_token

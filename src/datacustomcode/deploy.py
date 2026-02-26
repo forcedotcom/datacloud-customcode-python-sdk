@@ -18,6 +18,7 @@ from html import unescape
 import json
 import os
 import shutil
+import subprocess
 import tempfile
 import time
 from typing import (
@@ -154,6 +155,54 @@ def _retrieve_access_token(credentials: Credentials) -> AccessTokenResponse:
 
     response = _make_api_call(url, "POST", data=data)
     return AccessTokenResponse(**response)
+
+
+def _retrieve_access_token_from_sf_cli(sf_cli_org: str) -> AccessTokenResponse:
+    """Get an access token from the Salesforce CLI."""
+    try:
+        result = subprocess.run(
+            ["sf", "org", "display", "--target-org", sf_cli_org, "--json"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=30,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            "The 'sf' command was not found. "
+            "Please install Salesforce CLI: https://developer.salesforce.com/tools/salesforcecli"
+        ) from exc
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            f"'sf org display' timed out for org '{sf_cli_org}'"
+        ) from exc
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError(
+            f"'sf org display' failed for org '{sf_cli_org}'.\n"
+            f"Ensure the org is authenticated via 'sf org login web'.\n"
+            f"stderr: {exc.stderr.strip()}"
+        ) from exc
+
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Failed to parse 'sf org display' output: {exc}") from exc
+
+    if data.get("status") != 0:
+        raise RuntimeError(
+            f"SF CLI error for org '{sf_cli_org}': "
+            f"{data.get('message', 'unknown error')}"
+        )
+
+    org_result = data.get("result", {})
+    access_token = org_result.get("accessToken")
+    instance_url = org_result.get("instanceUrl")
+    if not access_token or not instance_url:
+        raise RuntimeError(
+            f"'sf org display' did not return an access token or instance URL "
+            f"for org '{sf_cli_org}'"
+        )
+    return AccessTokenResponse(access_token=access_token, instance_url=instance_url)
 
 
 class CreateDeploymentResponse(BaseModel):
@@ -463,12 +512,15 @@ def zip(
 def deploy_full(
     directory: str,
     metadata: CodeExtensionMetadata,
-    credentials: Credentials,
+    credentials: Union["Credentials", AccessTokenResponse],
     docker_network: str,
     callback=None,
 ) -> AccessTokenResponse:
     """Deploy a data transform in the DataCloud."""
-    access_token = _retrieve_access_token(credentials)
+    if isinstance(credentials, AccessTokenResponse):
+        access_token = credentials
+    else:
+        access_token = _retrieve_access_token(credentials)
 
     # prepare payload
     config = get_config(directory)
