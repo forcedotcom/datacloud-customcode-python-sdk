@@ -160,6 +160,11 @@ def zip(path: str, network: str):
     Choose based on your workload requirements.""",
 )
 @click.option("--function-invoke-opt")
+@click.option(
+    "--sf-cli-org",
+    default=None,
+    help="SF CLI org alias or username. Fetches credentials via `sf org display`.",
+)
 def deploy(
     path: str,
     name: str,
@@ -169,14 +174,18 @@ def deploy(
     profile: str,
     network: str,
     function_invoke_opt: str,
+    sf_cli_org: Optional[str],
 ):
     from datacustomcode.credentials import Credentials
-    from datacustomcode.deploy import CodeExtensionMetadata, deploy_full
+    from datacustomcode.deploy import (
+        COMPUTE_TYPES,
+        AccessTokenResponse,
+        CodeExtensionMetadata,
+        _retrieve_access_token_from_sf_cli,
+        deploy_full,
+    )
 
     logger.debug("Deploying project")
-
-    # Validate compute type
-    from datacustomcode.deploy import COMPUTE_TYPES
 
     if cpu_size not in COMPUTE_TYPES.keys():
         click.secho(
@@ -208,15 +217,23 @@ def deploy(
             function_invoke_options = function_invoke_opt.split(",")
             metadata.functionInvokeOptions = function_invoke_options
 
-    try:
-        credentials = Credentials.from_available(profile=profile)
-    except ValueError as e:
-        click.secho(
-            f"Error: {e}",
-            fg="red",
-        )
-        raise click.Abort() from None
-    deploy_full(path, metadata, credentials, network)
+    auth: Union[Credentials, AccessTokenResponse]
+    if sf_cli_org:
+        try:
+            auth = _retrieve_access_token_from_sf_cli(sf_cli_org)
+        except RuntimeError as e:
+            click.secho(f"Error: {e}", fg="red")
+            raise click.Abort() from None
+    else:
+        try:
+            auth = Credentials.from_available(profile=profile)
+        except ValueError as e:
+            click.secho(
+                f"Error: {e}",
+                fg="red",
+            )
+            raise click.Abort() from None
+    deploy_full(path, metadata, auth, network)
 
 
 @cli.command()

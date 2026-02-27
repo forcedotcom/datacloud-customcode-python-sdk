@@ -5,6 +5,7 @@ from unittest.mock import mock_open, patch
 from click.testing import CliRunner
 
 from datacustomcode.cli import deploy, init
+from datacustomcode.deploy import AccessTokenResponse
 from datacustomcode.scan import write_sdk_config
 
 
@@ -91,7 +92,9 @@ class TestDeploy:
             # Check that deploy_full was called with correct arguments
             call_args = mock_deploy_full.call_args
             assert call_args[0][0] == "payload"  # path
-            assert call_args[0][1].name == "test-job"  # metadata
+            assert (
+                call_args[0][1].name == "test_job"
+            )  # metadata (hyphen sanitized to underscore)
             assert call_args[0][1].version == "1.0.0"
             assert call_args[0][1].description == "Custom Data Transform Code"
             assert call_args[0][2] == mock_creds  # credentials
@@ -180,3 +183,39 @@ class TestDeploy:
             # Check that deploy_full was called with custom description
             call_args = mock_deploy_full.call_args
             assert call_args[0][1].description == "Custom description"
+
+    @patch("datacustomcode.deploy.deploy_full")
+    @patch("datacustomcode.deploy._retrieve_access_token_from_sf_cli")
+    def test_deploy_command_sf_cli_org(self, mock_sf_cli_token, mock_deploy_full):
+        """Test deploy command with --sf-cli-org flag."""
+        mock_token = AccessTokenResponse(
+            access_token="test_token", instance_url="https://test.salesforce.com"
+        )
+        mock_sf_cli_token.return_value = mock_token
+
+        runner = CliRunner()
+        with runner.isolated_filesystem():
+            os.makedirs("payload", exist_ok=True)
+            result = runner.invoke(
+                deploy, ["--name", "test-job", "--sf-cli-org", "my-org"]
+            )
+
+            assert result.exit_code == 0
+            mock_sf_cli_token.assert_called_once_with("my-org")
+            mock_deploy_full.assert_called_once()
+            call_args = mock_deploy_full.call_args
+            assert call_args[0][2] == mock_token  # AccessTokenResponse passed directly
+
+    @patch("datacustomcode.deploy._retrieve_access_token_from_sf_cli")
+    def test_deploy_command_sf_cli_org_error(self, mock_sf_cli_token):
+        """Test deploy command when --sf-cli-org fails."""
+        mock_sf_cli_token.side_effect = RuntimeError("sf command not found")
+
+        runner = CliRunner()
+        with runner.isolated_filesystem():
+            os.makedirs("payload", exist_ok=True)
+            result = runner.invoke(
+                deploy, ["--name", "test-job", "--sf-cli-org", "bad-org"]
+            )
+            assert result.exit_code == 1
+            assert "sf command not found" in result.output
