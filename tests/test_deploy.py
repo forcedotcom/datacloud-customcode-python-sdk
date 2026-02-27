@@ -29,6 +29,7 @@ with patch("datacustomcode.version.get_version", return_value="1.2.3"):
         _make_api_call,
         _retrieve_access_token,
         _retrieve_access_token_from_sf_cli,
+        _sanitize_api_name,
         create_data_transform,
         create_deployment,
         deploy_full,
@@ -1250,3 +1251,90 @@ class TestDeployFullWithAccessTokenResponse:
         mock_retrieve_token.assert_not_called()
         mock_create_deployment.assert_called_once_with(access_token, metadata)
         assert result == access_token
+
+
+class TestSanitizeApiName:
+    def test_valid_name_unchanged(self):
+        assert _sanitize_api_name("valid_name") == "valid_name"
+
+    def test_spaces_become_underscores(self):
+        assert _sanitize_api_name("foo bar") == "foo_bar"
+
+    def test_hyphens_become_underscores(self):
+        assert _sanitize_api_name("foo-bar") == "foo_bar"
+
+    def test_invalid_chars_removed(self):
+        assert _sanitize_api_name("foo!bar@baz") == "foobarbaz"
+
+    def test_consecutive_underscores_collapsed(self):
+        assert _sanitize_api_name("foo__bar") == "foo_bar"
+
+    def test_trailing_underscore_stripped(self):
+        assert _sanitize_api_name("foo_bar_") == "foo_bar"
+
+    def test_leading_underscore_stripped(self):
+        assert _sanitize_api_name("_foo_bar") == "foo_bar"
+
+    def test_mixed_sanitization(self):
+        assert _sanitize_api_name("foo Bar-baz!") == "foo_Bar_baz"
+
+    def test_empty_string_returns_empty(self):
+        assert _sanitize_api_name("") == ""
+
+    def test_only_invalid_chars_returns_empty(self):
+        assert _sanitize_api_name("!@#$") == ""
+
+
+class TestCodeExtensionMetadataValidation:
+    def _make_metadata(self, name: str) -> CodeExtensionMetadata:
+        return CodeExtensionMetadata(
+            name=name,
+            version="1.0.0",
+            description="test",
+            computeType="CPU_M",
+            codeType="script",
+        )
+
+    def test_valid_name_passes(self):
+        m = self._make_metadata("valid_name")
+        assert m.name == "valid_name"
+
+    def test_space_in_name_sanitized(self):
+        m = self._make_metadata("foo bar")
+        assert m.name == "foo_bar"
+
+    def test_hyphen_in_name_sanitized(self):
+        m = self._make_metadata("foo-bar")
+        assert m.name == "foo_bar"
+
+    def test_invalid_chars_removed(self):
+        m = self._make_metadata("foo!bar")
+        assert m.name == "foobar"
+
+    def test_consecutive_underscores_collapsed(self):
+        m = self._make_metadata("foo__bar")
+        assert m.name == "foo_bar"
+
+    def test_trailing_underscore_stripped(self):
+        m = self._make_metadata("foo_bar_")
+        assert m.name == "foo_bar"
+
+    def test_name_starting_with_digit_raises(self):
+        with pytest.raises(ValueError, match="must begin with a letter"):
+            self._make_metadata("123abc")
+
+    def test_empty_name_raises(self):
+        with pytest.raises(ValueError, match="invalid and could not be sanitized"):
+            self._make_metadata("")
+
+    def test_all_invalid_chars_raises(self):
+        with pytest.raises(ValueError, match="invalid and could not be sanitized"):
+            self._make_metadata("!@#$")
+
+    def test_warning_logged_when_name_changed(self):
+        with patch("datacustomcode.deploy.logger") as mock_logger:
+            m = self._make_metadata("foo bar")
+        assert m.name == "foo_bar"
+        mock_logger.warning.assert_called_once()
+        warning_msg = mock_logger.warning.call_args[0][0]
+        assert "foo bar" in warning_msg and "foo_bar" in warning_msg

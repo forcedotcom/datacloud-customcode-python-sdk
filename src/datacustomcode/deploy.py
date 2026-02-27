@@ -17,6 +17,7 @@ from __future__ import annotations
 from html import unescape
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -58,6 +59,19 @@ COMPUTE_TYPES = {
 }
 
 
+def _sanitize_api_name(name: str) -> str:
+    """Sanitize an API name to comply with Salesforce naming rules.
+
+    Replaces spaces and hyphens with underscores, removes invalid characters,
+    collapses consecutive underscores, and strips leading/trailing underscores.
+    """
+    sanitized = re.sub(r"[ \-]", "_", name)
+    sanitized = re.sub(r"[^\w]", "", sanitized)
+    sanitized = re.sub(r"_+", "_", sanitized)
+    sanitized = sanitized.strip("_")
+    return sanitized
+
+
 class CodeExtensionMetadata(BaseModel):
     name: str
     version: str
@@ -67,6 +81,24 @@ class CodeExtensionMetadata(BaseModel):
     functionInvokeOptions: Union[list[str], None] = None
 
     def __init__(self, **data):
+        name = data.get("name", "")
+        sanitized = _sanitize_api_name(name)
+        if sanitized != name:
+            logger.warning(f"API name '{name}' was sanitized to '{sanitized}'")
+            data["name"] = sanitized
+        if not sanitized:
+            raise ValueError(
+                f"API name '{name}' is invalid and could not be sanitized to a"
+                " valid name."
+            )
+        if not sanitized[0].isalpha():
+            raise ValueError(
+                f"API name '{sanitized}' must begin with a letter. "
+                "The name can only contain underscores and alphanumeric"
+                " characters, must begin with a letter, not include spaces,"
+                " not end with an underscore, and not contain two consecutive"
+                " underscores."
+            )
         super().__init__(**data)
 
 

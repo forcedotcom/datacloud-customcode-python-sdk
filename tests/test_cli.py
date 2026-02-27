@@ -92,7 +92,9 @@ class TestDeploy:
             # Check that deploy_full was called with correct arguments
             call_args = mock_deploy_full.call_args
             assert call_args[0][0] == "payload"  # path
-            assert call_args[0][1].name == "test-job"  # metadata
+            assert (
+                call_args[0][1].name == "test_job"
+            )  # metadata (hyphen sanitized to underscore)
             assert call_args[0][1].version == "1.0.0"
             assert call_args[0][1].description == "Custom Data Transform Code"
             assert call_args[0][2] == mock_creds  # credentials
