@@ -611,7 +611,7 @@ class TestZip:
         zip("/test/dir", "default")
 
         mock_has_requirements.assert_called_once_with("/test/dir")
-        mock_prepare.assert_called_once_with("/test/dir", "default")
+        mock_prepare.assert_called_once_with("/test/dir", "default", "script")
         mock_zipfile.assert_called_once_with(
             "deployment.zip", "w", zipfile.ZIP_DEFLATED
         )

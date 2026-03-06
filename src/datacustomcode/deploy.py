@@ -279,10 +279,11 @@ DEPENDENCIES_ARCHIVE_FULL_NAME = f"{DEPENDENCIES_ARCHIVE_NAME}.tar.gz"
 DEPENDENCIES_ARCHIVE_PATH = os.path.join(
     "payload", "archives", DEPENDENCIES_ARCHIVE_FULL_NAME
 )
+PY_FILES_PATH = os.path.join("payload", "py-files")
 ZIP_FILE_NAME = "deployment.zip"
 
 
-def prepare_dependency_archive(directory: str, docker_network: str) -> None:
+def prepare_dependency_archive(directory: str, docker_network: str, package_type: str) -> None:
     cmd = f"docker images -q {DOCKER_IMAGE_NAME}"
     image_exists = cmd_output(cmd)
 
@@ -299,11 +300,21 @@ def prepare_dependency_archive(directory: str, docker_network: str) -> None:
         shutil.copy("build_native_dependencies.sh", temp_dir)
         cmd = docker_run_cmd(docker_network, temp_dir)
         cmd_output(cmd)
-        archives_temp_path = os.path.join(temp_dir, DEPENDENCIES_ARCHIVE_FULL_NAME)
-        os.makedirs(os.path.dirname(DEPENDENCIES_ARCHIVE_PATH), exist_ok=True)
-        shutil.copy(archives_temp_path, DEPENDENCIES_ARCHIVE_PATH)
 
-        logger.info(f"Dependencies archived to {DEPENDENCIES_ARCHIVE_PATH}")
+        if package_type == "function":
+            source_py_files = os.path.join(temp_dir, "py-files")
+            os.makedirs(os.path.dirname(PY_FILES_PATH), exist_ok=True)
+            if os.path.exists(PY_FILES_PATH):
+                shutil.rmtree(PY_FILES_PATH)
+            shutil.copytree(source_py_files, PY_FILES_PATH)
+            logger.info(f"Dependencies copied to {PY_FILES_PATH}")
+        else:
+            archives_temp_path = os.path.join(
+                temp_dir, DEPENDENCIES_ARCHIVE_FULL_NAME
+            )
+            os.makedirs(os.path.dirname(DEPENDENCIES_ARCHIVE_PATH), exist_ok=True)
+            shutil.copy(archives_temp_path, DEPENDENCIES_ARCHIVE_PATH)
+            logger.info(f"Dependencies archived to {DEPENDENCIES_ARCHIVE_PATH}")
 
 
 def docker_build_cmd(network: str) -> str:
@@ -511,6 +522,16 @@ def upload_zip(file_upload_url: str) -> None:
         response.raise_for_status()
 
 
+def _get_package_type_for_directory(directory: str) -> str:
+    """Resolve package type (script/function) for the given payload directory."""
+    try:
+        entrypoint_path = os.path.join(os.path.abspath(directory), "entrypoint.py")
+        base_directory = find_base_directory(entrypoint_path)
+        return get_package_type(base_directory)
+    except (ValueError, FileNotFoundError):
+        return "script"
+
+
 def zip(
     directory: str,
     docker_network: str,
@@ -518,9 +539,11 @@ def zip(
     # Create a zip file excluding .DS_Store files
     import zipfile
 
+    package_type = _get_package_type_for_directory(directory)
+
     # prepare payload only if requirements.txt is non-empty
     if has_nonempty_requirements_file(directory):
-        prepare_dependency_archive(directory, docker_network)
+        prepare_dependency_archive(directory, docker_network, package_type)
     else:
         logger.info(
             f"Skipping dependency archive: requirements.txt is missing or empty "

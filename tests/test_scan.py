@@ -8,9 +8,11 @@ import textwrap
 import pytest
 
 from datacustomcode.scan import (
-    SDK_CONFIG_DIR,
     DataAccessLayerCalls,
+    SDK_CONFIG_DIR,
+    SDK_CONFIG_FILE,
     dc_config_json_from_file,
+    get_sdk_config_path,
     scan_file,
     scan_file_for_imports,
     update_config,
@@ -40,7 +42,7 @@ def create_sdk_config(base_directory: str, package_type: str = "script") -> str:
     """
     sdk_config = {"type": package_type}
     write_sdk_config(base_directory, sdk_config)
-    return os.path.join(base_directory, SDK_CONFIG_DIR, "config.json")
+    return os.path.join(base_directory, SDK_CONFIG_DIR, SDK_CONFIG_FILE)
 
 
 class TestClientMethodVisitor:
