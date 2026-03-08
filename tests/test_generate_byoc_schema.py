@@ -104,6 +104,24 @@ class TestEntryFuncDecorator:
         assert len(schemas) == 1
         assert schemas[0].name == "greet"
 
+    def test_empty_lines_between_decorator_and_function(self):
+        """Multiple blank lines between @entry_func and def should still work."""
+        source = textwrap.dedent("""\
+            def entry_func(fn):
+                return fn
+
+
+            @entry_func
+
+
+            def add(a: int, b: int = 0) -> int:
+                return a + b
+        """)
+        schemas = extract_entry_functions(source)
+        assert len(schemas) == 1
+        assert schemas[0].name == "add"
+        assert schemas[0].prototype == "add(a: int, b: int = 0) -> int"
+
 
 # ---------------------------------------------------------------------------
 # python_type_to_openapi
