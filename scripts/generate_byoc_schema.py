@@ -6,7 +6,28 @@ OpenAPI 3.1.0 specification exposing each function as a POST endpoint.
 
 Usage::
 
-    python scripts/generate_openapi_schema.py input.py -o openapi.yaml
+    # Basic usage (uses default namespace="myOrg", package="myPackage")
+    python scripts/generate_byoc_schema.py input.py -o openapi.yaml
+
+    # Set namespace and package via command-line flags
+    python scripts/generate_byoc_schema.py input.py -o openapi.yaml --namespace myOrg --package myPackage
+
+    # Set namespace and package via a YAML or JSON config file
+    python scripts/generate_byoc_schema.py input.py -o openapi.yaml -c config.yaml
+
+    # CLI flags override config file values
+    python scripts/generate_byoc_schema.py input.py -o openapi.yaml -c config.yaml --namespace overrideOrg
+
+Config file format (YAML)::
+
+    namespace: myOrg
+    package: myPackage
+
+Config file format (JSON)::
+
+    {"namespace": "myOrg", "package": "myPackage"}
+
+Precedence: CLI flags > config file > built-in defaults.
 """
 
 from __future__ import annotations
