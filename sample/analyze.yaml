@@ -1,0 +1,58 @@
+openapi: 3.1.0
+info:
+  title: Analyze Service
+  description: API generated from Python function schema
+  version: 1.0.0
+paths:
+  /analyze:
+    post:
+      summary: Analyze data with nested configuration and return grouped results
+      description: Analyze data with nested configuration and return grouped results.
+      operationId: analyze
+      x-function:
+        language: python
+        namespace: salesforceOrg
+        package: dataCloudPkg
+        name: analyzeFn
+        prototype: 'analyze(config: Dict[str, Dict[str, int]], tags: List[str], threshold:
+          float = 0.5) -> Dict[str, List[int]]'
+        description: Will perform analyze operation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                config:
+                  type: object
+                  additionalProperties:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                tags:
+                  type: array
+                  items:
+                    type: string
+                threshold:
+                  type: number
+                  default: 0.5
+              required:
+              - config
+              - tags
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: object
+                    additionalProperties:
+                      type: array
+                      items:
+                        type: integer
+        '400':
+          description: Invalid input
