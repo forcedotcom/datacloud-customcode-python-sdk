@@ -96,6 +96,46 @@ class TestExtractEntryFunctions:
         with pytest.raises(ValueError, match="missing a type annotation"):
             extract_entry_functions(source)
 
+    def test_all_params_missing_types_raises(self):
+        source = textwrap.dedent("""\
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def add(a, b):
+                return a + b
+        """)
+        with pytest.raises(ValueError, match="missing a type annotation"):
+            extract_entry_functions(source)
+
+    def test_unsupported_param_type_raises(self):
+        """Using an unsupported type like complex should raise on spec generation."""
+        source = textwrap.dedent("""\
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def calc(a: complex) -> int:
+                return int(a.real)
+        """)
+        schemas = extract_entry_functions(source)
+        with pytest.raises(ValueError, match="Unsupported type"):
+            generate_openapi(schemas)
+
+    def test_unsupported_return_type_raises(self):
+        """Using an unsupported return type should raise on spec generation."""
+        source = textwrap.dedent("""\
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def calc(a: int) -> complex:
+                return complex(a, 0)
+        """)
+        schemas = extract_entry_functions(source)
+        with pytest.raises(ValueError, match="Unsupported type"):
+            generate_openapi(schemas)
+
     def test_no_return_type(self):
         source = textwrap.dedent("""\
             def entry_func(fn):
