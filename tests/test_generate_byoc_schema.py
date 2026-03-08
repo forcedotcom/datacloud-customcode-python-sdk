@@ -1,10 +1,28 @@
 from __future__ import annotations
 
+import importlib.util
 import json
+import os
 import textwrap
 
 import pytest
 import yaml
+
+# Import entry_func directly from its module to avoid pulling in heavy
+# SDK dependencies via datacustomcode/__init__.py.
+_spec = importlib.util.spec_from_file_location(
+    "datacustomcode.entry_func",
+    os.path.join(
+        os.path.dirname(__file__),
+        "..",
+        "src",
+        "datacustomcode",
+        "entry_func.py",
+    ),
+)
+_mod = importlib.util.module_from_spec(_spec)  # type: ignore[arg-type]
+_spec.loader.exec_module(_mod)  # type: ignore[union-attr]
+entry_func = _mod.entry_func
 
 from scripts.generate_byoc_schema import (
     FunctionSchema,
@@ -15,6 +33,76 @@ from scripts.generate_byoc_schema import (
     python_type_to_openapi,
     resolve_config,
 )
+
+
+# ---------------------------------------------------------------------------
+# python_type_to_openapi
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# entry_func decorator
+# ---------------------------------------------------------------------------
+
+
+class TestEntryFuncDecorator:
+    """Tests for the entry_func decorator itself."""
+
+    def test_decorated_function_is_callable(self):
+        @entry_func
+        def add(a: int, b: int) -> int:
+            return a + b
+
+        assert callable(add)
+
+    def test_decorated_function_returns_correct_result(self):
+        @entry_func
+        def add(a: int, b: int = 0) -> int:
+            return a + b
+
+        assert add(2, 3) == 5
+        assert add(10) == 10
+
+    def test_preserves_function_name(self):
+        @entry_func
+        def my_function(x: int) -> int:
+            return x
+
+        assert my_function.__name__ == "my_function"
+
+    def test_preserves_docstring(self):
+        @entry_func
+        def my_function(x: int) -> int:
+            """My docstring."""
+            return x
+
+        assert my_function.__doc__ == "My docstring."
+
+    def test_schema_extraction_with_sdk_import(self):
+        """Source using the SDK import should be extractable."""
+        source = textwrap.dedent("""\
+            from datacustomcode.entry_func import entry_func
+
+            @entry_func
+            def add(a: int, b: int = 0) -> int:
+                return a + b
+        """)
+        schemas = extract_entry_functions(source)
+        assert len(schemas) == 1
+        assert schemas[0].name == "add"
+
+    def test_schema_extraction_with_top_level_import(self):
+        """Source using top-level SDK import should be extractable."""
+        source = textwrap.dedent("""\
+            from datacustomcode import entry_func
+
+            @entry_func
+            def greet(name: str) -> str:
+                return name
+        """)
+        schemas = extract_entry_functions(source)
+        assert len(schemas) == 1
+        assert schemas[0].name == "greet"
 
 
 # ---------------------------------------------------------------------------

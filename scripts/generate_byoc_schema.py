@@ -4,6 +4,14 @@ Scans a Python file for functions decorated with ``@entry_func``, extracts
 their signatures (including type annotations and defaults), and produces an
 OpenAPI 3.1.0 specification exposing each function as a POST endpoint.
 
+The ``@entry_func`` decorator is provided by the SDK::
+
+    from datacustomcode.entry_func import entry_func
+
+    @entry_func
+    def add(a: int, b: int = 0) -> int:
+        return a + b
+
 Usage::
 
     # Basic usage (uses default namespace="myOrg", package="myPackage")

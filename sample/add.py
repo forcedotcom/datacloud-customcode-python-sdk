@@ -1,8 +1,4 @@
-from typing import Dict, List
-
-
-def entry_func(fn):
-    return fn
+from datacustomcode.entry_func import entry_func
 
 
 @entry_func
