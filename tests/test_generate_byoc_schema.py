@@ -350,7 +350,7 @@ class TestGenerateOpenapi:
         schemas = extract_entry_functions(source)
         spec = generate_openapi(schemas)
 
-        assert spec["openapi"] == "3.1.0"
+        assert spec["openapi"] == "3.0.0"
         assert spec["info"]["title"] == "Add Service"
         assert "/add" in spec["paths"]
 
@@ -449,7 +449,7 @@ class TestGenerateOpenapi:
         spec = generate_openapi(schemas)
         yaml_str = yaml.dump(spec, default_flow_style=False, sort_keys=False)
         reloaded = yaml.safe_load(yaml_str)
-        assert reloaded["openapi"] == "3.1.0"
+        assert reloaded["openapi"] == "3.0.0"
 
 
 # ---------------------------------------------------------------------------
@@ -485,7 +485,7 @@ class TestMain:
         out = tmp_path / "out.yaml"
         assert main([str(src), "-o", str(out)]) == 0
         spec = yaml.safe_load(out.read_text())
-        assert spec["openapi"] == "3.1.0"
+        assert spec["openapi"] == "3.0.0"
         assert "/add" in spec["paths"]
 
     def test_no_entry_func_raises(self, tmp_path):

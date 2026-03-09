@@ -2,7 +2,7 @@
 
 Scans a Python file for functions decorated with ``@entry_func``, extracts
 their signatures (including type annotations and defaults), and produces an
-OpenAPI 3.1.0 specification exposing each function as a POST endpoint.
+OpenAPI 3.0.0 specification exposing each function as a POST endpoint.
 
 The ``@entry_func`` decorator is provided by the SDK::
 
@@ -321,13 +321,13 @@ def generate_openapi(
     namespace: str = "myOrg",
     package: str = "myPackage",
 ) -> Dict[str, Any]:
-    """Build an OpenAPI 3.1.0 dict from a list of ``FunctionSchema`` objects."""
+    """Build an OpenAPI 3.0.0 dict from a list of ``FunctionSchema`` objects."""
     if not schemas:
         raise ValueError("No @entry_func functions found in the input file")
 
     first = schemas[0]
     spec: Dict[str, Any] = {
-        "openapi": "3.1.0",
+        "openapi": "3.0.0",
         "info": {
             "title": _title_from_name(first.name),
             "description": "API generated from Python function schema",
