@@ -294,7 +294,7 @@ def prepare_dependency_archive(directory: str, docker_network: str, package_type
 
     with tempfile.TemporaryDirectory() as temp_dir:
         logger.info(
-            f"Building dependencies archive with docker network: {docker_network}"
+            f"Building dependencies with docker network: {docker_network}"
         )
         shutil.copy("requirements.txt", temp_dir)
         shutil.copy("build_native_dependencies.sh", temp_dir)
@@ -303,6 +303,11 @@ def prepare_dependency_archive(directory: str, docker_network: str, package_type
 
         if package_type == "function":
             source_py_files = os.path.join(temp_dir, "py-files")
+            if not os.path.exists(source_py_files):
+                raise FileNotFoundError(
+                    f"Expected py-files directory not found at {source_py_files}. "
+                    "Docker build may have failed."
+                )
             os.makedirs(os.path.dirname(PY_FILES_PATH), exist_ok=True)
             if os.path.exists(PY_FILES_PATH):
                 shutil.rmtree(PY_FILES_PATH)
@@ -525,10 +530,13 @@ def upload_zip(file_upload_url: str) -> None:
 def _get_package_type_for_directory(directory: str) -> str:
     """Resolve package type (script/function) for the given payload directory."""
     try:
-        entrypoint_path = os.path.join(os.path.abspath(directory), "entrypoint.py")
-        base_directory = find_base_directory(entrypoint_path)
+        base_directory = find_base_directory(os.path.abspath(directory))
         return get_package_type(base_directory)
-    except (ValueError, FileNotFoundError):
+    except (ValueError, FileNotFoundError) as e:
+        logger.debug(
+            f"Could not determine package type for {directory}: {e}. "
+            "Defaulting to 'script'"
+        )
         return "script"
 
 

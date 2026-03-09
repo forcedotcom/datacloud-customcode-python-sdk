@@ -26,6 +26,7 @@ with patch("datacustomcode.version.get_version", return_value="1.2.3"):
         CreateDeploymentResponse,
         DataTransformConfig,
         DeploymentsResponse,
+        _get_package_type_for_directory,
         _make_api_call,
         _retrieve_access_token,
         _retrieve_access_token_from_sf_cli,
@@ -92,7 +93,7 @@ class TestPrepareDependencyArchive:
         mock_docker_build_cmd.return_value = "mock build command"
         mock_docker_run_cmd.return_value = "mock run command"
 
-        prepare_dependency_archive("/test/dir", "default")
+        prepare_dependency_archive("/test/dir", "default", "script")
 
         # Verify docker images command was called
         mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_IMAGES_CMD)
@@ -152,7 +153,7 @@ class TestPrepareDependencyArchive:
         mock_docker_build_cmd.return_value = "mock build command"
         mock_docker_run_cmd.return_value = "mock run command"
 
-        prepare_dependency_archive("/test/dir", "default")
+        prepare_dependency_archive("/test/dir", "default", "script")
 
         # Verify docker images command was called
         mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_IMAGES_CMD)
@@ -213,7 +214,7 @@ class TestPrepareDependencyArchive:
         ]
 
         with pytest.raises(CalledProcessError, match="Build failed"):
-            prepare_dependency_archive("/test/dir", "default")
+            prepare_dependency_archive("/test/dir", "default", "script")
 
         # Verify docker images command was called
         mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_IMAGES_CMD)
@@ -256,7 +257,7 @@ class TestPrepareDependencyArchive:
         ]
 
         with pytest.raises(CalledProcessError, match="Run failed"):
-            prepare_dependency_archive("/test/dir", "default")
+            prepare_dependency_archive("/test/dir", "default", "script")
 
         # Verify docker images command was called
         mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_IMAGES_CMD)
@@ -299,13 +300,210 @@ class TestPrepareDependencyArchive:
         mock_copy.side_effect = FileNotFoundError("File not found")
 
         with pytest.raises(FileNotFoundError, match="File not found"):
-            prepare_dependency_archive("/test/dir", "default")
+            prepare_dependency_archive("/test/dir", "default", "script")
 
         # Verify docker images command was called
         mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_IMAGES_CMD)
 
         # Verify files were attempted to be copied
         mock_copy.assert_any_call("requirements.txt", "/tmp/test_dir")
+
+    @patch("datacustomcode.deploy.cmd_output")
+    @patch("datacustomcode.deploy.shutil.copytree")
+    @patch("datacustomcode.deploy.shutil.rmtree")
+    @patch("datacustomcode.deploy.shutil.copy")
+    @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
+    @patch("datacustomcode.deploy.os.path.exists")
+    @patch("datacustomcode.deploy.os.path.join")
+    @patch("datacustomcode.deploy.os.makedirs")
+    @patch("datacustomcode.deploy.docker_build_cmd")
+    @patch("datacustomcode.deploy.docker_run_cmd")
+    def test_prepare_dependency_archive_function_type(
+        self,
+        mock_docker_run_cmd,
+        mock_docker_build_cmd,
+        mock_makedirs,
+        mock_join,
+        mock_exists,
+        mock_temp_dir,
+        mock_copy,
+        mock_rmtree,
+        mock_copytree,
+        mock_cmd_output,
+    ):
+        """Test prepare_dependency_archive with function package type."""
+        # Mock the temporary directory context manager
+        mock_temp_dir_instance = MagicMock()
+        mock_temp_dir_instance.__enter__.return_value = "/tmp/test_dir"
+        mock_temp_dir_instance.__exit__.return_value = None
+        mock_temp_dir.return_value = mock_temp_dir_instance
+
+        # Mock cmd_output to return image ID (indicating image exists)
+        mock_cmd_output.return_value = "abc123"
+
+        # Mock os.path.join for py-files paths
+        def join_side_effect(*args):
+            if args == ("/tmp/test_dir", "py-files"):
+                return "/tmp/test_dir/py-files"
+            return "/".join(args)
+
+        mock_join.side_effect = join_side_effect
+
+        # Mock os.path.exists
+        def exists_side_effect(path):
+            if path == "/tmp/test_dir/py-files":
+                return True
+            if path == "payload/py-files":
+                return False
+            return False
+
+        mock_exists.side_effect = exists_side_effect
+
+        # Mock the docker command functions
+        mock_docker_build_cmd.return_value = "mock build command"
+        mock_docker_run_cmd.return_value = "mock run command"
+
+        prepare_dependency_archive("/test/dir", "default", "function")
+
+        # Verify docker images command was called
+        mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_IMAGES_CMD)
+
+        # Verify docker build command was not called (since image already exists)
+        mock_docker_build_cmd.assert_not_called()
+
+        # Verify files were copied to temp directory
+        mock_copy.assert_any_call("requirements.txt", "/tmp/test_dir")
+        mock_copy.assert_any_call("build_native_dependencies.sh", "/tmp/test_dir")
+
+        # Verify docker run command was called
+        mock_docker_run_cmd.assert_called_once_with("default", "/tmp/test_dir")
+        mock_cmd_output.assert_any_call("mock run command")
+
+        # Verify payload directory was created
+        mock_makedirs.assert_called_once_with("payload", exist_ok=True)
+
+        # Verify py-files was NOT removed (doesn't exist yet)
+        mock_rmtree.assert_not_called()
+
+        # Verify py-files directory was copied
+        mock_copytree.assert_called_once_with(
+            "/tmp/test_dir/py-files", "payload/py-files"
+        )
+
+    @patch("datacustomcode.deploy.cmd_output")
+    @patch("datacustomcode.deploy.shutil.copy")
+    @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
+    @patch("datacustomcode.deploy.os.path.exists")
+    @patch("datacustomcode.deploy.os.path.join")
+    @patch("datacustomcode.deploy.os.makedirs")
+    @patch("datacustomcode.deploy.docker_build_cmd")
+    @patch("datacustomcode.deploy.docker_run_cmd")
+    def test_prepare_dependency_archive_function_type_missing_pyfiles(
+        self,
+        mock_docker_run_cmd,
+        mock_docker_build_cmd,
+        mock_makedirs,
+        mock_join,
+        mock_exists,
+        mock_temp_dir,
+        mock_copy,
+        mock_cmd_output,
+    ):
+        """Test prepare_dependency_archive with function type when py-files is missing."""
+        # Mock the temporary directory context manager
+        mock_temp_dir_instance = MagicMock()
+        mock_temp_dir_instance.__enter__.return_value = "/tmp/test_dir"
+        mock_temp_dir_instance.__exit__.return_value = None
+        mock_temp_dir.return_value = mock_temp_dir_instance
+
+        # Mock cmd_output to return image ID (indicating image exists)
+        mock_cmd_output.return_value = "abc123"
+
+        # Mock os.path.join for py-files path
+        def join_side_effect(*args):
+            if args == ("/tmp/test_dir", "py-files"):
+                return "/tmp/test_dir/py-files"
+            return "/".join(args)
+
+        mock_join.side_effect = join_side_effect
+
+        # Mock os.path.exists to return False for py-files (doesn't exist)
+        mock_exists.return_value = False
+
+        # Mock the docker command functions
+        mock_docker_build_cmd.return_value = "mock build command"
+        mock_docker_run_cmd.return_value = "mock run command"
+
+        # Should raise FileNotFoundError when py-files doesn't exist
+        with pytest.raises(
+            FileNotFoundError,
+            match="Expected py-files directory not found at /tmp/test_dir/py-files",
+        ):
+            prepare_dependency_archive("/test/dir", "default", "function")
+
+        # Verify docker commands were still called
+        mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_IMAGES_CMD)
+        mock_docker_run_cmd.assert_called_once_with("default", "/tmp/test_dir")
+
+
+class TestGetPackageTypeForDirectory:
+    @patch("datacustomcode.deploy.get_package_type")
+    @patch("datacustomcode.deploy.find_base_directory")
+    def test_get_package_type_function(
+        self, mock_find_base, mock_get_package_type
+    ):
+        """Test _get_package_type_for_directory returns function type."""
+        mock_find_base.return_value = "/project/root"
+        mock_get_package_type.return_value = "function"
+
+        result = _get_package_type_for_directory("/project/root/payload")
+
+        assert result == "function"
+        mock_find_base.assert_called_once()
+        mock_get_package_type.assert_called_once_with("/project/root")
+
+    @patch("datacustomcode.deploy.get_package_type")
+    @patch("datacustomcode.deploy.find_base_directory")
+    def test_get_package_type_script(self, mock_find_base, mock_get_package_type):
+        """Test _get_package_type_for_directory returns script type."""
+        mock_find_base.return_value = "/project/root"
+        mock_get_package_type.return_value = "script"
+
+        result = _get_package_type_for_directory("/project/root/payload")
+
+        assert result == "script"
+        mock_find_base.assert_called_once()
+        mock_get_package_type.assert_called_once_with("/project/root")
+
+    @patch("datacustomcode.deploy.get_package_type")
+    @patch("datacustomcode.deploy.find_base_directory")
+    def test_get_package_type_file_not_found(
+        self, mock_find_base, mock_get_package_type
+    ):
+        """Test _get_package_type_for_directory defaults to script when config not found."""
+        mock_find_base.return_value = "/project/root"
+        mock_get_package_type.side_effect = FileNotFoundError("Config not found")
+
+        result = _get_package_type_for_directory("/project/root/payload")
+
+        assert result == "script"
+        mock_find_base.assert_called_once()
+        mock_get_package_type.assert_called_once_with("/project/root")
+
+    @patch("datacustomcode.deploy.get_package_type")
+    @patch("datacustomcode.deploy.find_base_directory")
+    def test_get_package_type_value_error(
+        self, mock_find_base, mock_get_package_type
+    ):
+        """Test _get_package_type_for_directory defaults to script on ValueError."""
+        mock_find_base.return_value = "/project/root"
+        mock_get_package_type.side_effect = ValueError("Invalid type")
+
+        result = _get_package_type_for_directory("/project/root/payload")
+
+        assert result == "script"
+        mock_find_base.assert_called_once()
+        mock_get_package_type.assert_called_once_with("/project/root")
 
 
 class TestHasNonemptyRequirementsFile:
@@ -640,6 +838,42 @@ class TestZip:
 
         mock_has_requirements.assert_called_once_with("/test/dir")
         mock_prepare.assert_not_called()
+        mock_zipfile.assert_called_once_with(
+            "deployment.zip", "w", zipfile.ZIP_DEFLATED
+        )
+        assert mock_zipfile_instance.write.call_count == 3  # One call per file
+
+    @patch("datacustomcode.deploy._get_package_type_for_directory")
+    @patch("datacustomcode.deploy.has_nonempty_requirements_file")
+    @patch("datacustomcode.deploy.prepare_dependency_archive")
+    @patch("zipfile.ZipFile")
+    @patch("os.walk")
+    def test_zip_with_function_package_type(
+        self,
+        mock_walk,
+        mock_zipfile,
+        mock_prepare,
+        mock_has_requirements,
+        mock_get_package_type,
+    ):
+        """Test zipping a directory with function package type."""
+        mock_has_requirements.return_value = True
+        mock_get_package_type.return_value = "function"
+        mock_zipfile_instance = MagicMock()
+        mock_zipfile.return_value.__enter__.return_value = mock_zipfile_instance
+        mock_zipfile_instance.write = MagicMock()
+
+        # Mock os.walk to return some test files
+        mock_walk.return_value = [
+            ("/test/dir", ["subdir"], ["file1.py", "file2.py"]),
+            ("/test/dir/subdir", [], ["file3.py"]),
+        ]
+
+        zip("/test/dir", "default")
+
+        mock_has_requirements.assert_called_once_with("/test/dir")
+        mock_get_package_type.assert_called_once_with("/test/dir")
+        mock_prepare.assert_called_once_with("/test/dir", "default", "function")
         mock_zipfile.assert_called_once_with(
             "deployment.zip", "w", zipfile.ZIP_DEFLATED
         )
