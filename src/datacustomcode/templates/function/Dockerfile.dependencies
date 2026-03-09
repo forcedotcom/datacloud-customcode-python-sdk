@@ -1,4 +1,4 @@
-FROM public.ecr.aws/emr-on-eks/spark/emr-7.3.0:latest
+FROM python:3.11-slim
 
 USER root
 
