@@ -26,7 +26,6 @@ with patch("datacustomcode.version.get_version", return_value="1.2.3"):
         CreateDeploymentResponse,
         DataTransformConfig,
         DeploymentsResponse,
-        _get_package_type_for_directory,
         _make_api_call,
         _retrieve_access_token,
         _retrieve_access_token_from_sf_cli,
@@ -446,66 +445,6 @@ class TestPrepareDependencyArchive:
         mock_docker_run_cmd.assert_called_once_with("default", "/tmp/test_dir")
 
 
-class TestGetPackageTypeForDirectory:
-    @patch("datacustomcode.deploy.get_package_type")
-    @patch("datacustomcode.deploy.find_base_directory")
-    def test_get_package_type_function(
-        self, mock_find_base, mock_get_package_type
-    ):
-        """Test _get_package_type_for_directory returns function type."""
-        mock_find_base.return_value = "/project/root"
-        mock_get_package_type.return_value = "function"
-
-        result = _get_package_type_for_directory("/project/root/payload")
-
-        assert result == "function"
-        mock_find_base.assert_called_once()
-        mock_get_package_type.assert_called_once_with("/project/root")
-
-    @patch("datacustomcode.deploy.get_package_type")
-    @patch("datacustomcode.deploy.find_base_directory")
-    def test_get_package_type_script(self, mock_find_base, mock_get_package_type):
-        """Test _get_package_type_for_directory returns script type."""
-        mock_find_base.return_value = "/project/root"
-        mock_get_package_type.return_value = "script"
-
-        result = _get_package_type_for_directory("/project/root/payload")
-
-        assert result == "script"
-        mock_find_base.assert_called_once()
-        mock_get_package_type.assert_called_once_with("/project/root")
-
-    @patch("datacustomcode.deploy.get_package_type")
-    @patch("datacustomcode.deploy.find_base_directory")
-    def test_get_package_type_file_not_found(
-        self, mock_find_base, mock_get_package_type
-    ):
-        """Test _get_package_type_for_directory defaults to script when config not found."""
-        mock_find_base.return_value = "/project/root"
-        mock_get_package_type.side_effect = FileNotFoundError("Config not found")
-
-        result = _get_package_type_for_directory("/project/root/payload")
-
-        assert result == "script"
-        mock_find_base.assert_called_once()
-        mock_get_package_type.assert_called_once_with("/project/root")
-
-    @patch("datacustomcode.deploy.get_package_type")
-    @patch("datacustomcode.deploy.find_base_directory")
-    def test_get_package_type_value_error(
-        self, mock_find_base, mock_get_package_type
-    ):
-        """Test _get_package_type_for_directory defaults to script on ValueError."""
-        mock_find_base.return_value = "/project/root"
-        mock_get_package_type.side_effect = ValueError("Invalid type")
-
-        result = _get_package_type_for_directory("/project/root/payload")
-
-        assert result == "script"
-        mock_find_base.assert_called_once()
-        mock_get_package_type.assert_called_once_with("/project/root")
-
-
 class TestHasNonemptyRequirementsFile:
     @patch("datacustomcode.deploy.os.path.dirname")
     @patch("datacustomcode.deploy.os.path.isfile")
@@ -806,7 +745,7 @@ class TestZip:
             ("/test/dir/subdir", [], ["file3.py"]),
         ]
 
-        zip("/test/dir", "default")
+        zip("/test/dir", "default", "script")
 
         mock_has_requirements.assert_called_once_with("/test/dir")
         mock_prepare.assert_called_once_with("/test/dir", "default", "script")
@@ -834,7 +773,7 @@ class TestZip:
             ("/test/dir/subdir", [], ["file3.py"]),
         ]
 
-        zip("/test/dir", "default")
+        zip("/test/dir", "default", "script")
 
         mock_has_requirements.assert_called_once_with("/test/dir")
         mock_prepare.assert_not_called()
@@ -843,7 +782,6 @@ class TestZip:
         )
         assert mock_zipfile_instance.write.call_count == 3  # One call per file
 
-    @patch("datacustomcode.deploy._get_package_type_for_directory")
     @patch("datacustomcode.deploy.has_nonempty_requirements_file")
     @patch("datacustomcode.deploy.prepare_dependency_archive")
     @patch("zipfile.ZipFile")
@@ -854,11 +792,9 @@ class TestZip:
         mock_zipfile,
         mock_prepare,
         mock_has_requirements,
-        mock_get_package_type,
     ):
         """Test zipping a directory with function package type."""
         mock_has_requirements.return_value = True
-        mock_get_package_type.return_value = "function"
         mock_zipfile_instance = MagicMock()
         mock_zipfile.return_value.__enter__.return_value = mock_zipfile_instance
         mock_zipfile_instance.write = MagicMock()
@@ -869,10 +805,9 @@ class TestZip:
             ("/test/dir/subdir", [], ["file3.py"]),
         ]
 
-        zip("/test/dir", "default")
+        zip("/test/dir", "default", "function")
 
         mock_has_requirements.assert_called_once_with("/test/dir")
-        mock_get_package_type.assert_called_once_with("/test/dir")
         mock_prepare.assert_called_once_with("/test/dir", "default", "function")
         mock_zipfile.assert_called_once_with(
             "deployment.zip", "w", zipfile.ZIP_DEFLATED
@@ -1167,7 +1102,7 @@ class TestDeployFull:
         mock_retrieve_token.assert_called_once_with(credentials)
         mock_get_config.assert_called_once_with("/test/dir")
         mock_create_deployment.assert_called_once_with(access_token, metadata)
-        mock_zip.assert_called_once_with("/test/dir", "default")
+        mock_zip.assert_called_once_with("/test/dir", "default", "script")
         mock_upload_zip.assert_called_once_with("https://upload.example.com")
         mock_wait.assert_called_once_with(access_token, metadata, callback)
         mock_create_transform.assert_called_once_with(
@@ -1231,7 +1166,7 @@ class TestDeployFull:
         mock_retrieve_token.assert_called_once_with(credentials)
         mock_get_config.assert_called_once_with("/test/dir")
         mock_create_deployment.assert_called_once_with(access_token, metadata)
-        mock_zip.assert_called_once_with("/test/dir", "default")
+        mock_zip.assert_called_once_with("/test/dir", "default", "script")
         mock_upload_zip.assert_called_once_with("https://upload.example.com")
         mock_wait.assert_called_once_with(access_token, metadata, callback)
         mock_create_transform.assert_called_once_with(
@@ -1337,7 +1272,7 @@ class TestDeployFullWithDockerIntegration:
         mock_retrieve_token.assert_called_once_with(credentials)
         mock_get_config.assert_called_once_with("/test/dir")
         mock_create_deployment.assert_called_once_with(access_token, metadata)
-        mock_zip.assert_called_once_with("/test/dir", "default")
+        mock_zip.assert_called_once_with("/test/dir", "default", "script")
         mock_upload_zip.assert_called_once_with("https://upload.example.com")
         mock_wait.assert_called_once_with(access_token, metadata, callback)
         mock_create_transform.assert_called_once_with(

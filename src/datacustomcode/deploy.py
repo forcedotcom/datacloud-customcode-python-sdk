@@ -527,27 +527,13 @@ def upload_zip(file_upload_url: str) -> None:
         response.raise_for_status()
 
 
-def _get_package_type_for_directory(directory: str) -> str:
-    """Resolve package type (script/function) for the given payload directory."""
-    try:
-        base_directory = find_base_directory(os.path.abspath(directory))
-        return get_package_type(base_directory)
-    except (ValueError, FileNotFoundError) as e:
-        logger.debug(
-            f"Could not determine package type for {directory}: {e}. "
-            "Defaulting to 'script'"
-        )
-        return "script"
-
-
 def zip(
     directory: str,
     docker_network: str,
+    package_type: str,
 ):
     # Create a zip file excluding .DS_Store files
     import zipfile
-
-    package_type = _get_package_type_for_directory(directory)
 
     # prepare payload only if requirements.txt is non-empty
     if has_nonempty_requirements_file(directory):
@@ -590,7 +576,7 @@ def deploy_full(
 
     # create deployment and upload payload
     deployment = create_deployment(access_token, metadata)
-    zip(directory, docker_network)
+    zip(directory, docker_network, metadata.codeType)
     upload_zip(deployment.fileUploadUrl)
     wait_for_deployment(access_token, metadata, callback)
 
