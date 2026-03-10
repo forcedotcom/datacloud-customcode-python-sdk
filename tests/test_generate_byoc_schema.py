@@ -36,11 +36,6 @@ from scripts.generate_byoc_schema import (
 
 
 # ---------------------------------------------------------------------------
-# python_type_to_openapi
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
 # entry_func decorator
 # ---------------------------------------------------------------------------
 
@@ -50,31 +45,31 @@ class TestEntryFuncDecorator:
 
     def test_decorated_function_is_callable(self):
         @entry_func
-        def add(a: int, b: int) -> int:
-            return a + b
+        def process(request: dict) -> dict:
+            return request
 
-        assert callable(add)
+        assert callable(process)
 
     def test_decorated_function_returns_correct_result(self):
         @entry_func
-        def add(a: int, b: int = 0) -> int:
-            return a + b
+        def add(request: dict) -> dict:
+            return {"result": request.get("a", 0) + request.get("b", 0)}
 
-        assert add(2, 3) == 5
-        assert add(10) == 10
+        assert add({"a": 2, "b": 3}) == {"result": 5}
+        assert add({}) == {"result": 0}
 
     def test_preserves_function_name(self):
         @entry_func
-        def my_function(x: int) -> int:
-            return x
+        def my_function(request: dict) -> dict:
+            return request
 
         assert my_function.__name__ == "my_function"
 
     def test_preserves_docstring(self):
         @entry_func
-        def my_function(x: int) -> int:
+        def my_function(request: dict) -> dict:
             """My docstring."""
-            return x
+            return request
 
         assert my_function.__doc__ == "My docstring."
 
@@ -84,12 +79,12 @@ class TestEntryFuncDecorator:
             from datacustomcode.entry_func import entry_func
 
             @entry_func
-            def add(a: int, b: int = 0) -> int:
-                return a + b
+            def process(request: dict) -> dict:
+                return request
         """)
         schemas = extract_entry_functions(source)
         assert len(schemas) == 1
-        assert schemas[0].name == "add"
+        assert schemas[0].name == "process"
 
     def test_schema_extraction_with_top_level_import(self):
         """Source using top-level SDK import should be extractable."""
@@ -97,12 +92,12 @@ class TestEntryFuncDecorator:
             from datacustomcode import entry_func
 
             @entry_func
-            def greet(name: str) -> str:
-                return name
+            def process(request: dict) -> dict:
+                return request
         """)
         schemas = extract_entry_functions(source)
         assert len(schemas) == 1
-        assert schemas[0].name == "greet"
+        assert schemas[0].name == "process"
 
     def test_empty_lines_between_decorator_and_function(self):
         """Multiple blank lines between @entry_func and def should still work."""
@@ -114,13 +109,13 @@ class TestEntryFuncDecorator:
             @entry_func
 
 
-            def add(a: int, b: int = 0) -> int:
-                return a + b
+            def process(request: dict) -> dict:
+                return request
         """)
         schemas = extract_entry_functions(source)
         assert len(schemas) == 1
-        assert schemas[0].name == "add"
-        assert schemas[0].prototype == "add(a: int, b: int = 0) -> int"
+        assert schemas[0].name == "process"
+        assert schemas[0].prototype == "process(request: dict) -> dict"
 
 
 # ---------------------------------------------------------------------------
@@ -153,154 +148,102 @@ class TestPythonTypeToOpenapi:
 
 
 # ---------------------------------------------------------------------------
-# extract_entry_functions
+# extract_entry_functions – valid cases
 # ---------------------------------------------------------------------------
 
 
 class TestExtractEntryFunctions:
-    def test_simple_function(self):
+    def test_bare_dict(self):
         source = textwrap.dedent("""\
             def entry_func(fn):
                 return fn
 
             @entry_func
-            def add(a: int, b: int = 0) -> int:
-                \"\"\"Add two integers.\"\"\"
-                return a + b
+            def process(request: dict) -> dict:
+                \"\"\"Process a request.\"\"\"
+                return request
         """)
         schemas = extract_entry_functions(source)
         assert len(schemas) == 1
         s = schemas[0]
-        assert s.name == "add"
-        assert s.docstring == "Add two integers."
-        assert s.return_type == "int"
-        assert s.prototype == "add(a: int, b: int = 0) -> int"
-        assert len(s.params) == 2
-        assert s.params[0]["name"] == "a"
-        assert s.params[0]["type"] == "int"
-        assert s.params[1]["name"] == "b"
-        assert s.params[1]["type"] == "int"
-        assert s.params[1]["default"] == 0
+        assert s.name == "process"
+        assert s.docstring == "Process a request."
+        assert s.return_type == "dict"
+        assert s.prototype == "process(request: dict) -> dict"
+        assert len(s.params) == 1
+        assert s.params[0]["name"] == "request"
+        assert s.params[0]["type"] == "dict"
 
-    def test_no_entry_func(self):
+    def test_typing_dict(self):
+        """Dict from typing module should also be accepted."""
         source = textwrap.dedent("""\
-            def add(a: int, b: int) -> int:
-                return a + b
-        """)
-        schemas = extract_entry_functions(source)
-        assert schemas == []
-
-    def test_missing_type_annotation_raises(self):
-        source = textwrap.dedent("""\
+            from typing import Dict
             def entry_func(fn):
                 return fn
 
             @entry_func
-            def add(a, b: int) -> int:
-                return a + b
-        """)
-        with pytest.raises(ValueError, match="missing a type annotation"):
-            extract_entry_functions(source)
-
-    def test_all_params_missing_types_raises(self):
-        source = textwrap.dedent("""\
-            def entry_func(fn):
-                return fn
-
-            @entry_func
-            def add(a, b):
-                return a + b
-        """)
-        with pytest.raises(ValueError, match="missing a type annotation"):
-            extract_entry_functions(source)
-
-    def test_unsupported_param_type_raises(self):
-        """Using an unsupported type like complex should raise on spec generation."""
-        source = textwrap.dedent("""\
-            def entry_func(fn):
-                return fn
-
-            @entry_func
-            def calc(a: complex) -> int:
-                return int(a.real)
-        """)
-        schemas = extract_entry_functions(source)
-        with pytest.raises(ValueError, match="Unsupported type"):
-            generate_openapi(schemas)
-
-    def test_unsupported_return_type_raises(self):
-        """Using an unsupported return type should raise on spec generation."""
-        source = textwrap.dedent("""\
-            def entry_func(fn):
-                return fn
-
-            @entry_func
-            def calc(a: int) -> complex:
-                return complex(a, 0)
-        """)
-        schemas = extract_entry_functions(source)
-        with pytest.raises(ValueError, match="Unsupported type"):
-            generate_openapi(schemas)
-
-    def test_no_return_type(self):
-        source = textwrap.dedent("""\
-            def entry_func(fn):
-                return fn
-
-            @entry_func
-            def greet(name: str):
-                \"\"\"Say hello.\"\"\"
-                print(f"Hello, {name}")
+            def process(request: Dict) -> Dict:
+                return request
         """)
         schemas = extract_entry_functions(source)
         assert len(schemas) == 1
-        assert schemas[0].return_type is None
-        assert schemas[0].prototype == "greet(name: str)"
+        assert schemas[0].params[0]["type"] == "Dict"
+        assert schemas[0].return_type == "Dict"
 
-    def test_multiple_entry_functions(self):
+    def test_parameterized_dict(self):
+        """Dict[str, int] should be accepted as a Dict type."""
         source = textwrap.dedent("""\
+            from typing import Dict
             def entry_func(fn):
                 return fn
 
             @entry_func
-            def add(a: int, b: int) -> int:
-                return a + b
-
-            @entry_func
-            def multiply(x: float, y: float) -> float:
-                return x * y
+            def process(request: Dict[str, int]) -> Dict[str, str]:
+                return {}
         """)
         schemas = extract_entry_functions(source)
-        assert len(schemas) == 2
-        assert schemas[0].name == "add"
-        assert schemas[1].name == "multiply"
+        assert len(schemas) == 1
+        assert schemas[0].params[0]["type"] == "Dict[str, int]"
+        assert schemas[0].return_type == "Dict[str, str]"
 
-    def test_string_default(self):
+    def test_dict_with_nested_list(self):
+        """Dict containing List values should be accepted."""
         source = textwrap.dedent("""\
+            from typing import Dict, List
             def entry_func(fn):
                 return fn
 
             @entry_func
-            def greet(name: str, greeting: str = "hello") -> str:
-                return f"{greeting}, {name}"
+            def process(request: Dict[str, List[int]]) -> Dict[str, List[str]]:
+                return {}
         """)
         schemas = extract_entry_functions(source)
-        assert schemas[0].params[1]["default"] == "hello"
+        assert len(schemas) == 1
+        assert schemas[0].params[0]["type"] == "Dict[str, List[int]]"
+        assert schemas[0].return_type == "Dict[str, List[str]]"
 
-    def test_bool_param(self):
+    def test_dict_with_nested_dict(self):
+        """Dict containing Dict values should be accepted."""
         source = textwrap.dedent("""\
+            from typing import Dict
             def entry_func(fn):
                 return fn
 
             @entry_func
-            def toggle(flag: bool = True) -> bool:
-                return not flag
+            def process(request: Dict[str, Dict[str, int]]) -> Dict[str, Dict[str, str]]:
+                return {}
         """)
         schemas = extract_entry_functions(source)
-        p = schemas[0].params[0]
-        assert p["name"] == "flag"
-        assert p["type"] == "bool"
-        assert p["default"] is True
+        assert len(schemas) == 1
+        assert schemas[0].params[0]["type"] == "Dict[str, Dict[str, int]]"
+
+    def test_no_entry_func(self):
+        source = textwrap.dedent("""\
+            def process(request: dict) -> dict:
+                return request
+        """)
+        schemas = extract_entry_functions(source)
+        assert schemas == []
 
     def test_no_docstring(self):
         source = textwrap.dedent("""\
@@ -308,8 +251,8 @@ class TestExtractEntryFunctions:
                 return fn
 
             @entry_func
-            def add(a: int, b: int) -> int:
-                return a + b
+            def process(request: dict) -> dict:
+                return request
         """)
         schemas = extract_entry_functions(source)
         assert schemas[0].docstring is None
@@ -323,12 +266,243 @@ class TestExtractEntryFunctions:
                 return x + 1
 
             @entry_func
-            def add(a: int, b: int) -> int:
-                return a + b
+            def process(request: dict) -> dict:
+                return request
         """)
         schemas = extract_entry_functions(source)
         assert len(schemas) == 1
+        assert schemas[0].name == "process"
+
+    def test_multiple_entry_functions(self):
+        source = textwrap.dedent("""\
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def add(request: dict) -> dict:
+                return {}
+
+            @entry_func
+            def multiply(request: dict) -> dict:
+                return {}
+        """)
+        schemas = extract_entry_functions(source)
+        assert len(schemas) == 2
         assert schemas[0].name == "add"
+        assert schemas[1].name == "multiply"
+
+    def test_prototype_shows_nested_types(self):
+        """The prototype string should display full generic type annotations."""
+        source = textwrap.dedent("""\
+            from typing import Dict, List
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def process(request: Dict[str, List[int]]) -> Dict[str, int]:
+                return {}
+        """)
+        schemas = extract_entry_functions(source)
+        assert schemas[0].prototype == (
+            "process(request: Dict[str, List[int]]) -> Dict[str, int]"
+        )
+
+
+# ---------------------------------------------------------------------------
+# extract_entry_functions – error cases
+# ---------------------------------------------------------------------------
+
+
+class TestExtractEntryFunctionsErrors:
+    def test_missing_type_annotation_raises(self):
+        source = textwrap.dedent("""\
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def process(request) -> dict:
+                return request
+        """)
+        with pytest.raises(ValueError, match="missing a type annotation"):
+            extract_entry_functions(source)
+
+    def test_multiple_params_raises(self):
+        source = textwrap.dedent("""\
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def process(request: dict, extra: int) -> dict:
+                return request
+        """)
+        with pytest.raises(ValueError, match="exactly one parameter"):
+            extract_entry_functions(source)
+
+    def test_zero_params_raises(self):
+        source = textwrap.dedent("""\
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def process() -> dict:
+                return {}
+        """)
+        with pytest.raises(ValueError, match="exactly one parameter.*got 0"):
+            extract_entry_functions(source)
+
+    def test_wrong_param_name_raises(self):
+        source = textwrap.dedent("""\
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def process(data: dict) -> dict:
+                return data
+        """)
+        with pytest.raises(ValueError, match="named 'request', got 'data'"):
+            extract_entry_functions(source)
+
+    def test_non_dict_param_type_raises(self):
+        source = textwrap.dedent("""\
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def process(request: str) -> dict:
+                return {}
+        """)
+        with pytest.raises(ValueError, match="must be Dict type, got 'str'"):
+            extract_entry_functions(source)
+
+    def test_int_param_type_raises(self):
+        source = textwrap.dedent("""\
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def process(request: int) -> dict:
+                return {}
+        """)
+        with pytest.raises(ValueError, match="must be Dict type, got 'int'"):
+            extract_entry_functions(source)
+
+    def test_list_param_type_raises(self):
+        source = textwrap.dedent("""\
+            from typing import List
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def process(request: List[int]) -> dict:
+                return {}
+        """)
+        with pytest.raises(ValueError, match="must be Dict type"):
+            extract_entry_functions(source)
+
+    def test_no_return_type_raises(self):
+        source = textwrap.dedent("""\
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def process(request: dict):
+                pass
+        """)
+        with pytest.raises(ValueError, match="must have a Dict return type"):
+            extract_entry_functions(source)
+
+    def test_non_dict_return_type_raises(self):
+        source = textwrap.dedent("""\
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def process(request: dict) -> int:
+                return 0
+        """)
+        with pytest.raises(ValueError, match="must return Dict type, got 'int'"):
+            extract_entry_functions(source)
+
+    def test_str_return_type_raises(self):
+        source = textwrap.dedent("""\
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def process(request: dict) -> str:
+                return ""
+        """)
+        with pytest.raises(ValueError, match="must return Dict type, got 'str'"):
+            extract_entry_functions(source)
+
+    def test_list_return_type_raises(self):
+        source = textwrap.dedent("""\
+            from typing import List
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def process(request: dict) -> List[int]:
+                return []
+        """)
+        with pytest.raises(ValueError, match="must return Dict type"):
+            extract_entry_functions(source)
+
+    def test_any_in_param_type_raises(self):
+        """Dict[str, Any] in request param should be rejected."""
+        source = textwrap.dedent("""\
+            from typing import Any, Dict
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def process(request: Dict[str, Any]) -> Dict[str, int]:
+                return {}
+        """)
+        with pytest.raises(ValueError, match="uses 'Any'.*not allowed"):
+            extract_entry_functions(source)
+
+    def test_any_in_return_type_raises(self):
+        """Dict[str, Any] in return type should be rejected."""
+        source = textwrap.dedent("""\
+            from typing import Any, Dict
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def process(request: Dict[str, int]) -> Dict[str, Any]:
+                return {}
+        """)
+        with pytest.raises(ValueError, match="Return type.*uses 'Any'.*not allowed"):
+            extract_entry_functions(source)
+
+    def test_any_nested_in_param_raises(self):
+        """Dict[str, Dict[str, Any]] should also be rejected."""
+        source = textwrap.dedent("""\
+            from typing import Any, Dict
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def process(request: Dict[str, Dict[str, Any]]) -> Dict[str, int]:
+                return {}
+        """)
+        with pytest.raises(ValueError, match="uses 'Any'.*not allowed"):
+            extract_entry_functions(source)
+
+    def test_any_in_list_inside_dict_raises(self):
+        """Dict[str, List[Any]] should be rejected."""
+        source = textwrap.dedent("""\
+            from typing import Any, Dict, List
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def process(request: Dict[str, List[Any]]) -> Dict[str, int]:
+                return {}
+        """)
+        with pytest.raises(ValueError, match="uses 'Any'.*not allowed"):
+            extract_entry_functions(source)
 
 
 # ---------------------------------------------------------------------------
@@ -337,39 +511,36 @@ class TestExtractEntryFunctions:
 
 
 class TestGenerateOpenapi:
-    def test_basic_spec(self):
+    def test_basic_spec_bare_dict(self):
         source = textwrap.dedent("""\
             def entry_func(fn):
                 return fn
 
             @entry_func
-            def add(a: int, b: int = 0) -> int:
-                \"\"\"Add two integers.\"\"\"
-                return a + b
+            def process(request: dict) -> dict:
+                \"\"\"Process a request.\"\"\"
+                return request
         """)
         schemas = extract_entry_functions(source)
         spec = generate_openapi(schemas)
 
         assert spec["openapi"] == "3.0.0"
-        assert spec["info"]["title"] == "Add Service"
-        assert "/add" in spec["paths"]
+        assert spec["info"]["title"] == "Process Service"
+        assert "/process" in spec["paths"]
 
-        post = spec["paths"]["/add"]["post"]
-        assert post["operationId"] == "add"
-        assert post["summary"] == "Add two integers"
+        post = spec["paths"]["/process"]["post"]
+        assert post["operationId"] == "process"
+        assert post["summary"] == "Process a request"
 
         x_fn = post["x-function"]
         assert x_fn["language"] == "python"
-        assert x_fn["prototype"] == "add(a: int, b: int = 0) -> int"
+        assert x_fn["prototype"] == "process(request: dict) -> dict"
 
         req_schema = post["requestBody"]["content"]["application/json"]["schema"]
-        assert "a" in req_schema["properties"]
-        assert "b" in req_schema["properties"]
-        assert req_schema["required"] == ["a"]
-        assert req_schema["properties"]["b"]["default"] == 0
+        assert req_schema == {"type": "object"}
 
         resp_schema = post["responses"]["200"]["content"]["application/json"]["schema"]
-        assert resp_schema["properties"]["result"]["type"] == "integer"
+        assert resp_schema == {"type": "object"}
 
     def test_custom_namespace_and_package(self):
         source = textwrap.dedent("""\
@@ -377,12 +548,12 @@ class TestGenerateOpenapi:
                 return fn
 
             @entry_func
-            def foo(x: int) -> int:
-                return x
+            def process(request: dict) -> dict:
+                return request
         """)
         schemas = extract_entry_functions(source)
         spec = generate_openapi(schemas, namespace="testOrg", package="testPkg")
-        x_fn = spec["paths"]["/foo"]["post"]["x-function"]
+        x_fn = spec["paths"]["/process"]["post"]["x-function"]
         assert x_fn["namespace"] == "testOrg"
         assert x_fn["package"] == "testPkg"
 
@@ -390,50 +561,18 @@ class TestGenerateOpenapi:
         with pytest.raises(ValueError, match="No @entry_func"):
             generate_openapi([])
 
-    def test_no_return_type_response(self):
-        source = textwrap.dedent("""\
-            def entry_func(fn):
-                return fn
-
-            @entry_func
-            def do_stuff(x: int):
-                pass
-        """)
-        schemas = extract_entry_functions(source)
-        spec = generate_openapi(schemas)
-        resp_schema = spec["paths"]["/do_stuff"]["post"]["responses"]["200"][
-            "content"
-        ]["application/json"]["schema"]
-        assert resp_schema == {"type": "object"}
-
-    def test_all_params_have_defaults(self):
-        source = textwrap.dedent("""\
-            def entry_func(fn):
-                return fn
-
-            @entry_func
-            def f(a: int = 1, b: str = "hi") -> str:
-                return str(a) + b
-        """)
-        schemas = extract_entry_functions(source)
-        spec = generate_openapi(schemas)
-        req_schema = spec["paths"]["/f"]["post"]["requestBody"]["content"][
-            "application/json"
-        ]["schema"]
-        assert "required" not in req_schema
-
     def test_400_response_present(self):
         source = textwrap.dedent("""\
             def entry_func(fn):
                 return fn
 
             @entry_func
-            def f(a: int) -> int:
-                return a
+            def process(request: dict) -> dict:
+                return request
         """)
         schemas = extract_entry_functions(source)
         spec = generate_openapi(schemas)
-        assert "400" in spec["paths"]["/f"]["post"]["responses"]
+        assert "400" in spec["paths"]["/process"]["post"]["responses"]
 
     def test_output_is_valid_yaml(self):
         source = textwrap.dedent("""\
@@ -441,9 +580,9 @@ class TestGenerateOpenapi:
                 return fn
 
             @entry_func
-            def add(a: int, b: int = 0) -> int:
-                \"\"\"Add two integers.\"\"\"
-                return a + b
+            def process(request: dict) -> dict:
+                \"\"\"Process a request.\"\"\"
+                return request
         """)
         schemas = extract_entry_functions(source)
         spec = generate_openapi(schemas)
@@ -451,72 +590,36 @@ class TestGenerateOpenapi:
         reloaded = yaml.safe_load(yaml_str)
         assert reloaded["openapi"] == "3.0.0"
 
-
-# ---------------------------------------------------------------------------
-# CLI (main)
-# ---------------------------------------------------------------------------
-
-
-class TestMain:
-    def test_stdout(self, tmp_path):
-        src = tmp_path / "sample.py"
-        src.write_text(textwrap.dedent("""\
+    def test_multiple_functions_spec(self):
+        source = textwrap.dedent("""\
             def entry_func(fn):
                 return fn
 
             @entry_func
-            def add(a: int, b: int = 0) -> int:
-                \"\"\"Add two integers.\"\"\"
-                return a + b
-        """))
-        assert main([str(src)]) == 0
-
-    def test_output_file(self, tmp_path):
-        src = tmp_path / "sample.py"
-        src.write_text(textwrap.dedent("""\
-            def entry_func(fn):
-                return fn
+            def add(request: dict) -> dict:
+                \"\"\"Add numbers.\"\"\"
+                return {}
 
             @entry_func
-            def add(a: int, b: int = 0) -> int:
-                \"\"\"Add two integers.\"\"\"
-                return a + b
-        """))
-        out = tmp_path / "out.yaml"
-        assert main([str(src), "-o", str(out)]) == 0
-        spec = yaml.safe_load(out.read_text())
-        assert spec["openapi"] == "3.0.0"
+            def multiply(request: dict) -> dict:
+                \"\"\"Multiply numbers.\"\"\"
+                return {}
+        """)
+        schemas = extract_entry_functions(source)
+        spec = generate_openapi(schemas)
         assert "/add" in spec["paths"]
-
-    def test_no_entry_func_raises(self, tmp_path):
-        src = tmp_path / "empty.py"
-        src.write_text("x = 1\n")
-        with pytest.raises(ValueError, match="No @entry_func"):
-            main([str(src)])
-
-    def test_untyped_param_raises(self, tmp_path):
-        src = tmp_path / "bad.py"
-        src.write_text(textwrap.dedent("""\
-            def entry_func(fn):
-                return fn
-
-            @entry_func
-            def add(a, b):
-                return a + b
-        """))
-        with pytest.raises(ValueError, match="missing a type annotation"):
-            main([str(src)])
+        assert "/multiply" in spec["paths"]
 
 
 # ---------------------------------------------------------------------------
-# Complex / nested type tests
+# Nested type tests (Dict containing other types)
 # ---------------------------------------------------------------------------
 
 
 class TestNestedTypes:
-    """Tests for generic and nested type annotations like Dict[str, Dict[...]]."""
+    """Tests for Dict containing nested types like Dict[str, List[int]]."""
 
-    def test_dict_str_int_param(self):
+    def test_dict_str_int_request(self):
         """Dict[str, int] → object with additionalProperties integer."""
         source = textwrap.dedent("""\
             from typing import Dict
@@ -524,15 +627,19 @@ class TestNestedTypes:
                 return fn
 
             @entry_func
-            def process(data: Dict[str, int]) -> int:
-                return sum(data.values())
+            def process(request: Dict[str, int]) -> Dict[str, str]:
+                return {}
         """)
         schemas = extract_entry_functions(source)
         spec = generate_openapi(schemas)
-        prop = spec["paths"]["/process"]["post"]["requestBody"]["content"][
+        req = spec["paths"]["/process"]["post"]["requestBody"]["content"][
             "application/json"
-        ]["schema"]["properties"]["data"]
-        assert prop == {"type": "object", "additionalProperties": {"type": "integer"}}
+        ]["schema"]
+        assert req == {"type": "object", "additionalProperties": {"type": "integer"}}
+        resp = spec["paths"]["/process"]["post"]["responses"]["200"]["content"][
+            "application/json"
+        ]["schema"]
+        assert resp == {"type": "object", "additionalProperties": {"type": "string"}}
 
     def test_dict_nested_in_dict(self):
         """Dict[str, Dict[str, int]] → nested object with additionalProperties."""
@@ -542,15 +649,15 @@ class TestNestedTypes:
                 return fn
 
             @entry_func
-            def process(data: Dict[str, Dict[str, int]]) -> str:
-                return "ok"
+            def process(request: Dict[str, Dict[str, int]]) -> Dict[str, int]:
+                return {}
         """)
         schemas = extract_entry_functions(source)
         spec = generate_openapi(schemas)
-        prop = spec["paths"]["/process"]["post"]["requestBody"]["content"][
+        req = spec["paths"]["/process"]["post"]["requestBody"]["content"][
             "application/json"
-        ]["schema"]["properties"]["data"]
-        assert prop == {
+        ]["schema"]
+        assert req == {
             "type": "object",
             "additionalProperties": {
                 "type": "object",
@@ -566,15 +673,15 @@ class TestNestedTypes:
                 return fn
 
             @entry_func
-            def deep(data: Dict[str, Dict[str, Dict[str, float]]]) -> str:
-                return "deep"
+            def deep(request: Dict[str, Dict[str, Dict[str, float]]]) -> dict:
+                return {}
         """)
         schemas = extract_entry_functions(source)
         spec = generate_openapi(schemas)
-        prop = spec["paths"]["/deep"]["post"]["requestBody"]["content"][
+        req = spec["paths"]["/deep"]["post"]["requestBody"]["content"][
             "application/json"
-        ]["schema"]["properties"]["data"]
-        assert prop == {
+        ]["schema"]
+        assert req == {
             "type": "object",
             "additionalProperties": {
                 "type": "object",
@@ -582,48 +689,6 @@ class TestNestedTypes:
                     "type": "object",
                     "additionalProperties": {"type": "number"},
                 },
-            },
-        }
-
-    def test_list_of_int(self):
-        """List[int] → array with items integer."""
-        source = textwrap.dedent("""\
-            from typing import List
-            def entry_func(fn):
-                return fn
-
-            @entry_func
-            def total(numbers: List[int]) -> int:
-                return sum(numbers)
-        """)
-        schemas = extract_entry_functions(source)
-        spec = generate_openapi(schemas)
-        prop = spec["paths"]["/total"]["post"]["requestBody"]["content"][
-            "application/json"
-        ]["schema"]["properties"]["numbers"]
-        assert prop == {"type": "array", "items": {"type": "integer"}}
-
-    def test_list_of_dict(self):
-        """List[Dict[str, int]] → array of objects."""
-        source = textwrap.dedent("""\
-            from typing import Dict, List
-            def entry_func(fn):
-                return fn
-
-            @entry_func
-            def process(records: List[Dict[str, int]]) -> str:
-                return "ok"
-        """)
-        schemas = extract_entry_functions(source)
-        spec = generate_openapi(schemas)
-        prop = spec["paths"]["/process"]["post"]["requestBody"]["content"][
-            "application/json"
-        ]["schema"]["properties"]["records"]
-        assert prop == {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "additionalProperties": {"type": "integer"},
             },
         }
 
@@ -635,19 +700,46 @@ class TestNestedTypes:
                 return fn
 
             @entry_func
-            def process(groups: Dict[str, List[int]]) -> str:
-                return "ok"
+            def process(request: Dict[str, List[int]]) -> Dict[str, str]:
+                return {}
         """)
         schemas = extract_entry_functions(source)
         spec = generate_openapi(schemas)
-        prop = spec["paths"]["/process"]["post"]["requestBody"]["content"][
+        req = spec["paths"]["/process"]["post"]["requestBody"]["content"][
             "application/json"
-        ]["schema"]["properties"]["groups"]
-        assert prop == {
+        ]["schema"]
+        assert req == {
             "type": "object",
             "additionalProperties": {
                 "type": "array",
                 "items": {"type": "integer"},
+            },
+        }
+
+    def test_dict_of_list_of_dict(self):
+        """Dict[str, List[Dict[str, int]]] → object with array of objects."""
+        source = textwrap.dedent("""\
+            from typing import Dict, List
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def process(request: Dict[str, List[Dict[str, int]]]) -> dict:
+                return {}
+        """)
+        schemas = extract_entry_functions(source)
+        spec = generate_openapi(schemas)
+        req = spec["paths"]["/process"]["post"]["requestBody"]["content"][
+            "application/json"
+        ]["schema"]
+        assert req == {
+            "type": "object",
+            "additionalProperties": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": {"type": "integer"},
+                },
             },
         }
 
@@ -659,14 +751,14 @@ class TestNestedTypes:
                 return fn
 
             @entry_func
-            def group_data(data: List[int]) -> Dict[str, List[int]]:
-                return {"evens": [x for x in data if x % 2 == 0]}
+            def group_data(request: dict) -> Dict[str, List[int]]:
+                return {}
         """)
         schemas = extract_entry_functions(source)
         spec = generate_openapi(schemas)
         resp = spec["paths"]["/group_data"]["post"]["responses"]["200"]["content"][
             "application/json"
-        ]["schema"]["properties"]["result"]
+        ]["schema"]
         assert resp == {
             "type": "object",
             "additionalProperties": {
@@ -675,70 +767,8 @@ class TestNestedTypes:
             },
         }
 
-    def test_mixed_simple_and_nested_params(self):
-        """Function with both simple and nested params."""
-        source = textwrap.dedent("""\
-            from typing import Dict
-            def entry_func(fn):
-                return fn
-
-            @entry_func
-            def update(name: str, scores: Dict[str, int], verbose: bool = False) -> str:
-                return name
-        """)
-        schemas = extract_entry_functions(source)
-        spec = generate_openapi(schemas)
-        req = spec["paths"]["/update"]["post"]["requestBody"]["content"][
-            "application/json"
-        ]["schema"]
-        assert req["properties"]["name"] == {"type": "string"}
-        assert req["properties"]["scores"] == {
-            "type": "object",
-            "additionalProperties": {"type": "integer"},
-        }
-        assert req["properties"]["verbose"] == {"type": "boolean", "default": False}
-        assert req["required"] == ["name", "scores"]
-
-    def test_prototype_shows_nested_types(self):
-        """The prototype string should display full generic type annotations."""
-        source = textwrap.dedent("""\
-            from typing import Dict, List
-            def entry_func(fn):
-                return fn
-
-            @entry_func
-            def process(data: Dict[str, List[int]]) -> Dict[str, int]:
-                return {}
-        """)
-        schemas = extract_entry_functions(source)
-        assert len(schemas) == 1
-        assert schemas[0].prototype == (
-            "process(data: Dict[str, List[int]]) -> Dict[str, int]"
-        )
-
-    def test_list_of_list(self):
-        """List[List[str]] → array of arrays."""
-        source = textwrap.dedent("""\
-            from typing import List
-            def entry_func(fn):
-                return fn
-
-            @entry_func
-            def matrix(rows: List[List[str]]) -> int:
-                return len(rows)
-        """)
-        schemas = extract_entry_functions(source)
-        spec = generate_openapi(schemas)
-        prop = spec["paths"]["/matrix"]["post"]["requestBody"]["content"][
-            "application/json"
-        ]["schema"]["properties"]["rows"]
-        assert prop == {
-            "type": "array",
-            "items": {"type": "array", "items": {"type": "string"}},
-        }
-
     def test_complex_end_to_end_yaml(self, tmp_path):
-        """Full round-trip: nested types → YAML file → reload and verify."""
+        """Full round-trip: nested Dict types → YAML file → reload and verify."""
         src = tmp_path / "complex.py"
         src.write_text(textwrap.dedent("""\
             from typing import Dict, List
@@ -746,11 +776,7 @@ class TestNestedTypes:
                 return fn
 
             @entry_func
-            def analyze(
-                config: Dict[str, Dict[str, int]],
-                tags: List[str],
-                threshold: float = 0.5,
-            ) -> Dict[str, List[int]]:
+            def analyze(request: Dict[str, Dict[str, int]]) -> Dict[str, List[int]]:
                 \"\"\"Analyze data with nested config.\"\"\"
                 return {}
         """))
@@ -761,23 +787,17 @@ class TestNestedTypes:
         req = spec["paths"]["/analyze"]["post"]["requestBody"]["content"][
             "application/json"
         ]["schema"]
-        assert req["properties"]["config"] == {
+        assert req == {
             "type": "object",
             "additionalProperties": {
                 "type": "object",
                 "additionalProperties": {"type": "integer"},
             },
         }
-        assert req["properties"]["tags"] == {
-            "type": "array",
-            "items": {"type": "string"},
-        }
-        assert req["properties"]["threshold"] == {"type": "number", "default": 0.5}
-        assert req["required"] == ["config", "tags"]
 
         resp = spec["paths"]["/analyze"]["post"]["responses"]["200"]["content"][
             "application/json"
-        ]["schema"]["properties"]["result"]
+        ]["schema"]
         assert resp == {
             "type": "object",
             "additionalProperties": {
@@ -785,6 +805,88 @@ class TestNestedTypes:
                 "items": {"type": "integer"},
             },
         }
+
+
+# ---------------------------------------------------------------------------
+# CLI (main)
+# ---------------------------------------------------------------------------
+
+
+class TestMain:
+    def test_stdout(self, tmp_path):
+        src = tmp_path / "sample.py"
+        src.write_text(textwrap.dedent("""\
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def process(request: dict) -> dict:
+                \"\"\"Process a request.\"\"\"
+                return request
+        """))
+        assert main([str(src)]) == 0
+
+    def test_output_file(self, tmp_path):
+        src = tmp_path / "sample.py"
+        src.write_text(textwrap.dedent("""\
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def process(request: dict) -> dict:
+                \"\"\"Process a request.\"\"\"
+                return request
+        """))
+        out = tmp_path / "out.yaml"
+        assert main([str(src), "-o", str(out)]) == 0
+        spec = yaml.safe_load(out.read_text())
+        assert spec["openapi"] == "3.0.0"
+        assert "/process" in spec["paths"]
+
+    def test_no_entry_func_raises(self, tmp_path):
+        src = tmp_path / "empty.py"
+        src.write_text("x = 1\n")
+        with pytest.raises(ValueError, match="No @entry_func"):
+            main([str(src)])
+
+    def test_untyped_param_raises(self, tmp_path):
+        src = tmp_path / "bad.py"
+        src.write_text(textwrap.dedent("""\
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def process(request) -> dict:
+                return request
+        """))
+        with pytest.raises(ValueError, match="missing a type annotation"):
+            main([str(src)])
+
+    def test_multiple_params_raises(self, tmp_path):
+        src = tmp_path / "bad.py"
+        src.write_text(textwrap.dedent("""\
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def process(request: dict, extra: int) -> dict:
+                return request
+        """))
+        with pytest.raises(ValueError, match="exactly one parameter"):
+            main([str(src)])
+
+    def test_non_dict_return_raises(self, tmp_path):
+        src = tmp_path / "bad.py"
+        src.write_text(textwrap.dedent("""\
+            def entry_func(fn):
+                return fn
+
+            @entry_func
+            def process(request: dict) -> int:
+                return 0
+        """))
+        with pytest.raises(ValueError, match="must return Dict type"):
+            main([str(src)])
 
 
 # ---------------------------------------------------------------------------
@@ -796,8 +898,8 @@ SAMPLE_SOURCE = textwrap.dedent("""\
         return fn
 
     @entry_func
-    def add(a: int, b: int = 0) -> int:
-        return a + b
+    def add(request: dict) -> dict:
+        return request
 """)
 
 

@@ -4,13 +4,21 @@ Scans a Python file for functions decorated with ``@entry_func``, extracts
 their signatures (including type annotations and defaults), and produces an
 OpenAPI 3.0.0 specification exposing each function as a POST endpoint.
 
+Each ``@entry_func`` function must accept exactly **one** parameter named
+``request`` whose top-level type is ``Dict`` (or ``dict``), and must return
+a ``Dict`` (or ``dict``).  The Dict may contain any supported nested types
+(``int``, ``str``, ``float``, ``bool``, ``List``, ``Dict``, and
+combinations thereof).
+
 The ``@entry_func`` decorator is provided by the SDK::
 
     from datacustomcode.entry_func import entry_func
 
     @entry_func
-    def add(a: int, b: int = 0) -> int:
-        return a + b
+    def add(request: dict) -> dict:
+        a = request.get("a", 0)
+        b = request.get("b", 0)
+        return {"result": a + b}
 
 Usage::
 
@@ -140,6 +148,24 @@ def _ast_node_to_openapi(node: ast.expr) -> Dict[str, Any]:
     raise ValueError(f"Unsupported annotation node: {ast.dump(node)}")
 
 
+def _is_dict_type(type_str: str) -> bool:
+    """Check if a type string represents a Dict type (with or without type parameters)."""
+    _dict_names = ("dict", "Dict")
+    return type_str in _dict_names or any(
+        type_str.startswith(f"{n}[") for n in _dict_names
+    )
+
+
+def _contains_any(type_str: str) -> bool:
+    """Check if a type string contains 'Any' as a type component."""
+    # Match "Any" as a standalone type token, not as a substring of other words.
+    # Split on delimiters that separate type tokens: [ ] , and space.
+    import re
+
+    tokens = re.split(r"[\[\],\s]+", type_str)
+    return "Any" in tokens
+
+
 # ---------------------------------------------------------------------------
 # AST helpers
 # ---------------------------------------------------------------------------
@@ -258,6 +284,42 @@ def extract_entry_functions(source: str) -> List[FunctionSchema]:
             return_type = _annotation_to_str(node.returns)
             return_type_node = node.returns
 
+        # --- validate: single "request" param of Dict type, Dict return -----
+        if len(params) != 1:
+            raise ValueError(
+                f"Function '{node.name}' must have exactly one parameter "
+                f"named 'request', got {len(params)} parameter(s)"
+            )
+        if params[0]["name"] != "request":
+            raise ValueError(
+                f"Function '{node.name}' must have a single parameter "
+                f"named 'request', got '{params[0]['name']}'"
+            )
+        if not _is_dict_type(params[0]["type"]):
+            raise ValueError(
+                f"Parameter 'request' of function '{node.name}' must be "
+                f"Dict type, got '{params[0]['type']}'"
+            )
+        if return_type is None:
+            raise ValueError(
+                f"Function '{node.name}' must have a Dict return type annotation"
+            )
+        if not _is_dict_type(return_type):
+            raise ValueError(
+                f"Function '{node.name}' must return Dict type, "
+                f"got '{return_type}'"
+            )
+        if _contains_any(params[0]["type"]):
+            raise ValueError(
+                f"Parameter 'request' of function '{node.name}' uses 'Any' "
+                "which is not allowed; all types must be fully specified"
+            )
+        if _contains_any(return_type):
+            raise ValueError(
+                f"Return type of function '{node.name}' uses 'Any' "
+                "which is not allowed; all types must be fully specified"
+            )
+
         ret_str = f" -> {return_type}" if return_type else ""
         prototype = f"{node.name}({', '.join(proto_parts)}){ret_str}"
 
@@ -289,30 +351,16 @@ def _title_from_name(name: str) -> str:
 
 
 def _build_request_schema(params: List[Dict[str, Any]]) -> Dict[str, Any]:
-    properties: Dict[str, Any] = {}
-    required: List[str] = []
-
-    for p in params:
-        type_source = p.get("type_node", p["type"])
-        prop = python_type_to_openapi(type_source)
-        if "default" in p:
-            prop["default"] = p["default"]
-        else:
-            required.append(p["name"])
-        properties[p["name"]] = prop
-
-    schema: Dict[str, Any] = {"type": "object", "properties": properties}
-    if required:
-        schema["required"] = required
-    return schema
+    """Build the request body schema from the single ``request`` Dict parameter."""
+    p = params[0]
+    type_source = p.get("type_node", p["type"])
+    return python_type_to_openapi(type_source)
 
 
 def _build_response_schema(schema: FunctionSchema) -> Dict[str, Any]:
-    if schema.return_type is None:
-        return {"type": "object"}
+    """Build the response schema from the Dict return type."""
     type_source = schema.return_type_node or schema.return_type
-    inner = python_type_to_openapi(type_source)
-    return {"type": "object", "properties": {"result": inner}}
+    return python_type_to_openapi(type_source)
 
 
 def generate_openapi(

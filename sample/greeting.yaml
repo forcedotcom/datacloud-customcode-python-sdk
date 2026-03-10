@@ -14,7 +14,7 @@ paths:
         namespace: salesforceOrg
         package: dataCloudPkg
         name: greetFn
-        prototype: 'greet(name: str, greeting: str = ''Hello'') -> str'
+        prototype: 'greet(request: Dict[str, str]) -> Dict[str, str]'
         description: Will perform greet operation
       requestBody:
         required: true
@@ -22,14 +22,8 @@ paths:
           application/json:
             schema:
               type: object
-              properties:
-                name:
-                  type: string
-                greeting:
-                  type: string
-                  default: Hello
-              required:
-              - name
+              additionalProperties:
+                type: string
       responses:
         '200':
           description: Successful response
@@ -37,8 +31,7 @@ paths:
             application/json:
               schema:
                 type: object
-                properties:
-                  result:
-                    type: string
+                additionalProperties:
+                  type: string
         '400':
           description: Invalid input

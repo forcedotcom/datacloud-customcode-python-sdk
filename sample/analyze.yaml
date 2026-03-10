@@ -14,8 +14,7 @@ paths:
         namespace: salesforceOrg
         package: dataCloudPkg
         name: analyzeFn
-        prototype: 'analyze(config: Dict[str, Dict[str, int]], tags: List[str], threshold:
-          float = 0.5) -> Dict[str, List[int]]'
+        prototype: 'analyze(request: Dict[str, Dict[str, int]]) -> Dict[str, List[int]]'
         description: Will perform analyze operation
       requestBody:
         required: true
@@ -23,23 +22,10 @@ paths:
           application/json:
             schema:
               type: object
-              properties:
-                config:
-                  type: object
-                  additionalProperties:
-                    type: object
-                    additionalProperties:
-                      type: integer
-                tags:
-                  type: array
-                  items:
-                    type: string
-                threshold:
-                  type: number
-                  default: 0.5
-              required:
-              - config
-              - tags
+              additionalProperties:
+                type: object
+                additionalProperties:
+                  type: integer
       responses:
         '200':
           description: Successful response
@@ -47,12 +33,9 @@ paths:
             application/json:
               schema:
                 type: object
-                properties:
-                  result:
-                    type: object
-                    additionalProperties:
-                      type: array
-                      items:
-                        type: integer
+                additionalProperties:
+                  type: array
+                  items:
+                    type: integer
         '400':
           description: Invalid input
