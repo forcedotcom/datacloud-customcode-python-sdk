@@ -15,6 +15,8 @@ paths:
         package: dataCloudPkg
         name: greetFn
         prototype: 'greet(request: dict) -> dict'
+        requestSchema: 'dict(name: str, greeting: Optional[str])'
+        responseSchema: 'dict(message: str)'
         description: Will perform greet operation
       requestBody:
         required: true

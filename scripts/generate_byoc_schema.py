@@ -481,6 +481,18 @@ def _title_from_name(name: str) -> str:
     return name.replace("_", " ").title() + " Service"
 
 
+def _build_schema_prototype(schema: ClassSchema) -> str:
+    """Build a Python-style prototype string from a ClassSchema.
+
+    Example output: ``Dict(a: int, b: int)``
+    """
+    parts = []
+    for field_name, type_node in schema.fields:
+        type_str = _annotation_to_str(type_node)
+        parts.append(f"{field_name}: {type_str}")
+    return f"dict({', '.join(parts)})"
+
+
 def _build_request_schema(
     params: List[Dict[str, Any]],
     input_schema: Optional[ClassSchema] = None,
@@ -499,6 +511,27 @@ def _build_response_schema(schema: FunctionSchema) -> Dict[str, Any]:
         return _build_class_openapi_schema(schema.output_schema)
     type_source = schema.return_type_node or schema.return_type
     return python_type_to_openapi(type_source)
+
+
+def _build_x_function(
+    schema: FunctionSchema,
+    namespace: str,
+    package: str,
+) -> Dict[str, Any]:
+    """Build the ``x-function`` extension object for an OpenAPI operation."""
+    x_fn: Dict[str, Any] = {
+        "language": "python",
+        "namespace": namespace,
+        "package": package,
+        "name": f"{schema.name}Fn",
+        "prototype": schema.prototype,
+    }
+    if schema.input_schema:
+        x_fn["requestSchema"] = _build_schema_prototype(schema.input_schema)
+    if schema.output_schema:
+        x_fn["responseSchema"] = _build_schema_prototype(schema.output_schema)
+    x_fn["description"] = f"Will perform {schema.name} operation"
+    return x_fn
 
 
 def generate_openapi(
@@ -528,14 +561,7 @@ def generate_openapi(
             "summary": summary,
             "description": schema.docstring or "",
             "operationId": schema.name,
-            "x-function": {
-                "language": "python",
-                "namespace": namespace,
-                "package": package,
-                "name": f"{schema.name}Fn",
-                "prototype": schema.prototype,
-                "description": f"Will perform {schema.name} operation",
-            },
+            "x-function": _build_x_function(schema, namespace, package),
             "requestBody": {
                 "required": True,
                 "content": {

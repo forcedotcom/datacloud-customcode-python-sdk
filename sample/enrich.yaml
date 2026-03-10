@@ -1,0 +1,99 @@
+openapi: 3.0.0
+info:
+  title: Enrich Service
+  description: API generated from Python function schema
+  version: 1.0.0
+paths:
+  /enrich:
+    post:
+      summary: Enrich a customer profile with computed features and recommendations
+      description: Enrich a customer profile with computed features and recommendations.
+      operationId: enrich
+      x-function:
+        language: python
+        namespace: salesforceOrg
+        package: dataCloudPkg
+        name: enrichFn
+        prototype: 'enrich(request: dict) -> dict'
+        requestSchema: 'dict(customer_id: str, age: int, score: float, is_active:
+          bool, tags: List[str], weights: List[float], address: Optional[str], nickname:
+          Optional[str])'
+        responseSchema: 'dict(customer_id: str, segment: str, lifetime_value: float,
+          risk_score: int, is_eligible: bool, recommendations: List[str], feature_vector:
+          List[float], labels: List[int])'
+        description: Will perform enrich operation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                customer_id:
+                  type: string
+                age:
+                  type: integer
+                score:
+                  type: number
+                is_active:
+                  type: boolean
+                tags:
+                  type: array
+                  items:
+                    type: string
+                weights:
+                  type: array
+                  items:
+                    type: number
+                address:
+                  type: string
+                nickname:
+                  type: string
+              required:
+              - customer_id
+              - age
+              - score
+              - is_active
+              - tags
+              - weights
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  customer_id:
+                    type: string
+                  segment:
+                    type: string
+                  lifetime_value:
+                    type: number
+                  risk_score:
+                    type: integer
+                  is_eligible:
+                    type: boolean
+                  recommendations:
+                    type: array
+                    items:
+                      type: string
+                  feature_vector:
+                    type: array
+                    items:
+                      type: number
+                  labels:
+                    type: array
+                    items:
+                      type: integer
+                required:
+                - customer_id
+                - segment
+                - lifetime_value
+                - risk_score
+                - is_eligible
+                - recommendations
+                - feature_vector
+                - labels
+        '400':
+          description: Invalid input

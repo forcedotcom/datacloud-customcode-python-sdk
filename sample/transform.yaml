@@ -15,6 +15,9 @@ paths:
         package: dataCloudPkg
         name: transformFn
         prototype: 'transform(request: dict) -> dict'
+        requestSchema: 'dict(records: List[Dict[str, str]], key_mapping: Dict[str,
+          str])'
+        responseSchema: 'dict(transformed: List[Dict[str, str]], count: int)'
         description: Will perform transform operation
       requestBody:
         required: true

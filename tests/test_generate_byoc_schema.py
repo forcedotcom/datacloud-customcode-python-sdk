@@ -970,6 +970,8 @@ class TestGenerateOpenapi:
         x_fn = post["x-function"]
         assert x_fn["language"] == "python"
         assert x_fn["prototype"] == "process(request: Dict[str, int]) -> Dict[str, int]"
+        assert "requestSchema" not in x_fn
+        assert "responseSchema" not in x_fn
 
         req_schema = post["requestBody"]["content"]["application/json"]["schema"]
         assert req_schema == {"type": "object", "additionalProperties": {"type": "integer"}}
@@ -1007,6 +1009,10 @@ class TestGenerateOpenapi:
         schemas = extract_entry_functions(source)
         spec = generate_openapi(schemas)
         post = spec["paths"]["/add"]["post"]
+
+        x_fn = post["x-function"]
+        assert x_fn["requestSchema"] == "dict(a: int, b: int)"
+        assert x_fn["responseSchema"] == "dict(result: int)"
 
         req_schema = post["requestBody"]["content"]["application/json"]["schema"]
         assert req_schema == {
@@ -1058,6 +1064,10 @@ class TestGenerateOpenapi:
         schemas = extract_entry_functions(source)
         spec = generate_openapi(schemas)
         post = spec["paths"]["/analyze"]["post"]
+
+        x_fn = post["x-function"]
+        assert x_fn["requestSchema"] == "dict(filters: Dict[str, List[str]], limit: int)"
+        assert x_fn["responseSchema"] == "dict(rows: List[Dict[str, int]], total: int)"
 
         req_schema = post["requestBody"]["content"]["application/json"]["schema"]
         assert req_schema == {
@@ -1113,6 +1123,10 @@ class TestGenerateOpenapi:
         schemas = extract_entry_functions(source)
         spec = generate_openapi(schemas)
         post = spec["paths"]["/transform"]["post"]
+
+        x_fn = post["x-function"]
+        assert x_fn["requestSchema"] == "dict(values: List[int], scale: float)"
+        assert "responseSchema" not in x_fn
 
         req_schema = post["requestBody"]["content"]["application/json"]["schema"]
         assert req_schema["properties"]["values"] == {
@@ -1430,16 +1444,17 @@ class TestNestedTypes:
         assert main([str(src), "-o", str(out)]) == 0
         spec = yaml.safe_load(out.read_text())
 
-        req = spec["paths"]["/add"]["post"]["requestBody"]["content"][
-            "application/json"
-        ]["schema"]
+        post = spec["paths"]["/add"]["post"]
+        x_fn = post["x-function"]
+        assert x_fn["requestSchema"] == "dict(a: int, b: int)"
+        assert x_fn["responseSchema"] == "dict(result: int)"
+
+        req = post["requestBody"]["content"]["application/json"]["schema"]
         assert req["properties"]["a"] == {"type": "integer"}
         assert req["properties"]["b"] == {"type": "integer"}
         assert set(req["required"]) == {"a", "b"}
 
-        resp = spec["paths"]["/add"]["post"]["responses"]["200"]["content"][
-            "application/json"
-        ]["schema"]
+        resp = post["responses"]["200"]["content"]["application/json"]["schema"]
         assert resp["properties"]["result"] == {"type": "integer"}
         assert resp["required"] == ["result"]
 
