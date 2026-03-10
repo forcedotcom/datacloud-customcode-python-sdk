@@ -14,7 +14,7 @@ paths:
         namespace: salesforceOrg
         package: dataCloudPkg
         name: addFn
-        prototype: 'add(request: Dict[str, int]) -> Dict[str, int]'
+        prototype: 'add(request: dict) -> dict'
         description: Will perform add operation
       requestBody:
         required: true
@@ -22,8 +22,14 @@ paths:
           application/json:
             schema:
               type: object
-              additionalProperties:
-                type: integer
+              properties:
+                a:
+                  type: integer
+                b:
+                  type: integer
+              required:
+              - a
+              - b
       responses:
         '200':
           description: Successful response
@@ -31,7 +37,10 @@ paths:
             application/json:
               schema:
                 type: object
-                additionalProperties:
-                  type: integer
+                properties:
+                  result:
+                    type: integer
+                required:
+                - result
         '400':
           description: Invalid input

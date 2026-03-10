@@ -210,6 +210,18 @@ def _annotation_to_str(node: ast.expr) -> str:
 # ---------------------------------------------------------------------------
 
 
+class ClassSchema:
+    """Parsed representation of a class with typed fields (e.g. TypedDict)."""
+
+    def __init__(
+        self,
+        name: str,
+        fields: List[Tuple[str, ast.expr]],
+    ) -> None:
+        self.name = name
+        self.fields = fields  # [(field_name, type_annotation_node), ...]
+
+
 class FunctionSchema:
     """Parsed representation of a single ``@entry_func`` function."""
 
@@ -221,6 +233,8 @@ class FunctionSchema:
         return_type: Optional[str],
         return_type_node: Optional[ast.expr],
         prototype: str,
+        input_schema: Optional[ClassSchema] = None,
+        output_schema: Optional[ClassSchema] = None,
     ) -> None:
         self.name = name
         self.docstring = docstring
@@ -228,6 +242,68 @@ class FunctionSchema:
         self.return_type = return_type
         self.return_type_node = return_type_node
         self.prototype = prototype
+        self.input_schema = input_schema
+        self.output_schema = output_schema
+
+
+def _find_class_in_tree(tree: ast.Module, class_name: str) -> ClassSchema:
+    """Find a class definition by name and extract its annotated fields."""
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef) and node.name == class_name:
+            fields: List[Tuple[str, ast.expr]] = []
+            for stmt in node.body:
+                if isinstance(stmt, ast.AnnAssign) and isinstance(
+                    stmt.target, ast.Name
+                ):
+                    fields.append((stmt.target.id, stmt.annotation))
+            if not fields:
+                raise ValueError(
+                    f"Class '{class_name}' has no typed fields; "
+                    "cannot be used as a schema"
+                )
+            return ClassSchema(class_name, fields)
+    raise ValueError(f"Class '{class_name}' not found in the source file")
+
+
+def _is_parameterized_dict(type_str: str) -> bool:
+    """Check if a type string is a parameterized Dict (not bare dict/Dict)."""
+    return any(type_str.startswith(f"{n}[") for n in ("dict", "Dict"))
+
+
+def _is_optional(node: ast.expr) -> bool:
+    """Check if an annotation node is ``Optional[X]``."""
+    return (
+        isinstance(node, ast.Subscript)
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "Optional"
+    )
+
+
+def _unwrap_optional(node: ast.expr) -> ast.expr:
+    """If *node* is ``Optional[X]``, return the inner ``X``."""
+    if _is_optional(node):
+        return node.slice
+    return node
+
+
+def _build_class_openapi_schema(schema: ClassSchema) -> Dict[str, Any]:
+    """Build an OpenAPI schema from a ClassSchema's typed fields.
+
+    Fields annotated with ``Optional[X]`` are included in ``properties``
+    but omitted from the ``required`` list.
+    """
+    properties: Dict[str, Any] = {}
+    required: List[str] = []
+    for field_name, type_node in schema.fields:
+        if _is_optional(type_node):
+            properties[field_name] = _ast_node_to_openapi(_unwrap_optional(type_node))
+        else:
+            properties[field_name] = _ast_node_to_openapi(type_node)
+            required.append(field_name)
+    result: Dict[str, Any] = {"type": "object", "properties": properties}
+    if required:
+        result["required"] = required
+    return result
 
 
 def extract_entry_functions(source: str) -> List[FunctionSchema]:
@@ -320,6 +396,59 @@ def extract_entry_functions(source: str) -> List[FunctionSchema]:
                 "which is not allowed; all types must be fully specified"
             )
 
+        # --- detect @requestSchema / @responseSchema decorators -----------------
+        input_class_name: Optional[str] = None
+        output_class_name: Optional[str] = None
+        for dec in node.decorator_list:
+            if isinstance(dec, ast.Call) and isinstance(dec.func, ast.Name):
+                if dec.func.id == "requestSchema" and dec.args:
+                    if isinstance(dec.args[0], ast.Name):
+                        input_class_name = dec.args[0].id
+                elif dec.func.id == "responseSchema" and dec.args:
+                    if isinstance(dec.args[0], ast.Name):
+                        output_class_name = dec.args[0].id
+
+        input_schema: Optional[ClassSchema] = None
+        output_schema: Optional[ClassSchema] = None
+
+        if input_class_name:
+            input_schema = _find_class_in_tree(tree, input_class_name)
+            for field_name, type_node_f in input_schema.fields:
+                type_str_f = _annotation_to_str(type_node_f)
+                if _contains_any(type_str_f):
+                    raise ValueError(
+                        f"Field '{field_name}' in class "
+                        f"'{input_class_name}' uses 'Any' "
+                        "which is not allowed; all types must be "
+                        "fully specified"
+                    )
+
+        if output_class_name:
+            output_schema = _find_class_in_tree(tree, output_class_name)
+            for field_name, type_node_f in output_schema.fields:
+                type_str_f = _annotation_to_str(type_node_f)
+                if _contains_any(type_str_f):
+                    raise ValueError(
+                        f"Field '{field_name}' in class "
+                        f"'{output_class_name}' uses 'Any' "
+                        "which is not allowed; all types must be "
+                        "fully specified"
+                    )
+
+        # --- validate bare dict without decorators --------------------------
+        if not input_schema and not _is_parameterized_dict(params[0]["type"]):
+            raise ValueError(
+                f"Parameter 'request' of function '{node.name}' uses bare "
+                "dict without @requestSchema; either use a parameterized "
+                "Dict type (e.g. Dict[str, int]) or add @requestSchema"
+            )
+        if not output_schema and not _is_parameterized_dict(return_type):
+            raise ValueError(
+                f"Return type of function '{node.name}' uses bare dict "
+                "without @responseSchema; either use a parameterized "
+                "Dict type (e.g. Dict[str, int]) or add @responseSchema"
+            )
+
         ret_str = f" -> {return_type}" if return_type else ""
         prototype = f"{node.name}({', '.join(proto_parts)}){ret_str}"
 
@@ -334,6 +463,8 @@ def extract_entry_functions(source: str) -> List[FunctionSchema]:
                 return_type=return_type,
                 return_type_node=return_type_node,
                 prototype=prototype,
+                input_schema=input_schema,
+                output_schema=output_schema,
             )
         )
 
@@ -350,8 +481,13 @@ def _title_from_name(name: str) -> str:
     return name.replace("_", " ").title() + " Service"
 
 
-def _build_request_schema(params: List[Dict[str, Any]]) -> Dict[str, Any]:
+def _build_request_schema(
+    params: List[Dict[str, Any]],
+    input_schema: Optional[ClassSchema] = None,
+) -> Dict[str, Any]:
     """Build the request body schema from the single ``request`` Dict parameter."""
+    if input_schema:
+        return _build_class_openapi_schema(input_schema)
     p = params[0]
     type_source = p.get("type_node", p["type"])
     return python_type_to_openapi(type_source)
@@ -359,6 +495,8 @@ def _build_request_schema(params: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 def _build_response_schema(schema: FunctionSchema) -> Dict[str, Any]:
     """Build the response schema from the Dict return type."""
+    if schema.output_schema:
+        return _build_class_openapi_schema(schema.output_schema)
     type_source = schema.return_type_node or schema.return_type
     return python_type_to_openapi(type_source)
 
@@ -402,7 +540,9 @@ def generate_openapi(
                 "required": True,
                 "content": {
                     "application/json": {
-                        "schema": _build_request_schema(schema.params),
+                        "schema": _build_request_schema(
+                            schema.params, schema.input_schema
+                        ),
                     }
                 },
             },

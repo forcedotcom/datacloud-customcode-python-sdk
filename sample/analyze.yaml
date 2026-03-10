@@ -6,15 +6,15 @@ info:
 paths:
   /analyze:
     post:
-      summary: Analyze data with nested configuration and return grouped results
-      description: Analyze data with nested configuration and return grouped results.
+      summary: Analyze data with filters and return grouped results
+      description: Analyze data with filters and return grouped results.
       operationId: analyze
       x-function:
         language: python
         namespace: salesforceOrg
         package: dataCloudPkg
         name: analyzeFn
-        prototype: 'analyze(request: Dict[str, Dict[str, int]]) -> Dict[str, List[int]]'
+        prototype: 'analyze(request: dict) -> dict'
         description: Will perform analyze operation
       requestBody:
         required: true
@@ -22,10 +22,19 @@ paths:
           application/json:
             schema:
               type: object
-              additionalProperties:
-                type: object
-                additionalProperties:
+              properties:
+                dataset:
+                  type: string
+                filters:
+                  type: object
+                  additionalProperties:
+                    type: array
+                    items:
+                      type: string
+                limit:
                   type: integer
+              required:
+              - dataset
       responses:
         '200':
           description: Successful response
@@ -33,9 +42,17 @@ paths:
             application/json:
               schema:
                 type: object
-                additionalProperties:
-                  type: array
-                  items:
+                properties:
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties:
+                        type: integer
+                  total:
                     type: integer
+                required:
+                - rows
+                - total
         '400':
           description: Invalid input

@@ -14,8 +14,7 @@ paths:
         namespace: salesforceOrg
         package: dataCloudPkg
         name: transformFn
-        prototype: 'transform(request: Dict[str, List[Dict[str, str]]]) -> Dict[str,
-          List[Dict[str, str]]]'
+        prototype: 'transform(request: dict) -> dict'
         description: Will perform transform operation
       requestBody:
         required: true
@@ -23,12 +22,20 @@ paths:
           application/json:
             schema:
               type: object
-              additionalProperties:
-                type: array
-                items:
+              properties:
+                records:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties:
+                      type: string
+                key_mapping:
                   type: object
                   additionalProperties:
                     type: string
+              required:
+              - records
+              - key_mapping
       responses:
         '200':
           description: Successful response
@@ -36,11 +43,17 @@ paths:
             application/json:
               schema:
                 type: object
-                additionalProperties:
-                  type: array
-                  items:
-                    type: object
-                    additionalProperties:
-                      type: string
+                properties:
+                  transformed:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties:
+                        type: string
+                  count:
+                    type: integer
+                required:
+                - transformed
+                - count
         '400':
           description: Invalid input

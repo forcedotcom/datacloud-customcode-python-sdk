@@ -1,10 +1,22 @@
-from typing import Dict
+from typing import Optional, TypedDict
 
 from datacustomcode.entry_func import entry_func
+from datacustomcode.schema import requestSchema, responseSchema
+
+
+class GreetRequest(TypedDict):
+    name: str
+    greeting: Optional[str]
+
+
+class GreetResponse(TypedDict):
+    message: str
 
 
 @entry_func
-def greet(request: Dict[str, str]) -> Dict[str, str]:
+@requestSchema(GreetRequest)
+@responseSchema(GreetResponse)
+def greet(request: dict) -> dict:
     """Generate a personalized greeting message."""
     name = request.get("name", "World")
     greeting = request.get("greeting", "Hello")
