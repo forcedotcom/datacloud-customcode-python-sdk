@@ -25,7 +25,6 @@ from typing import (
 )
 
 from datacustomcode.config import config
-from datacustomcode.scan import find_base_directory, get_package_type
 
 
 def _set_config_option(config_obj, key: str, value: str) -> None:
@@ -45,6 +44,7 @@ def run_entrypoint(
     config_file: Union[str, None],
     dependencies: List[str],
     profile: str,
+    package_type: str = "script",
     sf_cli_org: Optional[str] = None,
 ) -> None:
     """Run the entrypoint script with the given config and dependencies.
@@ -54,6 +54,7 @@ def run_entrypoint(
         config_file: The config file to use.
         dependencies: The dependencies to import.
         profile: The credentials profile to use.
+        package_type: The code type ("script" or "function").
         sf_cli_org: Optional SF CLI org alias or username. If provided, credentials
             are fetched via `sf org display` instead of from credentials.ini.
     """
@@ -67,9 +68,6 @@ def run_entrypoint(
         raise FileNotFoundError(
             f"config.json not found at {config_json_path}. config.json is required."
         )
-
-    base_directory = find_base_directory(entrypoint)
-    package_type = get_package_type(base_directory)
 
     try:
         with open(config_json_path, "r") as f:

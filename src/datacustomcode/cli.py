@@ -329,6 +329,14 @@ def run(
 ):
     from datacustomcode.run import run_entrypoint
 
+    base_directory = find_base_directory(entrypoint)
+    package_type = get_package_type(base_directory)
+
     run_entrypoint(
-        entrypoint, config_file, dependencies, profile, sf_cli_org=sf_cli_org
+        entrypoint,
+        config_file,
+        dependencies,
+        profile,
+        package_type=package_type,
+        sf_cli_org=sf_cli_org,
     )
