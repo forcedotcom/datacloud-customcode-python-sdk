@@ -25,7 +25,7 @@ from typing import (
 )
 
 from datacustomcode.config import config
-from datacustomcode.scan import get_package_type
+from datacustomcode.scan import find_base_directory, get_package_type
 
 
 def _set_config_option(config_obj, key: str, value: str) -> None:
@@ -68,7 +68,9 @@ def run_entrypoint(
             f"config.json not found at {config_json_path}. config.json is required."
         )
 
-    package_type = get_package_type(entrypoint_dir)
+    # SDK config (.datacustomcode_proj/sdk_config.json) is under project root
+    base_directory = find_base_directory(entrypoint)
+    package_type = get_package_type(base_directory)
 
     try:
         with open(config_json_path, "r") as f:
