@@ -408,7 +408,10 @@ class TestPrepareDependencyArchive:
         mock_copy,
         mock_cmd_output,
     ):
-        """Test prepare_dependency_archive with function type when py-files is missing."""
+        """
+        Test prepare_dependency_archive with function type when py-files is missing.
+        Should log and continue without error.
+        """
         # Mock the temporary directory context manager
         mock_temp_dir_instance = MagicMock()
         mock_temp_dir_instance.__enter__.return_value = "/tmp/test_dir"
@@ -433,14 +436,10 @@ class TestPrepareDependencyArchive:
         mock_docker_build_cmd.return_value = "mock build command"
         mock_docker_run_cmd.return_value = "mock run command"
 
-        # Should raise FileNotFoundError when py-files doesn't exist
-        with pytest.raises(
-            FileNotFoundError,
-            match="Expected py-files directory not found at /tmp/test_dir/py-files",
-        ):
-            prepare_dependency_archive("/test/dir", "default", "function")
+        # Should complete successfully without raising an error
+        prepare_dependency_archive("/test/dir", "default", "function")
 
-        # Verify docker commands were still called
+        # Verify docker commands were called
         mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_IMAGES_CMD)
         mock_docker_run_cmd.assert_called_once_with("default", "/tmp/test_dir")
 

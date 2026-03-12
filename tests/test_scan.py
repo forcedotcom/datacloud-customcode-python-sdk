@@ -8,11 +8,10 @@ import textwrap
 import pytest
 
 from datacustomcode.scan import (
-    DataAccessLayerCalls,
     SDK_CONFIG_DIR,
     SDK_CONFIG_FILE,
+    DataAccessLayerCalls,
     dc_config_json_from_file,
-    get_sdk_config_path,
     scan_file,
     scan_file_for_imports,
     update_config,

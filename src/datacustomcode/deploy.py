@@ -283,7 +283,9 @@ PY_FILES_PATH = os.path.join("payload", "py-files")
 ZIP_FILE_NAME = "deployment.zip"
 
 
-def prepare_dependency_archive(directory: str, docker_network: str, package_type: str) -> None:
+def prepare_dependency_archive(
+    directory: str, docker_network: str, package_type: str
+) -> None:
     cmd = f"docker images -q {DOCKER_IMAGE_NAME}"
     image_exists = cmd_output(cmd)
 
@@ -293,9 +295,7 @@ def prepare_dependency_archive(directory: str, docker_network: str, package_type
         cmd_output(cmd)
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        logger.info(
-            f"Building dependencies with docker network: {docker_network}"
-        )
+        logger.info(f"Building dependencies with docker network: {docker_network}")
         shutil.copy("requirements.txt", temp_dir)
         shutil.copy("build_native_dependencies.sh", temp_dir)
         cmd = docker_run_cmd(docker_network, temp_dir)
@@ -303,20 +303,23 @@ def prepare_dependency_archive(directory: str, docker_network: str, package_type
 
         if package_type == "function":
             source_py_files = os.path.join(temp_dir, "py-files")
-            if not os.path.exists(source_py_files):
-                raise FileNotFoundError(
-                    f"Expected py-files directory not found at {source_py_files}. "
-                    "Docker build may have failed."
+            if os.path.exists(source_py_files):
+                logger.info(
+                    f"py-files directory found at {source_py_files}. "
+                    "Copying to payload directory..."
                 )
-            os.makedirs(os.path.dirname(PY_FILES_PATH), exist_ok=True)
-            if os.path.exists(PY_FILES_PATH):
-                shutil.rmtree(PY_FILES_PATH)
-            shutil.copytree(source_py_files, PY_FILES_PATH)
-            logger.info(f"Dependencies copied to {PY_FILES_PATH}")
+                os.makedirs(os.path.dirname(PY_FILES_PATH), exist_ok=True)
+                if os.path.exists(PY_FILES_PATH):
+                    shutil.rmtree(PY_FILES_PATH)
+                shutil.copytree(source_py_files, PY_FILES_PATH)
+                logger.info(f"py-files copied to {PY_FILES_PATH}")
+            else:
+                logger.info(
+                    f"No py-files directory found at {source_py_files}. "
+                    "Skipping py-files copy."
+                )
         else:
-            archives_temp_path = os.path.join(
-                temp_dir, DEPENDENCIES_ARCHIVE_FULL_NAME
-            )
+            archives_temp_path = os.path.join(temp_dir, DEPENDENCIES_ARCHIVE_FULL_NAME)
             os.makedirs(os.path.dirname(DEPENDENCIES_ARCHIVE_PATH), exist_ok=True)
             shutil.copy(archives_temp_path, DEPENDENCIES_ARCHIVE_PATH)
             logger.info(f"Dependencies archived to {DEPENDENCIES_ARCHIVE_PATH}")
