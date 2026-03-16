@@ -2,6 +2,7 @@
 
 import json
 from unittest.mock import (
+    ANY,
     MagicMock,
     mock_open,
     patch,
@@ -49,11 +50,11 @@ class TestPrepareDependencyArchive:
         "docker images -q datacloud-custom-code-dependency-builder"
     )
     EXPECTED_BUILD_CMD = (
-        "DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build "
-        "-t datacloud-custom-code-dependency-builder -f Dockerfile.dependencies . "
+        "docker build "
+        "-t datacloud-custom-code-dependency-builder --file Dockerfile.dependencies . "
     )
     EXPECTED_DOCKER_RUN_CMD = (
-        "DOCKER_DEFAULT_PLATFORM=linux/amd64 docker run --rm "
+        "docker run --rm "
         "-v /tmp/test_dir:/workspace "
         "datacloud-custom-code-dependency-builder "
     )
@@ -106,7 +107,7 @@ class TestPrepareDependencyArchive:
 
         # Verify docker run command was called
         mock_docker_run_cmd.assert_called_once_with("default", "/tmp/test_dir")
-        mock_cmd_output.assert_any_call("mock run command")
+        mock_cmd_output.assert_any_call("mock run command", env=ANY)
 
         # Verify archives directory was created
         mock_makedirs.assert_called_once_with("payload/archives", exist_ok=True)
@@ -159,7 +160,7 @@ class TestPrepareDependencyArchive:
 
         # Verify docker build command was called
         mock_docker_build_cmd.assert_called_once_with("default")
-        mock_cmd_output.assert_any_call("mock build command")
+        mock_cmd_output.assert_any_call("mock build command", env=ANY)
 
         # Verify files were copied to temp directory
         mock_copy.assert_any_call("requirements.txt", "/tmp/test_dir")
@@ -167,7 +168,7 @@ class TestPrepareDependencyArchive:
 
         # Verify docker run command was called
         mock_docker_run_cmd.assert_called_once_with("default", "/tmp/test_dir")
-        mock_cmd_output.assert_any_call("mock run command")
+        mock_cmd_output.assert_any_call("mock run command", env=ANY)
 
         # Verify archives directory was created
         mock_makedirs.assert_called_once_with("payload/archives", exist_ok=True)

@@ -272,7 +272,7 @@ def create_deployment(
         raise
 
 
-PLATFORM_ENV_VAR = "DOCKER_DEFAULT_PLATFORM=linux/amd64"
+PLATFORM_ENV = {"DOCKER_DEFAULT_PLATFORM": "linux/amd64"}
 DOCKER_IMAGE_NAME = "datacloud-custom-code-dependency-builder"
 DEPENDENCIES_ARCHIVE_NAME = "native_dependencies"
 DEPENDENCIES_ARCHIVE_FULL_NAME = f"{DEPENDENCIES_ARCHIVE_NAME}.tar.gz"
@@ -286,10 +286,12 @@ def prepare_dependency_archive(directory: str, docker_network: str) -> None:
     cmd = f"docker images -q {DOCKER_IMAGE_NAME}"
     image_exists = cmd_output(cmd)
 
+    docker_env = {**os.environ, **PLATFORM_ENV}
+
     if not image_exists:
         logger.info(f"Building docker image with docker network: {docker_network}...")
         cmd = docker_build_cmd(docker_network)
-        cmd_output(cmd)
+        cmd_output(cmd, env=docker_env)
 
     with tempfile.TemporaryDirectory() as temp_dir:
         logger.info(
@@ -298,7 +300,7 @@ def prepare_dependency_archive(directory: str, docker_network: str) -> None:
         shutil.copy("requirements.txt", temp_dir)
         shutil.copy("build_native_dependencies.sh", temp_dir)
         cmd = docker_run_cmd(docker_network, temp_dir)
-        cmd_output(cmd)
+        cmd_output(cmd, env=docker_env)
         archives_temp_path = os.path.join(temp_dir, DEPENDENCIES_ARCHIVE_FULL_NAME)
         os.makedirs(os.path.dirname(DEPENDENCIES_ARCHIVE_PATH), exist_ok=True)
         shutil.copy(archives_temp_path, DEPENDENCIES_ARCHIVE_PATH)
@@ -307,10 +309,7 @@ def prepare_dependency_archive(directory: str, docker_network: str) -> None:
 
 
 def docker_build_cmd(network: str) -> str:
-    cmd = (
-        f"{PLATFORM_ENV_VAR} docker build -t {DOCKER_IMAGE_NAME} "
-        f"--file Dockerfile.dependencies . "
-    )
+    cmd = f"docker build -t {DOCKER_IMAGE_NAME} --file Dockerfile.dependencies . "
 
     if network != "default":
         cmd = cmd + f"--network {network}"
@@ -318,12 +317,8 @@ def docker_build_cmd(network: str) -> str:
     return cmd
 
 
-def docker_run_cmd(network: str, temp_dir) -> str:
-    cmd = (
-        f"{PLATFORM_ENV_VAR} docker run --rm "
-        f"-v {temp_dir}:/workspace "
-        f"{DOCKER_IMAGE_NAME} "
-    )
+def docker_run_cmd(network: str, temp_dir: str) -> str:
+    cmd = f"docker run --rm -v {temp_dir}:/workspace {DOCKER_IMAGE_NAME} "
 
     if network != "default":
         cmd = cmd + f"--network {network} "
