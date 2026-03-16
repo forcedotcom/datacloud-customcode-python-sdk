@@ -297,7 +297,7 @@ Options:
 - `--description TEXT`: Description of the transformation job (default: "")
 - `--network TEXT`: docker network (default: "default")
 - `--cpu-size TEXT`: CPU size for the deployment (default: `CPU_2XL`). Available options: CPU_L(Large), CPU_XL(Extra Large), CPU_2XL(2X Large), CPU_4XL(4X Large)
-- `--function-invoke-opt TEXT`: Currently we support only `UnstructuredChunking` for functions. 
+- `--function-invoke-opt TEXT`: Currently we support only `UnstructuredChunking` for functions.
 
 
 ## Docker usage
