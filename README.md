@@ -40,6 +40,8 @@ pip install salesforce-data-customcode
 datacustomcode init my_package
 ```
 
+To create a package of type function, pass the parameter `--code-type=function` with the init command.
+
 This will yield all necessary files to get started:
 ```
 .
@@ -244,6 +246,8 @@ Initialize a new development environment with a code package template.
 
 Argument:
 - `DIRECTORY`: Directory to create project in (default: ".")
+Options:
+- `--code-type TEXT`: This can be either `function` or `script`. The default value is `script` if the argument is missing.
 
 
 #### `datacustomcode scan`
@@ -293,6 +297,7 @@ Options:
 - `--description TEXT`: Description of the transformation job (default: "")
 - `--network TEXT`: docker network (default: "default")
 - `--cpu-size TEXT`: CPU size for the deployment (default: `CPU_2XL`). Available options: CPU_L(Large), CPU_XL(Extra Large), CPU_2XL(2X Large), CPU_4XL(4X Large)
+- `--function-invoke-opt TEXT`: Currently we support only `UnstructuredChunking` for functions.
 
 
 ## Docker usage
