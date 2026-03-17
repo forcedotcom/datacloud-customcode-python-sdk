@@ -107,9 +107,14 @@ def python_type_to_openapi(type_annotation: Any) -> Dict[str, Any]:
     raise ValueError(f"Unsupported type annotation: {ast.dump(type_annotation)}")
 
 
-def _ast_node_to_openapi(node: ast.expr) -> Dict[str, Any]:
+def _ast_node_to_openapi(
+    node: ast.expr,
+    class_map: Optional[Dict[str, "ClassSchema"]] = None,
+) -> Dict[str, Any]:
     """Recursively convert an AST annotation node to an OpenAPI schema."""
     if isinstance(node, ast.Name):
+        if class_map and node.id in class_map:
+            return _build_class_openapi_schema(class_map[node.id], class_map)
         return python_type_to_openapi(node.id)
 
     if isinstance(node, ast.Constant):
@@ -123,7 +128,7 @@ def _ast_node_to_openapi(node: ast.expr) -> Dict[str, Any]:
 
         # --- List[X] / list[X] ---------------------------------------------
         if base_name in ("List", "list"):
-            items_schema = _ast_node_to_openapi(node.slice)
+            items_schema = _ast_node_to_openapi(node.slice, class_map)
             return {"type": "array", "items": items_schema}
 
         # --- Dict[K, V] / dict[K, V] ---------------------------------------
@@ -134,13 +139,13 @@ def _ast_node_to_openapi(node: ast.expr) -> Dict[str, Any]:
                     raise ValueError(
                         f"Dict requires exactly 2 type args, got {len(elts)}"
                     )
-                value_schema = _ast_node_to_openapi(elts[1])
+                value_schema = _ast_node_to_openapi(elts[1], class_map)
                 return {
                     "type": "object",
                     "additionalProperties": value_schema,
                 }
             # Single subscript (unusual but handle gracefully)
-            value_schema = _ast_node_to_openapi(node.slice)
+            value_schema = _ast_node_to_openapi(node.slice, class_map)
             return {"type": "object", "additionalProperties": value_schema}
 
         raise ValueError(f"Unsupported generic type: {base_name}")
@@ -244,6 +249,7 @@ class FunctionSchema:
         self.prototype = prototype
         self.input_schema = input_schema
         self.output_schema = output_schema
+        self.class_map: Dict[str, ClassSchema] = {}
 
 
 def _find_class_in_tree(tree: ast.Module, class_name: str) -> ClassSchema:
@@ -286,7 +292,10 @@ def _unwrap_optional(node: ast.expr) -> ast.expr:
     return node
 
 
-def _build_class_openapi_schema(schema: ClassSchema) -> Dict[str, Any]:
+def _build_class_openapi_schema(
+    schema: ClassSchema,
+    class_map: Optional[Dict[str, "ClassSchema"]] = None,
+) -> Dict[str, Any]:
     """Build an OpenAPI schema from a ClassSchema's typed fields.
 
     Fields annotated with ``Optional[X]`` are included in ``properties``
@@ -296,9 +305,11 @@ def _build_class_openapi_schema(schema: ClassSchema) -> Dict[str, Any]:
     required: List[str] = []
     for field_name, type_node in schema.fields:
         if _is_optional(type_node):
-            properties[field_name] = _ast_node_to_openapi(_unwrap_optional(type_node))
+            properties[field_name] = _ast_node_to_openapi(
+                _unwrap_optional(type_node), class_map
+            )
         else:
-            properties[field_name] = _ast_node_to_openapi(type_node)
+            properties[field_name] = _ast_node_to_openapi(type_node, class_map)
             required.append(field_name)
     result: Dict[str, Any] = {"type": "object", "properties": properties}
     if required:
@@ -313,6 +324,19 @@ def extract_entry_functions(source: str) -> List[FunctionSchema]:
     """
     tree = ast.parse(source)
     results: List[FunctionSchema] = []
+
+    # Build a map of all class definitions for nested TypedDict resolution.
+    class_map: Dict[str, ClassSchema] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef):
+            fields: List[Tuple[str, ast.expr]] = []
+            for stmt in node.body:
+                if isinstance(stmt, ast.AnnAssign) and isinstance(
+                    stmt.target, ast.Name
+                ):
+                    fields.append((stmt.target.id, stmt.annotation))
+            if fields:
+                class_map[node.name] = ClassSchema(node.name, fields)
 
     for node in ast.walk(tree):
         if not isinstance(node, ast.FunctionDef):
@@ -455,18 +479,18 @@ def extract_entry_functions(source: str) -> List[FunctionSchema]:
         # --- docstring ------------------------------------------------------
         docstring = ast.get_docstring(node)
 
-        results.append(
-            FunctionSchema(
-                name=node.name,
-                docstring=docstring,
-                params=params,
-                return_type=return_type,
-                return_type_node=return_type_node,
-                prototype=prototype,
-                input_schema=input_schema,
-                output_schema=output_schema,
-            )
+        fn_schema = FunctionSchema(
+            name=node.name,
+            docstring=docstring,
+            params=params,
+            return_type=return_type,
+            return_type_node=return_type_node,
+            prototype=prototype,
+            input_schema=input_schema,
+            output_schema=output_schema,
         )
+        fn_schema.class_map = class_map
+        results.append(fn_schema)
 
     return results
 
@@ -496,19 +520,23 @@ def _build_schema_prototype(schema: ClassSchema) -> str:
 def _build_request_schema(
     params: List[Dict[str, Any]],
     input_schema: Optional[ClassSchema] = None,
+    class_map: Optional[Dict[str, ClassSchema]] = None,
 ) -> Dict[str, Any]:
     """Build the request body schema from the single ``request`` Dict parameter."""
     if input_schema:
-        return _build_class_openapi_schema(input_schema)
+        return _build_class_openapi_schema(input_schema, class_map)
     p = params[0]
     type_source = p.get("type_node", p["type"])
     return python_type_to_openapi(type_source)
 
 
-def _build_response_schema(schema: FunctionSchema) -> Dict[str, Any]:
+def _build_response_schema(
+    schema: FunctionSchema,
+    class_map: Optional[Dict[str, ClassSchema]] = None,
+) -> Dict[str, Any]:
     """Build the response schema from the Dict return type."""
     if schema.output_schema:
-        return _build_class_openapi_schema(schema.output_schema)
+        return _build_class_openapi_schema(schema.output_schema, class_map)
     type_source = schema.return_type_node or schema.return_type
     return python_type_to_openapi(type_source)
 
@@ -567,7 +595,8 @@ def generate_openapi(
                 "content": {
                     "application/json": {
                         "schema": _build_request_schema(
-                            schema.params, schema.input_schema
+                            schema.params, schema.input_schema,
+                            schema.class_map,
                         ),
                     }
                 },
@@ -577,7 +606,9 @@ def generate_openapi(
                     "description": "Successful response",
                     "content": {
                         "application/json": {
-                            "schema": _build_response_schema(schema),
+                            "schema": _build_response_schema(
+                                schema, schema.class_map
+                            ),
                         }
                     },
                 },
