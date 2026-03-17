@@ -55,7 +55,7 @@ class TestPrepareDependencyArchive:
     )
     EXPECTED_DOCKER_RUN_CMD = (
         "docker run --rm "
-        "-v /tmp/test_dir:/workspace "
+        '-v "/tmp/test_dir:/workspace" '
         "datacloud-custom-code-dependency-builder "
     )
 

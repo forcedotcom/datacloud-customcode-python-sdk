@@ -293,7 +293,11 @@ def prepare_dependency_archive(directory: str, docker_network: str) -> None:
         cmd = docker_build_cmd(docker_network)
         cmd_output(cmd, env=docker_env)
 
-    with tempfile.TemporaryDirectory() as temp_dir:
+    # ignore_cleanup_errors=True: on Windows, Docker creates files inside the
+    # mounted volume whose permissions prevent the host from deleting them.
+    # The archive has already been copied out, so silently skipping leftover
+    # files is safe and avoids a fatal error on context-manager exit.
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
         logger.info(
             f"Building dependencies archive with docker network: {docker_network}"
         )
@@ -318,7 +322,10 @@ def docker_build_cmd(network: str) -> str:
 
 
 def docker_run_cmd(network: str, temp_dir: str) -> str:
-    cmd = f"docker run --rm -v {temp_dir}:/workspace {DOCKER_IMAGE_NAME} "
+    # Normalise path separators: Docker expects forward slashes even on Windows,
+    # and quoting handles paths that contain spaces.
+    docker_path = temp_dir.replace("\\", "/")
+    cmd = f'docker run --rm -v "{docker_path}:/workspace" {DOCKER_IMAGE_NAME} '
 
     if network != "default":
         cmd = cmd + f"--network {network} "
