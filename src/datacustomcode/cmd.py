@@ -85,9 +85,13 @@ def _cmd_output(
     **kwargs: Any,
 ) -> tuple[int, bytes, Union[bytes, None]]:
     _setdefault_kwargs(kwargs)
+    kwargs.setdefault("shell", True)
+    # On Windows, Popen with shell=True and a sequence uses list2cmdline() which
+    # quotes the entire string, causing cmd.exe to fail. Joining to a plain string
+    # works correctly on both Unix (/bin/sh -c "...") and Windows (cmd.exe /c ...).
+    cmd_arg: Union[tuple[str, ...], str] = " ".join(cmd) if kwargs.get("shell") else cmd
     try:
-        kwargs.setdefault("shell", True)
-        proc = subprocess.Popen(cmd, **kwargs)
+        proc = subprocess.Popen(cmd_arg, **kwargs)
     except OSError as e:
         returncode, stdout_b, stderr_b = _oserror_to_output(e)
     else:

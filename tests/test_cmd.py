@@ -168,3 +168,40 @@ class TestCmd:
         _, kwargs = mock_cmd_output.call_args
         assert kwargs["env"] == {"PATH": "/usr/bin"}
         assert kwargs["cwd"] == "/tmp"
+
+    @patch("subprocess.Popen")
+    def test_cmd_output_shell_passes_string_not_tuple(self, mock_popen):
+        """When shell=True, Popen must receive a plain string, not a tuple.
+
+        On Windows, Popen(tuple, shell=True) calls list2cmdline() which quotes
+        the entire string (e.g. '"docker images -q foo"'), causing cmd.exe to
+        fail with 'not recognized as an internal or external command'. Passing
+        a joined string avoids this on both Windows and Unix.
+        """
+        process_mock = Mock()
+        process_mock.communicate.return_value = (b"", b"")
+        process_mock.returncode = 0
+        mock_popen.return_value = process_mock
+
+        _cmd_output("docker images -q my-image")
+
+        args, _ = mock_popen.call_args
+        cmd_arg = args[0]
+        assert isinstance(cmd_arg, str), (
+            f"Expected str but got {type(cmd_arg)}: {cmd_arg!r}. "
+            "Passing a tuple with shell=True causes Windows quoting issues."
+        )
+        assert cmd_arg == "docker images -q my-image"
+
+    @patch("subprocess.Popen")
+    def test_cmd_output_multi_arg_shell_joins_to_string(self, mock_popen):
+        """Multiple positional args are joined into one string for shell=True."""
+        process_mock = Mock()
+        process_mock.communicate.return_value = (b"", b"")
+        process_mock.returncode = 0
+        mock_popen.return_value = process_mock
+
+        _cmd_output("docker", "images", "-q")
+
+        args, _ = mock_popen.call_args
+        assert args[0] == "docker images -q"
