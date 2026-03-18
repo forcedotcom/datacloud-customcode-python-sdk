@@ -1,6 +1,6 @@
 openapi: 3.0.0
 info:
-  title: Dc Function Service
+  title: AgentForce BYOC Demo
   description: API generated from Python function schema
   version: 1.0.0
 paths:
@@ -14,7 +14,8 @@ paths:
         \ the concatenated string in `output`\n    and processing status metadata\
         \ in `status`."
       operationId: dc_function
-      x-function:
+      x-sfdc:
+        feature: BYOC
         language: python
         namespace: salesforceOrg
         package: dataCloudPkg

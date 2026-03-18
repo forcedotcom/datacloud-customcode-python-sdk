@@ -9,7 +9,8 @@ paths:
       summary: Enrich a customer profile with computed features and recommendations
       description: Enrich a customer profile with computed features and recommendations.
       operationId: enrich
-      x-function:
+      x-sfdc:
+        feature: BYOC
         language: python
         namespace: salesforceOrg
         package: dataCloudPkg

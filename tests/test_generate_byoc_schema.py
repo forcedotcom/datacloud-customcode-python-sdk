@@ -967,7 +967,7 @@ class TestGenerateOpenapi:
         assert post["operationId"] == "process"
         assert post["summary"] == "Process a request"
 
-        x_fn = post["x-function"]
+        x_fn = post["x-sfdc"]
         assert x_fn["language"] == "python"
         assert x_fn["prototype"] == "process(request: Dict[str, int]) -> Dict[str, int]"
         assert "requestSchema" not in x_fn
@@ -1010,7 +1010,7 @@ class TestGenerateOpenapi:
         spec = generate_openapi(schemas)
         post = spec["paths"]["/add"]["post"]
 
-        x_fn = post["x-function"]
+        x_fn = post["x-sfdc"]
         assert x_fn["requestSchema"] == "dict(a: int, b: int)"
         assert x_fn["responseSchema"] == "dict(result: int)"
 
@@ -1065,7 +1065,7 @@ class TestGenerateOpenapi:
         spec = generate_openapi(schemas)
         post = spec["paths"]["/analyze"]["post"]
 
-        x_fn = post["x-function"]
+        x_fn = post["x-sfdc"]
         assert x_fn["requestSchema"] == "dict(filters: Dict[str, List[str]], limit: int)"
         assert x_fn["responseSchema"] == "dict(rows: List[Dict[str, int]], total: int)"
 
@@ -1124,7 +1124,7 @@ class TestGenerateOpenapi:
         spec = generate_openapi(schemas)
         post = spec["paths"]["/transform"]["post"]
 
-        x_fn = post["x-function"]
+        x_fn = post["x-sfdc"]
         assert x_fn["requestSchema"] == "dict(values: List[int], scale: float)"
         assert "responseSchema" not in x_fn
 
@@ -1156,7 +1156,7 @@ class TestGenerateOpenapi:
         """)
         schemas = extract_entry_functions(source)
         spec = generate_openapi(schemas, namespace="testOrg", package="testPkg")
-        x_fn = spec["paths"]["/process"]["post"]["x-function"]
+        x_fn = spec["paths"]["/process"]["post"]["x-sfdc"]
         assert x_fn["namespace"] == "testOrg"
         assert x_fn["package"] == "testPkg"
 
@@ -1445,7 +1445,7 @@ class TestNestedTypes:
         spec = yaml.safe_load(out.read_text())
 
         post = spec["paths"]["/add"]["post"]
-        x_fn = post["x-function"]
+        x_fn = post["x-sfdc"]
         assert x_fn["requestSchema"] == "dict(a: int, b: int)"
         assert x_fn["responseSchema"] == "dict(result: int)"
 
@@ -1675,7 +1675,7 @@ class TestMainWithConfig:
         out = tmp_path / "out.yaml"
         assert main([str(src), "-o", str(out), "-c", str(cfg)]) == 0
         spec = yaml.safe_load(out.read_text())
-        x_fn = spec["paths"]["/add"]["post"]["x-function"]
+        x_fn = spec["paths"]["/add"]["post"]["x-sfdc"]
         assert x_fn["namespace"] == "yamlOrg"
         assert x_fn["package"] == "yamlPkg"
 
@@ -1686,7 +1686,7 @@ class TestMainWithConfig:
         out = tmp_path / "out.yaml"
         assert main([str(src), "-o", str(out), "-c", str(cfg)]) == 0
         spec = yaml.safe_load(out.read_text())
-        x_fn = spec["paths"]["/add"]["post"]["x-function"]
+        x_fn = spec["paths"]["/add"]["post"]["x-sfdc"]
         assert x_fn["namespace"] == "jOrg"
         assert x_fn["package"] == "jPkg"
 
@@ -1700,7 +1700,7 @@ class TestMainWithConfig:
             "--namespace", "cliOrg", "--package", "cliPkg",
         ]) == 0
         spec = yaml.safe_load(out.read_text())
-        x_fn = spec["paths"]["/add"]["post"]["x-function"]
+        x_fn = spec["paths"]["/add"]["post"]["x-sfdc"]
         assert x_fn["namespace"] == "cliOrg"
         assert x_fn["package"] == "cliPkg"
 
@@ -1713,7 +1713,7 @@ class TestMainWithConfig:
             str(src), "-o", str(out), "-c", str(cfg), "--namespace", "cliOrg",
         ]) == 0
         spec = yaml.safe_load(out.read_text())
-        x_fn = spec["paths"]["/add"]["post"]["x-function"]
+        x_fn = spec["paths"]["/add"]["post"]["x-sfdc"]
         assert x_fn["namespace"] == "cliOrg"
         assert x_fn["package"] == "filePkg"
 
@@ -1722,6 +1722,6 @@ class TestMainWithConfig:
         out = tmp_path / "out.yaml"
         assert main([str(src), "-o", str(out)]) == 0
         spec = yaml.safe_load(out.read_text())
-        x_fn = spec["paths"]["/add"]["post"]["x-function"]
+        x_fn = spec["paths"]["/add"]["post"]["x-sfdc"]
         assert x_fn["namespace"] == "myOrg"
         assert x_fn["package"] == "myPackage"

@@ -546,8 +546,9 @@ def _build_x_function(
     namespace: str,
     package: str,
 ) -> Dict[str, Any]:
-    """Build the ``x-function`` extension object for an OpenAPI operation."""
+    """Build the ``x-sfdc`` extension object for an OpenAPI operation."""
     x_fn: Dict[str, Any] = {
+        "feature": "BYOC",
         "language": "python",
         "namespace": namespace,
         "package": package,
@@ -589,7 +590,7 @@ def generate_openapi(
             "summary": summary,
             "description": schema.docstring or "",
             "operationId": schema.name,
-            "x-function": _build_x_function(schema, namespace, package),
+            "x-sfdc": _build_x_function(schema, namespace, package),
             "requestBody": {
                 "required": True,
                 "content": {

@@ -9,7 +9,8 @@ paths:
       summary: Generate a personalized greeting message
       description: Generate a personalized greeting message.
       operationId: greet
-      x-function:
+      x-sfdc:
+        feature: BYOC
         language: python
         namespace: salesforceOrg
         package: dataCloudPkg
