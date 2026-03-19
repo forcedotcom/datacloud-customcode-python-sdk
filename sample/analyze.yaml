@@ -10,16 +10,17 @@ paths:
       description: Analyze data with filters and return grouped results.
       operationId: analyze
       x-sfdc:
-        feature: BYOC
-        language: python
-        namespace: salesforceOrg
-        package: dataCloudPkg
-        name: analyzeFn
-        prototype: 'analyze(request: dict) -> dict'
-        requestSchema: 'dict(dataset: str, filters: Optional[Dict[str, List[str]]],
-          limit: Optional[int])'
-        responseSchema: 'dict(rows: List[Dict[str, int]], total: int)'
-        description: Will perform analyze operation
+        code-extension:
+          feature: BYOC
+          language: python
+          namespace: salesforceOrg
+          package: dataCloudPkg
+          name: analyzeFn
+          prototype: 'analyze(request: dict) -> dict'
+          requestSchema: 'dict(dataset: str, filters: Optional[Dict[str, List[str]]],
+            limit: Optional[int])'
+          responseSchema: 'dict(rows: List[Dict[str, int]], total: int)'
+          description: Will perform analyze operation
       requestBody:
         required: true
         content:

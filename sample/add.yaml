@@ -10,15 +10,16 @@ paths:
       description: Add two integers.
       operationId: add
       x-sfdc:
-        feature: BYOC
-        language: python
-        namespace: salesforceOrg
-        package: dataCloudPkg
-        name: addFn
-        prototype: 'add(request: dict) -> dict'
-        requestSchema: 'dict(a: int, b: int)'
-        responseSchema: 'dict(result: int)'
-        description: Will perform add operation
+        code-extension:
+          feature: BYOC
+          language: python
+          namespace: salesforceOrg
+          package: dataCloudPkg
+          name: addFn
+          prototype: 'add(request: dict) -> dict'
+          requestSchema: 'dict(a: int, b: int)'
+          responseSchema: 'dict(result: int)'
+          description: Will perform add operation
       requestBody:
         required: true
         content:

@@ -10,19 +10,20 @@ paths:
       description: Enrich a customer profile with computed features and recommendations.
       operationId: enrich
       x-sfdc:
-        feature: BYOC
-        language: python
-        namespace: salesforceOrg
-        package: dataCloudPkg
-        name: enrichFn
-        prototype: 'enrich(request: dict) -> dict'
-        requestSchema: 'dict(customer_id: str, age: int, score: float, is_active:
-          bool, tags: List[str], weights: List[float], address: Optional[str], nickname:
-          Optional[str])'
-        responseSchema: 'dict(customer_id: str, segment: str, lifetime_value: float,
-          risk_score: int, is_eligible: bool, recommendations: List[str], feature_vector:
-          List[float], labels: List[int])'
-        description: Will perform enrich operation
+        code-extension:
+          feature: BYOC
+          language: python
+          namespace: salesforceOrg
+          package: dataCloudPkg
+          name: enrichFn
+          prototype: 'enrich(request: dict) -> dict'
+          requestSchema: 'dict(customer_id: str, age: int, score: float, is_active:
+            bool, tags: List[str], weights: List[float], address: Optional[str], nickname:
+            Optional[str])'
+          responseSchema: 'dict(customer_id: str, segment: str, lifetime_value: float,
+            risk_score: int, is_eligible: bool, recommendations: List[str], feature_vector:
+            List[float], labels: List[int])'
+          description: Will perform enrich operation
       requestBody:
         required: true
         content:

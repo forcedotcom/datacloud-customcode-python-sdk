@@ -590,7 +590,9 @@ def generate_openapi(
             "summary": summary,
             "description": schema.docstring or "",
             "operationId": schema.name,
-            "x-sfdc": _build_x_function(schema, namespace, package),
+            "x-sfdc": {
+                "code-extension": _build_x_function(schema, namespace, package),
+            },
             "requestBody": {
                 "required": True,
                 "content": {

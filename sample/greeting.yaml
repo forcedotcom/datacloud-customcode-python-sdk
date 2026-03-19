@@ -10,15 +10,16 @@ paths:
       description: Generate a personalized greeting message.
       operationId: greet
       x-sfdc:
-        feature: BYOC
-        language: python
-        namespace: salesforceOrg
-        package: dataCloudPkg
-        name: greetFn
-        prototype: 'greet(request: dict) -> dict'
-        requestSchema: 'dict(name: str, greeting: Optional[str])'
-        responseSchema: 'dict(message: str)'
-        description: Will perform greet operation
+        code-extension:
+          feature: BYOC
+          language: python
+          namespace: salesforceOrg
+          package: dataCloudPkg
+          name: greetFn
+          prototype: 'greet(request: dict) -> dict'
+          requestSchema: 'dict(name: str, greeting: Optional[str])'
+          responseSchema: 'dict(message: str)'
+          description: Will perform greet operation
       requestBody:
         required: true
         content:

@@ -10,16 +10,17 @@ paths:
       description: Transform a list of records by remapping keys.
       operationId: transform
       x-sfdc:
-        feature: BYOC
-        language: python
-        namespace: salesforceOrg
-        package: dataCloudPkg
-        name: transformFn
-        prototype: 'transform(request: dict) -> dict'
-        requestSchema: 'dict(records: List[Dict[str, str]], key_mapping: Dict[str,
-          str])'
-        responseSchema: 'dict(transformed: List[Dict[str, str]], count: int)'
-        description: Will perform transform operation
+        code-extension:
+          feature: BYOC
+          language: python
+          namespace: salesforceOrg
+          package: dataCloudPkg
+          name: transformFn
+          prototype: 'transform(request: dict) -> dict'
+          requestSchema: 'dict(records: List[Dict[str, str]], key_mapping: Dict[str,
+            str])'
+          responseSchema: 'dict(transformed: List[Dict[str, str]], count: int)'
+          description: Will perform transform operation
       requestBody:
         required: true
         content:

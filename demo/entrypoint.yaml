@@ -15,15 +15,16 @@ paths:
         \ in `status`."
       operationId: dc_function
       x-sfdc:
-        feature: BYOC
-        language: python
-        namespace: salesforceOrg
-        package: dataCloudPkg
-        name: dc_functionFn
-        prototype: 'dc_function(request: dict) -> dict'
-        requestSchema: 'dict(input: List[InputItem], separator: Optional[str])'
-        responseSchema: 'dict(output: str, status: StatusResponse)'
-        description: Will perform dc_function operation
+        code-extension:
+          feature: BYOC
+          language: python
+          namespace: salesforceOrg
+          package: dataCloudPkg
+          name: dc_functionFn
+          prototype: 'dc_function(request: dict) -> dict'
+          requestSchema: 'dict(input: List[InputItem], separator: Optional[str])'
+          responseSchema: 'dict(output: str, status: StatusResponse)'
+          description: Will perform dc_function operation
       requestBody:
         required: true
         content:
