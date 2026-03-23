@@ -1,5 +1,19 @@
 """BYOC (Bring Your Own Code) - Extract function schema from a Python file and generate an OpenAPI spec.
 
+Usage examples::
+
+    # Basic usage (output to stdout)
+    python scripts/generate_byoc_schema.py sample/add.py
+
+    # Output to a YAML file
+    python scripts/generate_byoc_schema.py sample/add.py -o sample/add.yaml
+
+    # With a config file for namespace/package
+    python scripts/generate_byoc_schema.py sample/add.py -c sample/byoc_config.yaml -o sample/add.yaml
+
+    # Override namespace/package via CLI
+    python scripts/generate_byoc_schema.py sample/add.py --namespace myOrg --package myPkg -o out.yaml
+
 Scans a Python file for functions decorated with ``@entry_func``, extracts
 their signatures (including type annotations and defaults), and produces an
 OpenAPI 3.0.0 specification exposing each function as a POST endpoint.
