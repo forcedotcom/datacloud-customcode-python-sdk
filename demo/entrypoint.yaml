@@ -1,0 +1,72 @@
+openapi: 3.0.0
+info:
+  title: AgentForce BYOC Demo
+  description: API generated from Python function schema
+  version: 1.0.0
+paths:
+  /dc_function:
+    post:
+      summary: Concatenate a list of strings from request input into one string
+      description: "Concatenate a list of strings from request input into one string.\n\
+        \nArgs:\n    request: Dictionary containing:\n        - input (List[str]):\
+        \ List of strings to concatenate.\n        - separator (str, optional): String\
+        \ inserted between items.\n\nReturns:\n    dict: A response dictionary with\
+        \ the concatenated string in `output`\n    and processing status metadata\
+        \ in `status`."
+      operationId: dc_function
+      x-sfdc:
+        code-extension:
+          feature: BYOC
+          language: python
+          namespace: salesforceOrg
+          package: dataCloudPkg
+          name: dc_functionFn
+          prototype: 'dc_function(request: dict) -> dict'
+          requestSchema: 'dict(input: List[InputItem], separator: Optional[str])'
+          responseSchema: 'dict(output: str, status: StatusResponse)'
+          description: Will perform dc_function operation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                input:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      text:
+                        type: string
+                    required:
+                    - text
+                separator:
+                  type: string
+              required:
+              - input
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output:
+                    type: string
+                  status:
+                    type: object
+                    properties:
+                      status_type:
+                        type: string
+                      status_message:
+                        type: string
+                    required:
+                    - status_type
+                    - status_message
+                required:
+                - output
+                - status
+        '400':
+          description: Invalid input
