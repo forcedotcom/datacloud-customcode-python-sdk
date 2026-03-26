@@ -279,10 +279,13 @@ DEPENDENCIES_ARCHIVE_FULL_NAME = f"{DEPENDENCIES_ARCHIVE_NAME}.tar.gz"
 DEPENDENCIES_ARCHIVE_PATH = os.path.join(
     "payload", "archives", DEPENDENCIES_ARCHIVE_FULL_NAME
 )
+PY_FILES_PATH = os.path.join("payload", "py-files")
 ZIP_FILE_NAME = "deployment.zip"
 
 
-def prepare_dependency_archive(directory: str, docker_network: str) -> None:
+def prepare_dependency_archive(
+    directory: str, docker_network: str, package_type: str
+) -> None:
     cmd = f"docker images -q {DOCKER_IMAGE_NAME}"
     image_exists = cmd_output(cmd)
 
@@ -305,11 +308,28 @@ def prepare_dependency_archive(directory: str, docker_network: str) -> None:
         shutil.copy("build_native_dependencies.sh", temp_dir)
         cmd = docker_run_cmd(docker_network, temp_dir)
         cmd_output(cmd, env=docker_env)
-        archives_temp_path = os.path.join(temp_dir, DEPENDENCIES_ARCHIVE_FULL_NAME)
-        os.makedirs(os.path.dirname(DEPENDENCIES_ARCHIVE_PATH), exist_ok=True)
-        shutil.copy(archives_temp_path, DEPENDENCIES_ARCHIVE_PATH)
-
-        logger.info(f"Dependencies archived to {DEPENDENCIES_ARCHIVE_PATH}")
+        if package_type == "function":
+            source_py_files = os.path.join(temp_dir, "py-files")
+            if os.path.exists(source_py_files):
+                logger.info(
+                    f"py-files directory found at {source_py_files}. "
+                    "Copying to payload directory..."
+                )
+                os.makedirs(os.path.dirname(PY_FILES_PATH), exist_ok=True)
+                if os.path.exists(PY_FILES_PATH):
+                    shutil.rmtree(PY_FILES_PATH)
+                shutil.copytree(source_py_files, PY_FILES_PATH)
+                logger.info(f"py-files copied to {PY_FILES_PATH}")
+            else:
+                logger.info(
+                    f"No py-files directory found at {source_py_files}. "
+                    "Skipping py-files copy."
+                )
+        else:
+            archives_temp_path = os.path.join(temp_dir, DEPENDENCIES_ARCHIVE_FULL_NAME)
+            os.makedirs(os.path.dirname(DEPENDENCIES_ARCHIVE_PATH), exist_ok=True)
+            shutil.copy(archives_temp_path, DEPENDENCIES_ARCHIVE_PATH)
+            logger.info(f"Dependencies archived to {DEPENDENCIES_ARCHIVE_PATH}")
 
 
 def docker_build_cmd(network: str) -> str:
@@ -516,13 +536,14 @@ def upload_zip(file_upload_url: str) -> None:
 def zip(
     directory: str,
     docker_network: str,
+    package_type: str,
 ):
     # Create a zip file excluding .DS_Store files
     import zipfile
 
     # prepare payload only if requirements.txt is non-empty
     if has_nonempty_requirements_file(directory):
-        prepare_dependency_archive(directory, docker_network)
+        prepare_dependency_archive(directory, docker_network, package_type)
     else:
         logger.info(
             f"Skipping dependency archive: requirements.txt is missing or empty "
@@ -561,7 +582,7 @@ def deploy_full(
 
     # create deployment and upload payload
     deployment = create_deployment(access_token, metadata)
-    zip(directory, docker_network)
+    zip(directory, docker_network, metadata.codeType)
     upload_zip(deployment.fileUploadUrl)
     wait_for_deployment(access_token, metadata, callback)
 

@@ -134,9 +134,12 @@ def auth(profile: str):
 @click.option("--network", default="default")
 def zip(path: str, network: str):
     from datacustomcode.deploy import zip
+    from datacustomcode.scan import find_base_directory, get_package_type
 
     logger.debug("Zipping project")
-    zip(path, network)
+    base_directory = find_base_directory(path)
+    package_type = get_package_type(base_directory)
+    zip(path, network, package_type)
 
 
 @cli.command()
