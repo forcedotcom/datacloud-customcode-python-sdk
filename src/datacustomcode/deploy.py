@@ -272,7 +272,7 @@ def create_deployment(
         raise
 
 
-PLATFORM_ENV_VAR = "DOCKER_DEFAULT_PLATFORM=linux/amd64"
+PLATFORM_ENV = {"DOCKER_DEFAULT_PLATFORM": "linux/amd64"}
 DOCKER_IMAGE_NAME = "datacloud-custom-code-dependency-builder"
 DEPENDENCIES_ARCHIVE_NAME = "native_dependencies"
 DEPENDENCIES_ARCHIVE_FULL_NAME = f"{DEPENDENCIES_ARCHIVE_NAME}.tar.gz"
@@ -289,18 +289,25 @@ def prepare_dependency_archive(
     cmd = f"docker images -q {DOCKER_IMAGE_NAME}"
     image_exists = cmd_output(cmd)
 
+    docker_env = {**os.environ, **PLATFORM_ENV}
+
     if not image_exists:
         logger.info(f"Building docker image with docker network: {docker_network}...")
         cmd = docker_build_cmd(docker_network)
-        cmd_output(cmd)
+        cmd_output(cmd, env=docker_env)
 
-    with tempfile.TemporaryDirectory() as temp_dir:
-        logger.info(f"Building dependencies with docker network: {docker_network}")
+    # ignore_cleanup_errors=True: on Windows, Docker creates files inside the
+    # mounted volume whose permissions prevent the host from deleting them.
+    # The archive has already been copied out, so silently skipping leftover
+    # files is safe and avoids a fatal error on context-manager exit.
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+        logger.info(
+            f"Building dependencies archive with docker network: {docker_network}"
+        )
         shutil.copy("requirements.txt", temp_dir)
         shutil.copy("build_native_dependencies.sh", temp_dir)
         cmd = docker_run_cmd(docker_network, temp_dir)
-        cmd_output(cmd)
-
+        cmd_output(cmd, env=docker_env)
         if package_type == "function":
             source_py_files = os.path.join(temp_dir, "py-files")
             if os.path.exists(source_py_files):
@@ -326,10 +333,7 @@ def prepare_dependency_archive(
 
 
 def docker_build_cmd(network: str) -> str:
-    cmd = (
-        f"{PLATFORM_ENV_VAR} docker build -t {DOCKER_IMAGE_NAME} "
-        f"--file Dockerfile.dependencies . "
-    )
+    cmd = f"docker build -t {DOCKER_IMAGE_NAME} --file Dockerfile.dependencies . "
 
     if network != "default":
         cmd = cmd + f"--network {network}"
@@ -337,12 +341,11 @@ def docker_build_cmd(network: str) -> str:
     return cmd
 
 
-def docker_run_cmd(network: str, temp_dir) -> str:
-    cmd = (
-        f"{PLATFORM_ENV_VAR} docker run --rm "
-        f"-v {temp_dir}:/workspace "
-        f"{DOCKER_IMAGE_NAME} "
-    )
+def docker_run_cmd(network: str, temp_dir: str) -> str:
+    # Normalise path separators: Docker expects forward slashes even on Windows,
+    # and quoting handles paths that contain spaces.
+    docker_path = temp_dir.replace("\\", "/")
+    cmd = f'docker run --rm -v "{docker_path}:/workspace" {DOCKER_IMAGE_NAME} '
 
     if network != "default":
         cmd = cmd + f"--network {network} "

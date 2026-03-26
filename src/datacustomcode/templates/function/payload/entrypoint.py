@@ -33,8 +33,8 @@ def chunk_text(text: str, chunk_size: int = 1000) -> List[str]:
     return chunks
 
 
-def dc_function(request: dict) -> dict:
-    logger.info("Inside DC Function")
+def function(request: dict) -> dict:
+    logger.info("Inside Function")
     logger.info(request)
 
     items = request["input"]
@@ -107,7 +107,7 @@ if __name__ == "__main__":
     }
 
     # Run the function
-    result = dc_function(test_request)
+    result = function(test_request)
 
     # Print the results in a more readable format
     print("\nChunking Results:")
