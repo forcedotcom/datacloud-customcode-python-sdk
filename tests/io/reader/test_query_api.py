@@ -60,6 +60,22 @@ class TestPandasToSparkSchema:
         schema = _pandas_to_spark_schema(df, nullable=False)
         assert not schema.fields[0].nullable
 
+    def test_pandas_to_spark_schema_lowercases_columns(self):
+        """Column names from the API are lowercased to match Data Cloud."""
+        df = pd.DataFrame({"UnitPrice__c": [1.0], "Quantity__c": [2], "Name__c": ["a"]})
+        schema = _pandas_to_spark_schema(df)
+        assert [f.name for f in schema.fields] == [
+            "unitprice__c",
+            "quantity__c",
+            "name__c",
+        ]
+
+    def test_pandas_to_spark_schema_already_lowercase_is_idempotent(self):
+        """Already-lowercase column names are returned unchanged."""
+        df = pd.DataFrame({"unitprice__c": [1.0], "quantity__c": [2]})
+        schema = _pandas_to_spark_schema(df)
+        assert [f.name for f in schema.fields] == ["unitprice__c", "quantity__c"]
+
     def test_pandas_to_spark_schema_datetime_types(self):
         """Test conversion of pandas datetime types to Spark TimestampType."""
 
@@ -147,8 +163,8 @@ class TestQueryAPIDataCloudReader:
 
     @pytest.fixture
     def mock_pandas_dataframe(self):
-        """Create a sample pandas DataFrame for testing."""
-        return pd.DataFrame({"col1": [1, 2], "col2": ["a", "b"]})
+        """Sample pandas DataFrame with PascalCase columns, as the QueryAPI returns."""
+        return pd.DataFrame({"Col1__c": [1, 2], "Col2__c": ["a", "b"]})
 
     @pytest.fixture
     def mock_connection(self, mock_pandas_dataframe):
@@ -301,3 +317,27 @@ class TestQueryAPIDataCloudReader:
         mock_connection.get_pandas_dataframe.assert_called_once_with(
             SQL_QUERY_TEMPLATE.format("test_dmo", 25)
         )
+
+    def test_read_dlo_schema_is_lowercase(
+        self, reader_without_init, mock_connection, mock_pandas_dataframe
+    ):
+        """read_dlo returns a schema with all-lowercase field names even when the
+        QueryAPI returns PascalCase column names."""
+        reader_without_init._conn = mock_connection
+
+        reader_without_init.read_dlo("test_dlo")
+
+        _, schema_arg = reader_without_init.spark.createDataFrame.call_args[0]
+        assert all(f.name == f.name.lower() for f in schema_arg.fields)
+
+    def test_read_dmo_schema_is_lowercase(
+        self, reader_without_init, mock_connection, mock_pandas_dataframe
+    ):
+        """read_dmo returns a schema with all-lowercase field names even when the
+        QueryAPI returns PascalCase column names."""
+        reader_without_init._conn = mock_connection
+
+        reader_without_init.read_dmo("test_dmo")
+
+        _, schema_arg = reader_without_init.spark.createDataFrame.call_args[0]
+        assert all(f.name == f.name.lower() for f in schema_arg.fields)
