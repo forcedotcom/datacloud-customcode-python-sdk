@@ -311,7 +311,8 @@ class TestReadDloAndDmo:
 
     @pytest.fixture
     def sample_df(self):
-        return pd.DataFrame({"id": [1, 2], "name": ["a", "b"]})
+        """DataFrame with PascalCase columns, as the REST API metadata returns."""
+        return pd.DataFrame({"Id__c": [1, 2], "Name__c": ["a", "b"]})
 
     @pytest.mark.parametrize(
         "method,obj_name",
@@ -347,6 +348,17 @@ class TestReadDloAndDmo:
 
         _, schema_arg = reader.spark.createDataFrame.call_args[0]
         assert isinstance(schema_arg, StructType)
+
+    @pytest.mark.parametrize("method", ["read_dlo", "read_dmo"])
+    def test_auto_infers_schema_lowercases_pascal_case_columns(
+        self, reader, sample_df, method
+    ):
+        """Schema is lowercased so local results match Data Cloud column names."""
+        with patch.object(reader, "_execute_query", return_value=sample_df):
+            getattr(reader, method)("SomeObj")
+
+        _, schema_arg = reader.spark.createDataFrame.call_args[0]
+        assert all(f.name == f.name.lower() for f in schema_arg.fields)
 
     @pytest.mark.parametrize("method", ["read_dlo", "read_dmo"])
     def test_uses_provided_schema(self, reader, sample_df, method):

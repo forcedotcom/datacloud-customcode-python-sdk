@@ -49,5 +49,5 @@ def _pandas_to_spark_schema(
             spark_type = TimestampType()
         else:
             spark_type = PANDAS_TYPE_MAPPING.get(str(dtype), StringType())
-        fields.append(StructField(column, spark_type, nullable))
+        fields.append(StructField(column.lower(), spark_type, nullable))
     return StructType(fields)
