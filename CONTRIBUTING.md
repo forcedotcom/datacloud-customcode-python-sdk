@@ -102,12 +102,3 @@ make mypy
 # Run complete test suite
 make test
 ```
-
-## Release process
-
-1. Go to [releases page](https://github.com/forcedotcom/datacloud-customcode-python-sdk/releases)
-1. Click "Draft a new release"
-1. Click "Select tag" and manually enter the next logical version, e.g. v1.2.3
-1. Use "Generate release notes" button
-1. Keep "Set as the latest release" checkbox
-1. Click "Publish release"
