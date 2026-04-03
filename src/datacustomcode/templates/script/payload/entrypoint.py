@@ -10,11 +10,11 @@ def main():
     df = client.read_dlo("Account_std__dll")
 
     # Perform transformations on the DataFrame
-    df_upper1 = df.withColumn("Description__c", upper(col("Description__c")))
+    df_upper1 = df.withColumn("description__c", upper(col("description__c")))
 
     # Drop specific columns related to relationships
-    df_upper1 = df_upper1.drop("SfdcOrganizationId__c")
-    df_upper1 = df_upper1.drop("KQ_Id__c")
+    df_upper1 = df_upper1.drop("sfdcorganizationid__c")
+    df_upper1 = df_upper1.drop("kq_id__c")
 
     # Save the transformed DataFrame
     dlo_name = "Account_std_copy__dll"
