@@ -170,6 +170,23 @@ client.write_to_dlo('output_DLO')
 > [!WARNING]
 > Currently we only support reading from DMOs and writing to DMOs or reading from DLOs and writing to DLOs, but they cannot mix.
 
+## LLM Capabilities
+
+* `llm_complete(prompt_col, model_id, max_tokens)` – Generate AI completions from a prompt column
+
+For example:
+```python
+from datacustomcode.ai import llm_complete
+from pyspark.sql.functions import concat_ws, lit, col
+
+# Generate summaries
+prompt = concat_ws(" ", 
+    lit("Summarize:"), 
+    col("Name__c"), 
+    col("Description__c")
+)
+df = df.withColumn("summary", llm_complete(prompt))
+```
 
 ## CLI
 

@@ -13,21 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from datacustomcode.ai import llm_complete
-from datacustomcode.client import Client
-from datacustomcode.credentials import AuthType, Credentials
-from datacustomcode.io.reader.query_api import QueryAPIDataCloudReader
-from datacustomcode.io.writer.print import PrintDataCloudWriter
-from datacustomcode.proxy.client.LocalProxyClientProvider import (
-    LocalProxyClientProvider,
-)
+"""LLM capabilities for Data Cloud Custom Code.
+
+This module provides LLM functions
+
+Available functions:
+    llm_complete: Generate completions from a prompt column
+
+Example:
+    from datacustomcode.ai import llm_complete
+    from pyspark.sql.functions import col
+
+    df = spark.read.table("Account_std__dll")
+    df = df.withColumn("summary", llm_complete("Name__c"))
+"""
+
+from datacustomcode.ai.llm import llm_complete
 
 __all__ = [
-    "AuthType",
-    "Client",
-    "Credentials",
-    "LocalProxyClientProvider",
-    "PrintDataCloudWriter",
-    "QueryAPIDataCloudReader",
     "llm_complete",
 ]
