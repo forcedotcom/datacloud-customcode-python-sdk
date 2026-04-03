@@ -27,3 +27,6 @@ class LocalProxyClientProvider(BaseProxyClient):
 
     def call_llm_gateway(self, llmModelId: str, prompt: str, maxTokens: int) -> str:
         return f"Hello, thanks for using {llmModelId}. So many tokens: {maxTokens}"
+
+    def llm_gateway_generate_text(self, template, values, llmModelId: str, maxTokens: int):
+        return f"Using Generate Text with {llmModelId} and maxTokens: {maxTokens}"

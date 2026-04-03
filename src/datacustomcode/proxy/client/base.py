@@ -25,3 +25,6 @@ class BaseProxyClient(BaseProxyAccessLayer):
 
     @abstractmethod
     def call_llm_gateway(self, llmModelId: str, prompt: str, maxTokens: int) -> str: ...
+
+    @abstractmethod
+    def llm_gateway_generate_text(self, template, values, llmModelId: str, maxTokens: int): ...
