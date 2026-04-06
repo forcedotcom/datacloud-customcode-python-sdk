@@ -166,6 +166,9 @@ sdf = client.read_dlo('my_DLO')
 client.write_to_dlo('output_DLO')
 ```
 
+> [!WARNING]
+> Currently we only support reading from DMOs and writing to DMOs or reading from DLOs and writing to DLOs, but they cannot mix.
+
 ### LLM Gateway
 
 Generate AI completions in DataFrame transformations using the LLM gateway UDF.
@@ -193,7 +196,7 @@ df = df.withColumn(
 ```
 
 > [!WARNING]
-> This method returns a placeholder string in local development and won't execute. It only works when deployed, where it calls the real LLM Gateway service via the `llm_gateway_generate` UDF.
+> This method returns a placeholder string in local development. It only makes a LLM call and spends tokens when deployed, where it calls the real LLM Gateway service via a UDF.
 
 ## CLI
 
