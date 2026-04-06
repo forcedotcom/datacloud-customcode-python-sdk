@@ -196,7 +196,7 @@ df = df.withColumn(
 ```
 
 > [!WARNING]
-> This method returns a placeholder string in local development. It only makes a LLM call and spends tokens when deployed, where it calls the real LLM Gateway service via a UDF.
+> This method returns a placeholder string in local development. It only makes a LLM call and spends tokens when deployed, where it calls the real LLM Gateway service via a built-in UDF.
 
 ## CLI
 
