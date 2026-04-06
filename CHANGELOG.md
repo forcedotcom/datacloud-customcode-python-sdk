@@ -1,5 +1,45 @@
 # Changelog
 
+## 1.0.1
+
+### Added
+
+- **`llm_gateway_generate_text()` UDF wrapper for AI-powered DataFrame transformations.**
+
+  New method on proxy providers to generate AI completions in DataFrame operations via a built-in UDF.
+
+  ```python
+  from datacustomcode import Client
+  from pyspark.sql.functions import col
+
+  client = Client()
+
+  # Generate summaries in a DataFrame column
+  df = df.withColumn(
+      "summary",
+      client._proxy.llm_gateway_generate_text(
+          "Summarize {company}: revenue={revenue}, CEO={ceo}",
+          {
+              "company": col("company"),
+              "revenue": col("revenue"),
+              "ceo": col("ceo")
+          },
+          llmModelId="sfdc_ai__DefaultGPT4Omni",
+          maxTokens=200
+      )
+  )
+  ```
+
+  **Local Development:** Returns placeholder string (doesn't execute)
+  **Production:** Calls a built-in UDF
+
+  **Parameters:**
+  - `template` (str): Prompt template with {placeholder} syntax
+  - `values` (dict or Column): Dict mapping placeholders to Columns, or pre-built named_struct
+  - `llmModelId` (str): Model identifier (required, e.g., "sfdc_ai__DefaultGPT4Omni")
+  - `maxTokens` (int): Maximum tokens that will be spent on this query
+
+
 ## 1.0.0
 
 ### Breaking Changes

@@ -155,7 +155,7 @@ You should only need the following methods:
 * `write_to_dmo(name, spark_dataframe, write_mode)` – Write to a Data Lake Object by name with a Spark dataframe
 
 For example:
-```
+```python
 from datacustomcode import Client
 
 client = Client()
@@ -166,10 +166,37 @@ sdf = client.read_dlo('my_DLO')
 client.write_to_dlo('output_DLO')
 ```
 
-
 > [!WARNING]
 > Currently we only support reading from DMOs and writing to DMOs or reading from DLOs and writing to DLOs, but they cannot mix.
 
+### LLM Gateway
+
+Generate AI completions in DataFrame transformations using the LLM gateway UDF.
+
+```python
+from datacustomcode import Client
+from pyspark.sql.functions import col
+
+client = Client()
+
+# Use template with placeholders
+df = df.withColumn(
+    "summary",
+    client._proxy.llm_gateway_generate_text(
+        "Summarize {company}: revenue={revenue}, CEO={ceo}",
+        {
+            "company": col("company"),
+            "revenue": col("revenue"),
+            "ceo": col("ceo")
+        },
+        llmModelId="sfdc_ai__DefaultGPT4Omni",
+        maxTokens=200
+    )
+)
+```
+
+> [!WARNING]
+> This method returns a placeholder string in local development. It only makes a LLM call and spends tokens when deployed, where it calls the real LLM Gateway service via a built-in UDF.
 
 ## CLI
 
