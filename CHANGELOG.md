@@ -30,7 +30,7 @@
   )
   ```
 
-  **Local Development:** Returns placeholder string (doesn't execute)  
+  **Local Development:** Returns placeholder string (doesn't execute)
   **Production:** Calls a built-in UDF
 
   **Parameters:**
