@@ -2,8 +2,9 @@ import logging
 from typing import List
 from uuid import uuid4
 
-import datacustomcode.resources.ll_gateway.types.GenerateTextRequest
-import datacustomcode.resources.file
+import datacustomcode.ll_gateway.types.GenerateTextRequest
+import datacustomcode.file
+import datacustomcode.function_runtime.FunctionRuntime
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ def chunk_text(text: str, chunk_size: int = 1000) -> List[str]:
     return chunks
 
 
-def function(request: dict, client: FunctionClient) -> dict:
+def function(request: dict, runTime: FunctionRuntime) -> dict:
     logger.info("Inside Function")
     logger.info(request)
 
@@ -52,7 +53,7 @@ def function(request: dict, client: FunctionClient) -> dict:
     else:
         print(response.error_code)
 
-    file_path = client.file.find_path("data.csv")
+    file_path = runTime.file.find_path("data.csv")
     content = open(file_path, 'r').read()
     logger.info(content)
 
