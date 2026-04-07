@@ -14,11 +14,19 @@
 # limitations under the License.
 from __future__ import annotations
 
-from abc import ABC
+from abc import abstractmethod
 
-from datacustomcode.mixin import UserExtendableNamedConfigMixin
+from datacustomcode.proxy.base import BaseProxyAccessLayer
 
 
-class BaseProxyAccessLayer(ABC, UserExtendableNamedConfigMixin):
+class BaseLLMGateway:
     def __init__(self):
         pass
+
+    @abstractmethod
+    def generate_text(self, GenerateTextRequest) -> GenerateTextResponse: ...
+
+    @abstractmethod
+    def llm_gateway_generate_text(
+        self, template, values, llmModelId: str, maxTokens: int
+    ): ...

@@ -2,6 +2,9 @@ import logging
 from typing import List
 from uuid import uuid4
 
+import datacustomcode.resources.ll_gateway.types.GenerateTextRequest
+import datacustomcode.resources.file
+
 logger = logging.getLogger(__name__)
 
 
@@ -33,13 +36,25 @@ def chunk_text(text: str, chunk_size: int = 1000) -> List[str]:
     return chunks
 
 
-def function(request: dict) -> dict:
+def function(request: dict, client: FunctionClient) -> dict:
     logger.info("Inside Function")
     logger.info(request)
 
     items = request["input"]
     output_chunks = []
     current_seq_no = 1  # Start sequence number from 1
+
+
+    request =  GenerateTextRequest.with_locale(modelName= "", prompt="How are you doing?", locale="en_EN")
+    response = client.llm_gateway.genearte_text(request)
+    if response.is_success:
+        print(response.text)
+    else:
+        print(response.error_code)
+
+    file_path = client.file.find_path("data.csv")
+    content = open(file_path, 'r').read()
+    logger.info(content)
 
     for item in items:
         # Item is DocElement as dict
