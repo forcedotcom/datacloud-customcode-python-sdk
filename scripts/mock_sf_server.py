@@ -52,7 +52,7 @@ _USERINFO = {
 }
 
 _TOKEN_RESPONSE = {
-    "access_token": "fake_access_token_00D000000000001AAA",
+    "access_token": "00D000000000001AAA!fakeAccessTokenForCITesting",
     "instance_url": f"http://localhost:{PORT}",
     "token_type": "Bearer",
     "scope": "api",

@@ -57,7 +57,7 @@ jobs:
     - name: Register fake org 'dev1' with SF CLI
       run: |
         sleep 1
-        echo "fake_access_token_00D000000000001AAA" | \
+        echo "00D000000000001AAA!fakeAccessTokenForCITesting" | \
           sf org login access-token \
             --instance-url http://localhost:8888 \
             --alias dev1 \
