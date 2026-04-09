@@ -41,6 +41,28 @@ jobs:
     - name: Install data-code-extension plugin
       run: sf plugins install @salesforce/plugin-data-code-extension --force
 
+    - name: Set up Java 17 (required for PySpark during run)
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '17'
+
+      # ── Mock Salesforce server + fake org auth ────────────────────────────────
+
+    - name: Start mock Salesforce server
+      run: python scripts/mock_sf_server.py &
+      env:
+        MOCK_SF_PORT: '8888'
+
+    - name: Register fake org 'dev1' with SF CLI
+      run: |
+        sleep 1
+        echo "fake_access_token_00D000000000001AAA" | \
+          sf org login access-token \
+            --instance-url http://localhost:8888 \
+            --alias dev1 \
+            --no-prompt
+
       # ── Script: init ──────────────────────────────────────────────────────────
 
     - name: '[script] init — sf data-code-extension script init --package-dir testScript'
@@ -103,6 +125,17 @@ jobs:
       run: |
         test -f deployment.zip || {
           echo "::error::deployment.zip not found after sf data-code-extension script zip. The zip command may have written to a different path or failed silently."
+          exit 1
+        }
+
+      # ── Script: run ───────────────────────────────────────────────────────────
+
+    - name: '[script] run — sf data-code-extension script run --entrypoint testScript/payload/entrypoint.py -o dev1'
+      run: |
+        sf data-code-extension script run \
+          --entrypoint testScript/payload/entrypoint.py \
+          -o dev1 || {
+          echo "::error::sf data-code-extension script run FAILED. Check mock server output above for which endpoint failed. The --entrypoint flag or SF CLI org auth contract may have changed."
           exit 1
         }
 
@@ -171,5 +204,16 @@ jobs:
       run: |
         test -f deployment.zip || {
           echo "::error::deployment.zip not found after sf data-code-extension function zip."
+          exit 1
+        }
+
+      # ── Function: run ─────────────────────────────────────────────────────────
+
+    - name: '[function] run — sf data-code-extension function run --entrypoint testFunction/payload/entrypoint.py -o dev1'
+      run: |
+        sf data-code-extension function run \
+          --entrypoint testFunction/payload/entrypoint.py \
+          -o dev1 || {
+          echo "::error::sf data-code-extension function run FAILED. Check mock server output above; the --entrypoint flag or SF CLI org auth contract may have changed."
           exit 1
         }
