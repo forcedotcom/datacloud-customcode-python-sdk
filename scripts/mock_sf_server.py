@@ -1,7 +1,8 @@
 """Minimal mock Salesforce server for CI integration tests.
 
-Intercepts the HTTP calls made during ``sf data-code-extension script|function run``
-so that neither a real Salesforce org nor real Data Cloud data is required.
+Intercepts the HTTP calls made during ``sf data-code-extension script|function``
+``run`` and ``deploy`` so that neither a real Salesforce org nor real Data Cloud
+data is required.
 
 Endpoints handled
 -----------------
@@ -16,6 +17,20 @@ POST /services/data/v66.0/ssot/query-sql
     Called by SFCLIDataCloudReader when the script entrypoint reads a DLO/DMO.
     Returns fake rows with the columns expected by the default script template
     (Account_std__dll: description__c, sfdcorganizationid__c, kq_id__c).
+
+POST /services/data/v63.0/ssot/data-custom-code
+    Called by deploy_full() → create_deployment().
+    Returns a fake fileUploadUrl pointing back at this server.
+
+GET  /services/data/v63.0/ssot/data-custom-code/*
+    Called by deploy_full() → wait_for_deployment() → get_deployments().
+    Returns deploymentStatus=Deployed immediately so the poll loop exits.
+
+PUT  /upload/*
+    The presigned fileUploadUrl target.  Accepts the deployment.zip binary.
+
+POST /services/data/v63.0/ssot/data-transforms
+    Called by deploy_full() → create_data_transform() for script packages.
 
 GET  /* (catch-all)
     Returns {"status": "ok"} for any other SF API path the CLI may probe.
@@ -72,6 +87,9 @@ _QUERY_RESPONSE = {
     ],
 }
 
+_DATA_CUSTOM_CODE_PATH = "/services/data/v63.0/ssot/data-custom-code"
+_DATA_TRANSFORMS_PATH = "/services/data/v63.0/ssot/data-transforms"
+
 
 class MockSFHandler(BaseHTTPRequestHandler):
     def _send_json(self, payload: object, status: int = 200) -> None:
@@ -82,6 +100,15 @@ class MockSFHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_empty(self, status: int = 200) -> None:
+        self.send_response(status)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def _drain_body(self) -> bytes:
+        length = int(self.headers.get("Content-Length", 0))
+        return self.rfile.read(length) if length else b""
+
     def log_message(self, fmt: str, *args: object) -> None:  # type: ignore[override]
         print(f"[MOCK SF] {self.command} {self.path} — {fmt % args}", flush=True)
 
@@ -89,21 +116,37 @@ class MockSFHandler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path == "/services/oauth2/userinfo":
             self._send_json(_USERINFO)
+        elif path.startswith(_DATA_CUSTOM_CODE_PATH + "/"):
+            # Deployment status poll — report Deployed immediately
+            self._send_json({"deploymentStatus": "Deployed"})
         else:
             self._send_json({"status": "ok"})
 
     def do_POST(self) -> None:
         path = self.path.split("?")[0]
-        length = int(self.headers.get("Content-Length", 0))
-        body = self.rfile.read(length) if length else b""
-        print(f"[MOCK SF] POST body: {body[:200]!r}", flush=True)
+        body = self._drain_body()
+        print(f"[MOCK SF] POST body: {body[:300]!r}", flush=True)
 
         if path == "/services/oauth2/token":
             self._send_json(_TOKEN_RESPONSE)
         elif path.endswith("/ssot/query-sql"):
+            # Data Cloud query (run command)
             self._send_json(_QUERY_RESPONSE)
+        elif path == _DATA_CUSTOM_CODE_PATH:
+            # create_deployment() — return a presigned upload URL
+            self._send_json(
+                {"fileUploadUrl": f"http://localhost:{PORT}/upload/fake-deployment.zip"}
+            )
+        elif path == _DATA_TRANSFORMS_PATH:
+            # create_data_transform() — script packages only
+            self._send_json({"id": "fake-dt-id", "name": "fake-data-transform"})
         else:
             self._send_json({"status": "ok"})
+
+    def do_PUT(self) -> None:
+        # upload_zip() sends the deployment.zip to the presigned URL
+        self._drain_body()
+        self._send_empty(200)
 
 
 if __name__ == "__main__":

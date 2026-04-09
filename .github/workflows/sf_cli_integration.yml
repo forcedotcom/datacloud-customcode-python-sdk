@@ -166,6 +166,21 @@ jobs:
           exit 1
         }
 
+      # ── Script: deploy ───────────────────────────────────────────────────────
+
+    - name: '[script] deploy — sf data-code-extension script deploy'
+      run: |
+        sf data-code-extension script deploy \
+          --name test-script-deploy \
+          --package-version 0.0.1 \
+          --description "Test script deploy" \
+          --package-dir testScript/payload \
+          --cpu-size CPU_2XL \
+          -o dev1 || {
+          echo "::error::sf data-code-extension script deploy FAILED. Check mock server output above for which endpoint failed. The deploy command flags or API contract may have changed."
+          exit 1
+        }
+
       # ── Function: init ────────────────────────────────────────────────────────
 
     - name: '[function] init — sf data-code-extension function init --package-dir testFunction'
@@ -242,5 +257,20 @@ jobs:
           --entrypoint testFunction/payload/entrypoint.py \
           -o dev1 || {
           echo "::error::sf data-code-extension function run FAILED. Check mock server output above; the --entrypoint flag or SF CLI org auth contract may have changed."
+          exit 1
+        }
+
+      # ── Function: deploy ─────────────────────────────────────────────────────
+
+    - name: '[function] deploy — sf data-code-extension function deploy'
+      run: |
+        sf data-code-extension function deploy \
+          --name test-function-deploy \
+          --package-version 0.0.1 \
+          --description "Test function deploy" \
+          --package-dir testFunction/payload \
+          --cpu-size CPU_2XL \
+          -o dev1 || {
+          echo "::error::sf data-code-extension function deploy FAILED. Check mock server output above for which endpoint failed. The deploy command flags or API contract may have changed."
           exit 1
         }
