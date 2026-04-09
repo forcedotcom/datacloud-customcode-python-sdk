@@ -54,14 +54,41 @@ jobs:
       env:
         MOCK_SF_PORT: '8888'
 
-    - name: Register fake org 'dev1' with SF CLI
+    - name: Create fake SF CLI auth for org alias 'dev1'
       run: |
         sleep 1
-        echo "00D000000000001AAA!fakeAccessTokenForCITesting" | \
-          sf org login access-token \
-            --instance-url http://localhost:8888 \
-            --alias dev1 \
-            --no-prompt
+        python - <<'PYEOF'
+        import json, pathlib
+        home = pathlib.Path.home()
+
+        # Auth file — @salesforce/core reads ~/.sfdx/<username>.json on Linux
+        # (plain-text storage, no OS keychain involved on CI runners)
+        sfdx_dir = home / ".sfdx"
+        sfdx_dir.mkdir(exist_ok=True)
+        auth = {
+            "accessToken": "00D000000000001AAA!fakeTokenForCITesting",
+            "instanceUrl": "http://localhost:8888",
+            "loginUrl": "https://login.salesforce.com",
+            "orgId": "00D000000000001AAA",
+            "userId": "005000000000001AAA",
+            "username": "dev1@example.com",
+            "clientId": "PlatformCLI",
+            "isDevHub": False,
+            "isSandbox": False,
+            "created": "2024-01-01T00:00:00.000Z",
+            "createdOrgInstance": "CS1",
+        }
+        (sfdx_dir / "dev1@example.com.json").write_text(json.dumps(auth, indent=2))
+
+        # Alias mapping — write to both locations for compat across sf versions
+        alias_data = {"orgs": {"dev1": "dev1@example.com"}}
+        sf_dir = home / ".sf"
+        sf_dir.mkdir(exist_ok=True)
+        (sf_dir / "alias.json").write_text(json.dumps(alias_data))
+        (sfdx_dir / "alias.json").write_text(json.dumps(alias_data))
+
+        print("Fake SF CLI org auth written to ~/.sfdx/dev1@example.com.json")
+        PYEOF
 
       # ── Script: init ──────────────────────────────────────────────────────────
 
