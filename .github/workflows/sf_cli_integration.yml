@@ -1,0 +1,277 @@
+name: SF CLI Integration Test
+
+on:
+  pull_request:
+
+jobs:
+  sf-cli-integration:
+    runs-on: ubuntu-latest
+    env:
+      SF_AUTOUPDATE_DISABLE: true
+      NO_COLOR: '1'
+
+    steps:
+      # ── Setup ─────────────────────────────────────────────────────────────────
+
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install Poetry and Python SDK
+      run: |
+        python -m pip install --upgrade pip
+        pip install poetry
+        make develop
+
+    - name: Add Poetry venv to PATH
+      run: echo "$(poetry env info --path)/bin" >> $GITHUB_PATH
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: lts/*
+
+    - name: Install Salesforce CLI
+      run: npm install -g @salesforce/cli
+
+    - name: Install data-code-extension plugin
+      run: sf plugins install @salesforce/plugin-data-code-extension --force
+
+    - name: Set up Java 17 (required for PySpark during run)
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '17'
+
+      # ── Mock Salesforce server + fake org auth ────────────────────────────────
+
+    - name: Start mock Salesforce server
+      run: python scripts/mock_sf_server.py &
+      env:
+        MOCK_SF_PORT: '8888'
+
+    - name: Create fake SF CLI auth for org alias 'dev1'
+      run: |
+        sleep 1
+        python - <<'PYEOF'
+        import json, pathlib
+        home = pathlib.Path.home()
+
+        # Auth file — @salesforce/core reads ~/.sfdx/<username>.json on Linux
+        # (plain-text storage, no OS keychain involved on CI runners)
+        sfdx_dir = home / ".sfdx"
+        sfdx_dir.mkdir(exist_ok=True)
+        auth = {
+            "accessToken": "00D000000000001AAA!fakeTokenForCITesting",
+            "instanceUrl": "http://localhost:8888",
+            "loginUrl": "https://login.salesforce.com",
+            "orgId": "00D000000000001AAA",
+            "userId": "005000000000001AAA",
+            "username": "dev1@example.com",
+            "clientId": "PlatformCLI",
+            "isDevHub": False,
+            "isSandbox": False,
+            "created": "2024-01-01T00:00:00.000Z",
+            "createdOrgInstance": "CS1",
+        }
+        (sfdx_dir / "dev1@example.com.json").write_text(json.dumps(auth, indent=2))
+
+        # Alias mapping — write to both locations for compat across sf versions
+        alias_data = {"orgs": {"dev1": "dev1@example.com"}}
+        sf_dir = home / ".sf"
+        sf_dir.mkdir(exist_ok=True)
+        (sf_dir / "alias.json").write_text(json.dumps(alias_data))
+        (sfdx_dir / "alias.json").write_text(json.dumps(alias_data))
+
+        print("Fake SF CLI org auth written to ~/.sfdx/dev1@example.com.json")
+        PYEOF
+
+      # ── Script: init ──────────────────────────────────────────────────────────
+
+    - name: '[script] init — sf data-code-extension script init --package-dir testScript'
+      run: |
+        sf data-code-extension script init --package-dir testScript || {
+          echo "::error::sf data-code-extension script init FAILED. Verify --package-dir is still a recognised flag and that the command exits 0 on success."
+          exit 1
+        }
+
+    - name: '[script] verify init — expected files exist'
+      run: |
+        test -f testScript/payload/entrypoint.py || {
+          echo "::error::testScript/payload/entrypoint.py not found after init. The init command may not have copied the script template."
+          exit 1
+        }
+        test -f testScript/.datacustomcode_proj/sdk_config.json || {
+          echo "::error::testScript/.datacustomcode_proj/sdk_config.json not found after init. The SDK config marker was not written."
+          exit 1
+        }
+
+      # ── Script: scan ──────────────────────────────────────────────────────────
+
+    - name: '[script] scan — sf data-code-extension script scan --entrypoint testScript/payload/entrypoint.py'
+      run: |
+        sf data-code-extension script scan --entrypoint testScript/payload/entrypoint.py || {
+          echo "::error::sf data-code-extension script scan FAILED. Verify --entrypoint is still a recognised flag and the command exits 0."
+          exit 1
+        }
+
+    - name: '[script] verify scan — config.json contains permissions'
+      run: |
+        python - <<'EOF'
+        import json, sys
+        path = "testScript/payload/config.json"
+        try:
+            with open(path) as f:
+                data = json.load(f)
+        except Exception as e:
+            print(f"::error::Could not read {path}: {e}")
+            sys.exit(1)
+        if "permissions" not in data:
+            print(f"::error::{path} is missing 'permissions' key after scan. Got: {json.dumps(data)}")
+            sys.exit(1)
+        print("config.json OK:", json.dumps(data, indent=2))
+        EOF
+
+      # ── Script: zip ───────────────────────────────────────────────────────────
+
+    - name: '[script] prepare for zip — clear requirements.txt to skip native-dep Docker build'
+      run: echo "" > testScript/payload/requirements.txt
+
+    - name: '[script] zip — sf data-code-extension script zip --package-dir testScript'
+      run: |
+        sf data-code-extension script zip --package-dir testScript || {
+          echo "::error::sf data-code-extension script zip FAILED. Verify --package-dir is still recognised and the command exits 0."
+          exit 1
+        }
+
+    - name: '[script] verify zip — deployment.zip exists'
+      run: |
+        test -f deployment.zip || {
+          echo "::error::deployment.zip not found after sf data-code-extension script zip. The zip command may have written to a different path or failed silently."
+          exit 1
+        }
+
+      # ── Script: run ───────────────────────────────────────────────────────────
+
+    - name: '[script] run — sf data-code-extension script run --entrypoint testScript/payload/entrypoint.py -o dev1'
+      run: |
+        sf data-code-extension script run \
+          --entrypoint testScript/payload/entrypoint.py \
+          -o dev1 || {
+          echo "::error::sf data-code-extension script run FAILED. Check mock server output above for which endpoint failed. The --entrypoint flag or SF CLI org auth contract may have changed."
+          exit 1
+        }
+
+      # ── Script: deploy ───────────────────────────────────────────────────────
+
+    - name: '[script] deploy — sf data-code-extension script deploy'
+      run: |
+        sf data-code-extension script deploy \
+          --name test-script-deploy \
+          --package-version 0.0.1 \
+          --description "Test script deploy" \
+          --package-dir testScript/payload \
+          --cpu-size CPU_2XL \
+          -o dev1 || {
+          echo "::error::sf data-code-extension script deploy FAILED. Check mock server output above for which endpoint failed. The deploy command flags or API contract may have changed."
+          exit 1
+        }
+
+      # ── Function: init ────────────────────────────────────────────────────────
+
+    - name: '[function] init — sf data-code-extension function init --package-dir testFunction'
+      run: |
+        sf data-code-extension function init --package-dir testFunction || {
+          echo "::error::sf data-code-extension function init FAILED. Verify --package-dir is still recognised and the function template copies correctly."
+          exit 1
+        }
+
+    - name: '[function] verify init — expected files exist'
+      run: |
+        test -f testFunction/payload/entrypoint.py || {
+          echo "::error::testFunction/payload/entrypoint.py not found after function init."
+          exit 1
+        }
+        test -f testFunction/.datacustomcode_proj/sdk_config.json || {
+          echo "::error::testFunction/.datacustomcode_proj/sdk_config.json not found after function init."
+          exit 1
+        }
+
+      # ── Function: scan ────────────────────────────────────────────────────────
+
+    - name: '[function] scan — sf data-code-extension function scan --entrypoint testFunction/payload/entrypoint.py'
+      run: |
+        sf data-code-extension function scan --entrypoint testFunction/payload/entrypoint.py || {
+          echo "::error::sf data-code-extension function scan FAILED."
+          exit 1
+        }
+
+    - name: '[function] verify scan — config.json contains entryPoint'
+      run: |
+        python - <<'EOF'
+        import json, sys
+        path = "testFunction/payload/config.json"
+        try:
+            with open(path) as f:
+                data = json.load(f)
+        except Exception as e:
+            print(f"::error::Could not read {path}: {e}")
+            sys.exit(1)
+        if "entryPoint" not in data:
+            print(f"::error::{path} is missing 'entryPoint' key after scan. Got: {json.dumps(data)}")
+            sys.exit(1)
+        print("config.json OK:", json.dumps(data, indent=2))
+        EOF
+
+      # ── Function: zip ─────────────────────────────────────────────────────────
+
+    - name: '[function] prepare for zip — clear requirements.txt to skip native-dep Docker build'
+      run: echo "" > testFunction/payload/requirements.txt
+
+    - name: '[function] clean up previous deployment.zip before function zip'
+      run: rm -f deployment.zip
+
+    - name: '[function] zip — sf data-code-extension function zip --package-dir testFunction'
+      run: |
+        sf data-code-extension function zip --package-dir testFunction || {
+          echo "::error::sf data-code-extension function zip FAILED."
+          exit 1
+        }
+
+    - name: '[function] verify zip — deployment.zip exists'
+      run: |
+        test -f deployment.zip || {
+          echo "::error::deployment.zip not found after sf data-code-extension function zip."
+          exit 1
+        }
+
+      # ── Function: run ─────────────────────────────────────────────────────────
+
+    - name: '[function] run — sf data-code-extension function run --entrypoint testFunction/payload/entrypoint.py -o dev1'
+      run: |
+        sf data-code-extension function run \
+          --entrypoint testFunction/payload/entrypoint.py \
+          -o dev1 || {
+          echo "::error::sf data-code-extension function run FAILED. Check mock server output above; the --entrypoint flag or SF CLI org auth contract may have changed."
+          exit 1
+        }
+
+      # ── Function: deploy ─────────────────────────────────────────────────────
+
+    - name: '[function] deploy — sf data-code-extension function deploy'
+      run: |
+        sf data-code-extension function deploy \
+          --name test-function-deploy \
+          --package-version 0.0.1 \
+          --description "Test function deploy" \
+          --package-dir testFunction/payload \
+          --cpu-size CPU_2XL \
+          --function-invoke-opt UnstructuredChunking \
+          -o dev1 || {
+          echo "::error::sf data-code-extension function deploy FAILED. Check mock server output above for which endpoint failed. The deploy command flags or API contract may have changed."
+          exit 1
+        }
