@@ -25,11 +25,11 @@ class MockDataCloudReader(BaseDataCloudReader):
 
     CONFIG_NAME = "MockDataCloudReader"
 
-    def read_dlo(self, name: str, schema=None, row_limit: int = 1000) -> DataFrame:
+    def read_dlo(self, name: str, schema=None, row_limit=None) -> DataFrame:
         df = MagicMock(spec=DataFrame)
         return df
 
-    def read_dmo(self, name: str, schema=None, row_limit: int = 1000) -> DataFrame:
+    def read_dmo(self, name: str, schema=None, row_limit=None) -> DataFrame:
         df = MagicMock(spec=DataFrame)
         return df
 
@@ -153,7 +153,7 @@ class TestClient:
         client = Client(reader=reader, writer=writer, proxy=mock_proxy)
         result = client.read_dlo("test_dlo")
 
-        reader.read_dlo.assert_called_once_with("test_dlo", row_limit=1000)
+        reader.read_dlo.assert_called_once_with("test_dlo", row_limit=None)
         assert result is mock_df
         assert "test_dlo" in client._data_layer_history[DataCloudObjectType.DLO]
 
@@ -166,7 +166,7 @@ class TestClient:
         client = Client(reader=reader, writer=writer, proxy=mock_proxy)
         result = client.read_dmo("test_dmo")
 
-        reader.read_dmo.assert_called_once_with("test_dmo", row_limit=1000)
+        reader.read_dmo.assert_called_once_with("test_dmo", row_limit=None)
         assert result is mock_df
         assert "test_dmo" in client._data_layer_history[DataCloudObjectType.DMO]
 
@@ -238,7 +238,7 @@ class TestClient:
         df = client.read_dlo("source_dlo")
         client.write_to_dlo("target_dlo", df, WriteMode.APPEND)
 
-        reader.read_dlo.assert_called_once_with("source_dlo", row_limit=1000)
+        reader.read_dlo.assert_called_once_with("source_dlo", row_limit=None)
         writer.write_to_dlo.assert_called_once_with(
             "target_dlo", mock_df, WriteMode.APPEND
         )
@@ -253,7 +253,7 @@ class TestClient:
         df = client.read_dmo("source_dmo")
         client.write_to_dmo("target_dmo", df, WriteMode.MERGE)
 
-        reader.read_dmo.assert_called_once_with("source_dmo", row_limit=1000)
+        reader.read_dmo.assert_called_once_with("source_dmo", row_limit=None)
         writer.write_to_dmo.assert_called_once_with(
             "target_dmo", mock_df, WriteMode.MERGE
         )

@@ -20,6 +20,7 @@ import pytest
 
 from datacustomcode.io.reader.query_api import (
     SQL_QUERY_TEMPLATE,
+    SQL_QUERY_TEMPLATE_NO_LIMIT,
     QueryAPIDataCloudReader,
 )
 from datacustomcode.io.reader.utils import _pandas_to_spark_schema
@@ -188,6 +189,7 @@ class TestQueryAPIDataCloudReader:
         with patch.object(QueryAPIDataCloudReader, "__init__", return_value=None):
             reader = QueryAPIDataCloudReader(None)  # None is ignored due to mock
             reader.spark = mock_spark_session
+            reader._default_row_limit = 1000
             yield reader
 
     def test_pandas_to_spark_schema_function(self):
@@ -341,3 +343,83 @@ class TestQueryAPIDataCloudReader:
 
         _, schema_arg = reader_without_init.spark.createDataFrame.call_args[0]
         assert all(f.name == f.name.lower() for f in schema_arg.fields)
+
+
+@pytest.mark.usefixtures("patch_all_requests")
+class TestQueryAPIDataCloudReaderNoDefaultLimit:
+    """Tests for deployed behavior where default_row_limit is None (no limit)."""
+
+    @pytest.fixture(scope="class", autouse=True)
+    def patch_all_requests(self, request):
+        patches = []
+        for target in [
+            "requests.get",
+            "requests.post",
+            "requests.session",
+            "requests.adapters.HTTPAdapter.send",
+            "urllib3.connectionpool.HTTPConnectionPool.urlopen",
+        ]:
+            patcher = patch(target)
+            patches.append(patcher)
+            patcher.start()
+
+        def fin():
+            for patcher in patches:
+                patcher.stop()
+
+        request.addfinalizer(fin)
+
+    @pytest.fixture
+    def mock_spark_session(self):
+        spark = MagicMock()
+        spark.createDataFrame.return_value = spark
+        return spark
+
+    @pytest.fixture
+    def mock_pandas_dataframe(self):
+        return pd.DataFrame({"Col1__c": [1, 2], "Col2__c": ["a", "b"]})
+
+    @pytest.fixture
+    def mock_connection(self, mock_pandas_dataframe):
+        mock_conn = MagicMock()
+        mock_conn.get_pandas_dataframe.return_value = mock_pandas_dataframe
+        return mock_conn
+
+    @pytest.fixture
+    def reader_no_limit(self, mock_spark_session):
+        """Reader with no default row limit (simulates deployed environment)."""
+        with patch.object(QueryAPIDataCloudReader, "__init__", return_value=None):
+            reader = QueryAPIDataCloudReader(None)
+            reader.spark = mock_spark_session
+            reader._default_row_limit = None
+            yield reader
+
+    def test_read_dlo_no_limit_when_deployed(
+        self, reader_no_limit, mock_connection, mock_pandas_dataframe
+    ):
+        """When default_row_limit is None and no explicit row_limit, omit LIMIT."""
+        reader_no_limit._conn = mock_connection
+        reader_no_limit.read_dlo("test_dlo")
+        mock_connection.get_pandas_dataframe.assert_called_once_with(
+            SQL_QUERY_TEMPLATE_NO_LIMIT.format("test_dlo")
+        )
+
+    def test_read_dmo_no_limit_when_deployed(
+        self, reader_no_limit, mock_connection, mock_pandas_dataframe
+    ):
+        """When default_row_limit is None and no explicit row_limit, omit LIMIT."""
+        reader_no_limit._conn = mock_connection
+        reader_no_limit.read_dmo("test_dmo")
+        mock_connection.get_pandas_dataframe.assert_called_once_with(
+            SQL_QUERY_TEMPLATE_NO_LIMIT.format("test_dmo")
+        )
+
+    def test_read_dlo_explicit_limit_still_applied_when_deployed(
+        self, reader_no_limit, mock_connection, mock_pandas_dataframe
+    ):
+        """An explicit row_limit always applies, even without a default."""
+        reader_no_limit._conn = mock_connection
+        reader_no_limit.read_dlo("test_dlo", row_limit=500)
+        mock_connection.get_pandas_dataframe.assert_called_once_with(
+            SQL_QUERY_TEMPLATE.format("test_dlo", 500)
+        )

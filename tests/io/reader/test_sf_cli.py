@@ -15,11 +15,18 @@ from datacustomcode.io.reader.sf_cli import API_VERSION, SFCLIDataCloudReader
 
 
 def _make_reader(
-    sf_cli_org: str = "dev1", dataspace: str | None = None
+    sf_cli_org: str = "dev1",
+    dataspace: str | None = None,
+    default_row_limit: int | None = 1000,
 ) -> SFCLIDataCloudReader:
     spark = MagicMock()
     spark.createDataFrame.return_value = MagicMock()
-    return SFCLIDataCloudReader(spark=spark, sf_cli_org=sf_cli_org, dataspace=dataspace)
+    return SFCLIDataCloudReader(
+        spark=spark,
+        sf_cli_org=sf_cli_org,
+        dataspace=dataspace,
+        default_row_limit=default_row_limit,
+    )
 
 
 def _sf_display_output(
@@ -327,7 +334,7 @@ class TestReadDloAndDmo:
         ) as mock_exec:
             getattr(reader, method)(obj_name)
 
-        mock_exec.assert_called_once_with(f"SELECT * FROM {obj_name}", 1000)
+        mock_exec.assert_called_once_with(f"SELECT * FROM {obj_name}", None)
 
     @pytest.mark.parametrize("method", ["read_dlo", "read_dmo"])
     def test_custom_row_limit(self, reader, sample_df, method):
@@ -391,3 +398,58 @@ class TestReadDloAndDmo:
             result = getattr(reader, method)("SomeObj")
 
         assert result is expected
+
+
+# ---------------------------------------------------------------------------
+# No default row limit (deployed environment)
+# ---------------------------------------------------------------------------
+
+
+class TestSFCLINoDefaultRowLimit:
+    """Tests for deployed behavior where default_row_limit is None."""
+
+    @pytest.fixture
+    def reader(self):
+        return _make_reader(default_row_limit=None)
+
+    @pytest.fixture
+    def mock_token(self, reader):
+        with patch.object(
+            reader, "_get_token", return_value=("tok", "https://org.salesforce.com")
+        ):
+            yield
+
+    def _mock_response(
+        self, status_code: int = 200, json_body: dict | None = None, text: str = ""
+    ) -> MagicMock:
+        response = MagicMock()
+        response.status_code = status_code
+        response.text = text
+        response.json.return_value = json_body or {}
+        return response
+
+    def test_execute_query_omits_limit_when_no_default(self, reader, mock_token):
+        """When default_row_limit is None and row_limit is None, no LIMIT clause."""
+        api_response = {"metadata": [{"name": "col"}], "data": [["v"]]}
+        with patch(
+            "requests.post",
+            return_value=self._mock_response(json_body=api_response),
+        ) as mock_post:
+            reader._execute_query("SELECT * FROM foo", None)
+
+        body = mock_post.call_args.kwargs["json"]
+        assert body["sql"] == "SELECT * FROM foo"
+
+    def test_execute_query_applies_explicit_limit_when_no_default(
+        self, reader, mock_token
+    ):
+        """An explicit row_limit is always applied, even without a default."""
+        api_response = {"metadata": [{"name": "col"}], "data": [["v"]]}
+        with patch(
+            "requests.post",
+            return_value=self._mock_response(json_body=api_response),
+        ) as mock_post:
+            reader._execute_query("SELECT * FROM foo", 42)
+
+        body = mock_post.call_args.kwargs["json"]
+        assert body["sql"] == "SELECT * FROM foo LIMIT 42"

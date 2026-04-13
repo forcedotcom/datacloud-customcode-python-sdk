@@ -185,12 +185,16 @@ class Client:
         )
         return cls._instance
 
-    def read_dlo(self, name: str, row_limit: int = 1000) -> PySparkDataFrame:
+    def read_dlo(
+        self, name: str, row_limit: Optional[int] = None
+    ) -> PySparkDataFrame:
         """Read a DLO from Data Cloud.
 
         Args:
             name: The name of the DLO to read.
-            row_limit: Maximum number of rows to fetch (default: 1000).
+            row_limit: Maximum number of rows to fetch. When ``None``, the
+                reader's configured ``default_row_limit`` is used (1000 for
+                local development, no limit when deployed).
 
         Returns:
             A PySpark DataFrame containing the DLO data.
@@ -198,12 +202,16 @@ class Client:
         self._record_dlo_access(name)
         return self._reader.read_dlo(name, row_limit=row_limit)
 
-    def read_dmo(self, name: str, row_limit: int = 1000) -> PySparkDataFrame:
+    def read_dmo(
+        self, name: str, row_limit: Optional[int] = None
+    ) -> PySparkDataFrame:
         """Read a DMO from Data Cloud.
 
         Args:
             name: The name of the DMO to read.
-            row_limit: Maximum number of rows to fetch (default: 1000).
+            row_limit: Maximum number of rows to fetch. When ``None``, the
+                reader's configured ``default_row_limit`` is used (1000 for
+                local development, no limit when deployed).
 
         Returns:
             A PySpark DataFrame containing the DMO data.
