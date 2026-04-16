@@ -261,7 +261,6 @@ class TestClient:
         assert "source_dmo" in client._data_layer_history[DataCloudObjectType.DMO]
 
 
-
 # Add tests for DefaultSparkSessionProvider
 class TestDefaultSparkSessionProvider:
 

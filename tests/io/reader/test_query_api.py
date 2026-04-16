@@ -389,4 +389,3 @@ class TestQueryAPIDataCloudReaderNoDefaultLimit:
         mock_connection.get_pandas_dataframe.assert_called_once_with(
             SQL_QUERY_TEMPLATE_NO_LIMIT.format("test_dmo")
         )
-
