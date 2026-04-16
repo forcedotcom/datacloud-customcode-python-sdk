@@ -12,14 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import annotations
-from abc import abstractmethod
-from pathlib import Path
 
-
-class BaseDataAccessLayer:
-    def __init__(self):
-        pass
-
-    @abstractmethod
-    def find_file_path(self, file_name: str) -> Path: ...
+class BaseRuntime:
+    """Base class for datacustomcode run time """

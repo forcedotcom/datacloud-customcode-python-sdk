@@ -2,9 +2,10 @@ import logging
 from typing import List
 from uuid import uuid4
 
-import datacustomcode.ll_gateway.types.GenerateTextRequest
-import datacustomcode.file
-import datacustomcode.function_runtime.FunctionRuntime
+from datacustomcode.llm_gateway.types.generate_text_request_builder import GenerateTextRequestBuilder
+from datacustomcode.llm_gateway.types.generate_text_request import GenerateTextRequest
+from datacustomcode.llm_gateway.types.generate_text_response import GenerateTextResponse
+from datacustomcode.runtime.function import Runtime
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,7 @@ def chunk_text(text: str, chunk_size: int = 1000) -> List[str]:
     return chunks
 
 
-def function(request: dict, runTime: FunctionRuntime) -> dict:
+def function(request: dict, runTime: Runtime) -> dict:
     logger.info("Inside Function")
     logger.info(request)
 
@@ -46,14 +47,15 @@ def function(request: dict, runTime: FunctionRuntime) -> dict:
     current_seq_no = 1  # Start sequence number from 1
 
 
-    request =  GenerateTextRequest.with_locale(modelName= "", prompt="How are you doing?", locale="en_EN")
-    response = client.llm_gateway.genearte_text(request)
+    builder = GenerateTextRequestBuilder()
+    request = builder.set_prompt("Hello").set_model("gpt-4").build()
+    response = runTime.llm_gateway.generate_text(request)
     if response.is_success:
         print(response.text)
     else:
         print(response.error_code)
 
-    file_path = runTime.file.find_path("data.csv")
+    file_path = runTime.file.find_file_path("data.csv")
     content = open(file_path, 'r').read()
     logger.info(content)
 

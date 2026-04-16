@@ -19,14 +19,9 @@ from abc import abstractmethod
 from datacustomcode.proxy.base import BaseProxyAccessLayer
 
 
-class BaseLLMGateway:
+class LLMGateway:
     def __init__(self):
         pass
 
     @abstractmethod
     def generate_text(self, GenerateTextRequest) -> GenerateTextResponse: ...
-
-    @abstractmethod
-    def llm_gateway_generate_text(
-        self, template, values, llmModelId: str, maxTokens: int
-    ): ...

@@ -12,14 +12,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import annotations
-from abc import abstractmethod
-from pathlib import Path
+
+from datacustomcode.llm_gateway.base import LLMGateway
+from datacustomcode.llm_gateway.types.generate_text_request import GenerateTextRequest
+from datacustomcode.llm_gateway.types.generate_text_response import GenerateTextResponse
 
 
-class BaseDataAccessLayer:
-    def __init__(self):
-        pass
+class DefaultLLMGateway(LLMGateway):
+    def generate_text(
+            self,
+            request: GenerateTextRequest
+    ) -> GenerateTextResponse:
 
-    @abstractmethod
-    def find_file_path(self, file_name: str) -> Path: ...
+
+        response_data = {
+            'generation' : {'generatedText' : "I am dreaming!!"},
+        }
+
+        return GenerateTextResponse(200, {"data": response_data})
