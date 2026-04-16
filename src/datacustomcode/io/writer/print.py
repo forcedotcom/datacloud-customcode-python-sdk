@@ -90,7 +90,7 @@ class PrintDataCloudWriter(BaseDataCloudWriter):
             schema.
         """
         # Get DLO schema (no data, just schema)
-        dlo_df = self.reader.read_dlo(dlo_name, row_limit=0)
+        dlo_df = self.reader.read_dlo(dlo_name).limit(0)
         dlo_columns = set(dlo_df.columns)
         df_columns = set(dataframe.columns)
 

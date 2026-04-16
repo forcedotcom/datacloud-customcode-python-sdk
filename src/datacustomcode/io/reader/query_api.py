@@ -139,9 +139,9 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
                 reader delegates to :class:`SFCLIDataCloudReader` which calls
                 the Data Cloud REST API directly using the token obtained from
                 ``sf org display``, bypassing the CDP token-exchange flow.
-            default_row_limit: Default maximum number of rows to fetch when
-                ``row_limit`` is not explicitly passed to read methods. When
-                ``None``, no limit is applied (all rows are returned).
+            default_row_limit: Maximum number of rows to fetch automatically.
+                When ``None``, no limit is applied (all rows are returned).
+                Set via ``default_row_limit`` in ``config.yaml`` reader options.
         """
         self.spark = spark
         self._default_row_limit = default_row_limit
@@ -165,28 +165,23 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
             )
             self._conn = create_cdp_connection(credentials, dataspace)
 
-    def _build_query(self, name: str, row_limit: Optional[int]) -> str:
-        """Build a SQL query, applying the default row limit when needed.
+    def _build_query(self, name: str) -> str:
+        """Build a SQL query, applying the configured default row limit.
 
         Args:
             name: Object name to query.
-            row_limit: Explicit row limit, or ``None`` to use the configured default.
 
         Returns:
             SQL query string.
         """
-        effective_limit = (
-            row_limit if row_limit is not None else self._default_row_limit
-        )
-        if effective_limit is not None:
-            return SQL_QUERY_TEMPLATE.format(name, effective_limit)
+        if self._default_row_limit is not None:
+            return SQL_QUERY_TEMPLATE.format(name, self._default_row_limit)
         return SQL_QUERY_TEMPLATE_NO_LIMIT.format(name)
 
     def read_dlo(
         self,
         name: str,
         schema: Union[AtomicType, StructType, str, None] = None,
-        row_limit: Optional[int] = None,
     ) -> PySparkDataFrame:
         """
         Read a Data Lake Object (DLO) from the Data Cloud.
@@ -194,8 +189,6 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
         Args:
             name (str): The name of the DLO.
             schema (Optional[Union[AtomicType, StructType, str]]): Schema of the DLO.
-            row_limit (Optional[int]): Maximum number of rows to fetch.
-                When ``None``, the configured ``default_row_limit`` is used.
 
         Returns:
             PySparkDataFrame: The PySpark DataFrame.
@@ -204,9 +197,9 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
             self, "_sf_cli_reader", None
         )
         if sf_cli_reader is not None:
-            return sf_cli_reader.read_dlo(name, schema, row_limit)
+            return sf_cli_reader.read_dlo(name, schema)
 
-        query = self._build_query(name, row_limit)
+        query = self._build_query(name)
 
         assert self._conn is not None
         pandas_df = self._conn.get_pandas_dataframe(query)
@@ -222,7 +215,6 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
         self,
         name: str,
         schema: Union[AtomicType, StructType, str, None] = None,
-        row_limit: Optional[int] = None,
     ) -> PySparkDataFrame:
         """
         Read a Data Model Object (DMO) from the Data Cloud.
@@ -230,8 +222,6 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
         Args:
             name (str): The name of the DMO.
             schema (Optional[Union[AtomicType, StructType, str]]): Schema of the DMO.
-            row_limit (Optional[int]): Maximum number of rows to fetch.
-                When ``None``, the configured ``default_row_limit`` is used.
 
         Returns:
             PySparkDataFrame: The PySpark DataFrame.
@@ -240,9 +230,9 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
             self, "_sf_cli_reader", None
         )
         if sf_cli_reader is not None:
-            return sf_cli_reader.read_dmo(name, schema, row_limit)
+            return sf_cli_reader.read_dmo(name, schema)
 
-        query = self._build_query(name, row_limit)
+        query = self._build_query(name)
 
         assert self._conn is not None
         pandas_df = self._conn.get_pandas_dataframe(query)

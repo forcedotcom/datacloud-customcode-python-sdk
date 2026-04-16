@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Union
 
 from datacustomcode.io.base import BaseDataAccessLayer
 
@@ -33,7 +33,6 @@ class BaseDataCloudReader(BaseDataAccessLayer):
         self,
         name: str,
         schema: Union[AtomicType, StructType, str, None] = None,
-        row_limit: Optional[int] = None,
     ) -> PySparkDataFrame: ...
 
     @abstractmethod
@@ -41,5 +40,4 @@ class BaseDataCloudReader(BaseDataAccessLayer):
         self,
         name: str,
         schema: Union[AtomicType, StructType, str, None] = None,
-        row_limit: Optional[int] = None,
     ) -> PySparkDataFrame: ...
