@@ -16,9 +16,6 @@ from __future__ import annotations
 
 from abc import abstractmethod
 
-from datacustomcode.proxy.base import BaseProxyAccessLayer
-
-
 class LLMGateway:
     def __init__(self):
         pass

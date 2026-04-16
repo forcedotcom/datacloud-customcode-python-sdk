@@ -1,9 +1,7 @@
 
 from dataclasses import dataclass
-from typing import Optional
 
 import betterproto
-import grpclib
 
 from .google import protobuf
 

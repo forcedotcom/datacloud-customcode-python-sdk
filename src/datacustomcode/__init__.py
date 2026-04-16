@@ -17,15 +17,16 @@ from datacustomcode.client import Client
 from datacustomcode.credentials import AuthType, Credentials
 from datacustomcode.io.reader.query_api import QueryAPIDataCloudReader
 from datacustomcode.io.writer.print import PrintDataCloudWriter
-from datacustomcode.proxy.client.LocalProxyClientProvider import (
-    LocalProxyClientProvider,
-)
+# TODO: Restore proxy/LLM gateway integration
+# from datacustomcode.proxy.client.LocalProxyClientProvider import (
+#     LocalProxyClientProvider,
+# )
 
 __all__ = [
     "AuthType",
     "Client",
     "Credentials",
-    "LocalProxyClientProvider",
+    # "LocalProxyClientProvider",  # TODO: Restore
     "PrintDataCloudWriter",
     "QueryAPIDataCloudReader",
 ]

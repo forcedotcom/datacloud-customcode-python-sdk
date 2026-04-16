@@ -50,6 +50,7 @@ def function(request: dict, runTime: Runtime) -> dict:
     builder = GenerateTextRequestBuilder()
     request = builder.set_prompt("Hello").set_model("gpt-4").build()
     response = runTime.llm_gateway.generate_text(request)
+
     if response.is_success:
         print(response.text)
     else:
