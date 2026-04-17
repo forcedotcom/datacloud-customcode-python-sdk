@@ -1,17 +1,12 @@
-from dataclasses import dataclass
-
-import betterproto
-
-from .google import protobuf
+from typing import Optional, Dict, Any, Literal
+from pydantic import BaseModel, Field
 
 
-@dataclass
-class GenerateTextRequest(betterproto.Message):
-    version: str = betterproto.string_field(1)
-    model_name: str = betterproto.string_field(2)
-    prompt: str = betterproto.string_field(3)
-    localization: protobuf.Struct = betterproto.message_field(4)
-    tags: protobuf.Struct = betterproto.message_field(5)
+class GenerateTextRequest(BaseModel):
+    """Request for LLM text generation"""
 
-
-
+    version: Literal["v1"] = Field(default="v1", description="API version, must be 'v1'")
+    model_name: str = Field(..., min_length=1, description="Name of the model to use")
+    prompt: str = Field(..., min_length=1, max_length=1000, description="Input prompt")
+    localization: Optional[Dict[str, Any]] = Field(default=None, description="Localization settings")
+    tags: Optional[Dict[str, Any]] = Field(default=None, description="Additional tags")

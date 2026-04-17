@@ -17,6 +17,7 @@ from datacustomcode.llm_gateway.base import LLMGateway
 from datacustomcode.llm_gateway.types.generate_text_request import GenerateTextRequest
 from datacustomcode.llm_gateway.types.generate_text_response import GenerateTextResponse
 
+from datacustomcode.llm_gateway.types.generate_text_response_builder import GenerateTextResponseBuilder
 
 class DefaultLLMGateway(LLMGateway):
     def generate_text(
@@ -26,7 +27,11 @@ class DefaultLLMGateway(LLMGateway):
 
 
         response_data = {
-            'generation' : {'generatedText' : "I am dreaming!!"},
+            'version': 'v1',
+            'status_code': 200,
+            'data' : {
+                'generation': {'generatedText': 'Hello World'}
+            }
         }
 
-        return GenerateTextResponse(200, {"data": response_data})
+        return GenerateTextResponseBuilder.build(response_data)

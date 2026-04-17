@@ -48,17 +48,13 @@ def function(request: dict, runTime: Runtime) -> dict:
 
 
     builder = GenerateTextRequestBuilder()
-    request = builder.set_prompt("Hello").set_model("gpt-4").build()
-    response = runTime.llm_gateway.generate_text(request)
+    llm_request = builder.set_prompt("Hello").set_model("").build()
+    llm_response = runTime.llm_gateway.generate_text(llm_request)
 
-    if response.is_success:
-        print(response.text)
+    if llm_response.is_success:
+        print(llm_response.text)
     else:
-        print(response.error_code)
-
-    file_path = runTime.file.find_file_path("data.csv")
-    content = open(file_path, 'r').read()
-    logger.info(content)
+        print(llm_response.error_code)
 
     for item in items:
         # Item is DocElement as dict
@@ -126,7 +122,7 @@ if __name__ == "__main__":
     }
 
     # Run the function
-    result = function(test_request)
+    result = function(test_request, Runtime())
 
     # Print the results in a more readable format
     print("\nChunking Results:")
