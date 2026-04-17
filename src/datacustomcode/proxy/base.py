@@ -12,20 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
-from datacustomcode.client import Client
-from datacustomcode.credentials import AuthType, Credentials
-from datacustomcode.io.reader.query_api import QueryAPIDataCloudReader
-from datacustomcode.io.writer.print import PrintDataCloudWriter
-from datacustomcode.proxy.client.LocalProxyClientProvider import (
-    LocalProxyClientProvider,
-)
+from abc import ABC
 
-__all__ = [
-    "AuthType",
-    "Client",
-    "Credentials",
-    "LocalProxyClientProvider",
-    "PrintDataCloudWriter",
-    "QueryAPIDataCloudReader",
-]
+from datacustomcode.mixin import UserExtendableNamedConfigMixin
+
+
+class BaseProxyAccessLayer(ABC, UserExtendableNamedConfigMixin):
+    def __init__(self):
+        pass

@@ -17,6 +17,7 @@ from datacustomcode.config import (
 )
 from datacustomcode.io.reader.base import BaseDataCloudReader
 from datacustomcode.io.writer.base import BaseDataCloudWriter, WriteMode
+from datacustomcode.proxy.client.base import BaseProxyClient
 
 
 class MockDataCloudReader(BaseDataCloudReader):
@@ -76,6 +77,13 @@ def mock_config(mock_spark):
 
 
 @pytest.fixture
+def mock_proxy():
+    """Mock proxy client to avoid starting Spark when reader/writer are provided."""
+    proxy = MagicMock(spec=BaseProxyClient)
+    return proxy
+
+
+@pytest.fixture
 def reset_client():
     """Reset the Client singleton between tests."""
     Client._instance = None
@@ -85,12 +93,12 @@ def reset_client():
 
 class TestClient:
 
-    def test_singleton_pattern(self, reset_client, mock_spark):
+    def test_singleton_pattern(self, reset_client, mock_spark, mock_proxy):
         """Test that Client behaves as a singleton."""
         reader = MockDataCloudReader(mock_spark)
         writer = MockDataCloudWriter(mock_spark)
 
-        client1 = Client(reader=reader, writer=writer)
+        client1 = Client(reader=reader, writer=writer, proxy=mock_proxy)
         client2 = Client()
 
         assert client1 is client2
@@ -136,38 +144,38 @@ class TestClient:
             assert client._reader is mock_reader
             assert client._writer is mock_writer
 
-    def test_read_dlo(self, reset_client, mock_spark):
+    def test_read_dlo(self, reset_client, mock_spark, mock_proxy):
         reader = MagicMock(spec=BaseDataCloudReader)
         writer = MagicMock(spec=BaseDataCloudWriter)
         mock_df = MagicMock(spec=DataFrame)
         reader.read_dlo.return_value = mock_df
 
-        client = Client(reader=reader, writer=writer)
+        client = Client(reader=reader, writer=writer, proxy=mock_proxy)
         result = client.read_dlo("test_dlo")
 
         reader.read_dlo.assert_called_once_with("test_dlo", row_limit=1000)
         assert result is mock_df
         assert "test_dlo" in client._data_layer_history[DataCloudObjectType.DLO]
 
-    def test_read_dmo(self, reset_client, mock_spark):
+    def test_read_dmo(self, reset_client, mock_spark, mock_proxy):
         reader = MagicMock(spec=BaseDataCloudReader)
         writer = MagicMock(spec=BaseDataCloudWriter)
         mock_df = MagicMock(spec=DataFrame)
         reader.read_dmo.return_value = mock_df
 
-        client = Client(reader=reader, writer=writer)
+        client = Client(reader=reader, writer=writer, proxy=mock_proxy)
         result = client.read_dmo("test_dmo")
 
         reader.read_dmo.assert_called_once_with("test_dmo", row_limit=1000)
         assert result is mock_df
         assert "test_dmo" in client._data_layer_history[DataCloudObjectType.DMO]
 
-    def test_write_to_dlo(self, reset_client, mock_spark):
+    def test_write_to_dlo(self, reset_client, mock_spark, mock_proxy):
         reader = MagicMock(spec=BaseDataCloudReader)
         writer = MagicMock(spec=BaseDataCloudWriter)
         mock_df = MagicMock(spec=DataFrame)
 
-        client = Client(reader=reader, writer=writer)
+        client = Client(reader=reader, writer=writer, proxy=mock_proxy)
         client._record_dlo_access("some_dlo")
 
         client.write_to_dlo("test_dlo", mock_df, WriteMode.APPEND, extra_param=True)
@@ -176,12 +184,12 @@ class TestClient:
             "test_dlo", mock_df, WriteMode.APPEND, extra_param=True
         )
 
-    def test_write_to_dmo(self, reset_client, mock_spark):
+    def test_write_to_dmo(self, reset_client, mock_spark, mock_proxy):
         reader = MagicMock(spec=BaseDataCloudReader)
         writer = MagicMock(spec=BaseDataCloudWriter)
         mock_df = MagicMock(spec=DataFrame)
 
-        client = Client(reader=reader, writer=writer)
+        client = Client(reader=reader, writer=writer, proxy=mock_proxy)
         client._record_dmo_access("some_dmo")
 
         client.write_to_dmo("test_dmo", mock_df, WriteMode.OVERWRITE, extra_param=True)
@@ -190,13 +198,13 @@ class TestClient:
             "test_dmo", mock_df, WriteMode.OVERWRITE, extra_param=True
         )
 
-    def test_mixed_dlo_dmo_raises_exception(self, reset_client, mock_spark):
+    def test_mixed_dlo_dmo_raises_exception(self, reset_client, mock_spark, mock_proxy):
         """Test that mixing DLOs and DMOs raises an exception."""
         reader = MagicMock(spec=BaseDataCloudReader)
         writer = MagicMock(spec=BaseDataCloudWriter)
         mock_df = MagicMock(spec=DataFrame)
 
-        client = Client(reader=reader, writer=writer)
+        client = Client(reader=reader, writer=writer, proxy=mock_proxy)
         client._record_dlo_access("test_dlo")
 
         with pytest.raises(DataCloudAccessLayerException) as exc_info:
@@ -204,13 +212,13 @@ class TestClient:
 
         assert "test_dlo" in str(exc_info.value)
 
-    def test_mixed_dmo_dlo_raises_exception(self, reset_client, mock_spark):
+    def test_mixed_dmo_dlo_raises_exception(self, reset_client, mock_spark, mock_proxy):
         """Test that mixing DMOs and DLOs raises an exception (converse case)."""
         reader = MagicMock(spec=BaseDataCloudReader)
         writer = MagicMock(spec=BaseDataCloudWriter)
         mock_df = MagicMock(spec=DataFrame)
 
-        client = Client(reader=reader, writer=writer)
+        client = Client(reader=reader, writer=writer, proxy=mock_proxy)
         client._record_dmo_access("test_dmo")
 
         with pytest.raises(DataCloudAccessLayerException) as exc_info:
@@ -218,14 +226,14 @@ class TestClient:
 
         assert "test_dmo" in str(exc_info.value)
 
-    def test_read_pattern_flow(self, reset_client, mock_spark):
+    def test_read_pattern_flow(self, reset_client, mock_spark, mock_proxy):
         """Test a complete flow of reading and writing within the same object type."""
         reader = MagicMock(spec=BaseDataCloudReader)
         writer = MagicMock(spec=BaseDataCloudWriter)
         mock_df = MagicMock(spec=DataFrame)
         reader.read_dlo.return_value = mock_df
 
-        client = Client(reader=reader, writer=writer)
+        client = Client(reader=reader, writer=writer, proxy=mock_proxy)
 
         df = client.read_dlo("source_dlo")
         client.write_to_dlo("target_dlo", df, WriteMode.APPEND)
@@ -239,7 +247,7 @@ class TestClient:
 
         # Reset for DMO test
         Client._instance = None
-        client = Client(reader=reader, writer=writer)
+        client = Client(reader=reader, writer=writer, proxy=mock_proxy)
         reader.read_dmo.return_value = mock_df
 
         df = client.read_dmo("source_dmo")
@@ -252,28 +260,28 @@ class TestClient:
 
         assert "source_dmo" in client._data_layer_history[DataCloudObjectType.DMO]
 
-    def test_read_dlo_with_row_limit(self, reset_client, mock_spark):
+    def test_read_dlo_with_row_limit(self, reset_client, mock_spark, mock_proxy):
         """Test that row_limit parameter is passed through to reader."""
         reader = MagicMock(spec=BaseDataCloudReader)
         writer = MagicMock(spec=BaseDataCloudWriter)
         mock_df = MagicMock(spec=DataFrame)
         reader.read_dlo.return_value = mock_df
 
-        client = Client(reader=reader, writer=writer)
+        client = Client(reader=reader, writer=writer, proxy=mock_proxy)
         result = client.read_dlo("test_dlo", row_limit=500)
 
         reader.read_dlo.assert_called_once_with("test_dlo", row_limit=500)
         assert result is mock_df
         assert "test_dlo" in client._data_layer_history[DataCloudObjectType.DLO]
 
-    def test_read_dmo_with_row_limit(self, reset_client, mock_spark):
+    def test_read_dmo_with_row_limit(self, reset_client, mock_spark, mock_proxy):
         """Test that row_limit parameter is passed through to reader."""
         reader = MagicMock(spec=BaseDataCloudReader)
         writer = MagicMock(spec=BaseDataCloudWriter)
         mock_df = MagicMock(spec=DataFrame)
         reader.read_dmo.return_value = mock_df
 
-        client = Client(reader=reader, writer=writer)
+        client = Client(reader=reader, writer=writer, proxy=mock_proxy)
         result = client.read_dmo("test_dmo", row_limit=100)
 
         reader.read_dmo.assert_called_once_with("test_dmo", row_limit=100)

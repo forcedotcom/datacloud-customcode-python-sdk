@@ -12,20 +12,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
-from datacustomcode.client import Client
-from datacustomcode.credentials import AuthType, Credentials
-from datacustomcode.io.reader.query_api import QueryAPIDataCloudReader
-from datacustomcode.io.writer.print import PrintDataCloudWriter
-from datacustomcode.proxy.client.LocalProxyClientProvider import (
-    LocalProxyClientProvider,
-)
+from abc import abstractmethod
 
-__all__ = [
-    "AuthType",
-    "Client",
-    "Credentials",
-    "LocalProxyClientProvider",
-    "PrintDataCloudWriter",
-    "QueryAPIDataCloudReader",
-]
+from datacustomcode.proxy.base import BaseProxyAccessLayer
+
+
+class BaseProxyClient(BaseProxyAccessLayer):
+    def __init__(self):
+        pass
+
+    @abstractmethod
+    def call_llm_gateway(self, llmModelId: str, prompt: str, maxTokens: int) -> str: ...
+
+    @abstractmethod
+    def llm_gateway_generate_text(
+        self, template, values, llmModelId: str, maxTokens: int
+    ): ...

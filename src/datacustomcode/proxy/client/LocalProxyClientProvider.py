@@ -14,6 +14,21 @@
 # limitations under the License.
 from __future__ import annotations
 
+from datacustomcode.proxy.client.base import BaseProxyClient
 
-class BaseDataAccessLayer:
-    """Base class for data access layer implementations."""
+
+class LocalProxyClientProvider(BaseProxyClient):
+    """Default proxy client provider."""
+
+    CONFIG_NAME = "LocalProxyClientProvider"
+
+    def __init__(self, **kwargs: object) -> None:
+        pass
+
+    def call_llm_gateway(self, llmModelId: str, prompt: str, maxTokens: int) -> str:
+        return f"Hello, thanks for using {llmModelId}. So many tokens: {maxTokens}"
+
+    def llm_gateway_generate_text(
+        self, template, values, llmModelId: str, maxTokens: int
+    ):
+        return f"Using Generate Text with {llmModelId} and maxTokens: {maxTokens}"
