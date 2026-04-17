@@ -37,13 +37,13 @@ class GenerateTextResponse(BaseModel):
     @property
     def text(self) -> str:
         """Generated text (convenience property)."""
-        if self.is_success:
+        if self.is_success and self.data:
             return self.data.get('generation', {}).get('generatedText', '')
         return ''
 
     @property
     def error_code(self) -> str:
         """Generated text (convenience property)."""
-        if self.is_error:
+        if self.is_error and self.data:
             return self.data.get('errorCode', self.status_code)
         return ''

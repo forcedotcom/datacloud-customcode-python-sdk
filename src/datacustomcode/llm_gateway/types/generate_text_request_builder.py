@@ -50,7 +50,6 @@ class GenerateTextRequestBuilder:
         else:
             raise ValueError("Must provide either localization or locale")
 
-        self._localization = localization
         return self
 
     def set_tags(self, tags: dict):
