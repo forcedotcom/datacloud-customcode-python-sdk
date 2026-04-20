@@ -13,8 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional, Dict, Any, Literal
-from pydantic import BaseModel, Field, ConfigDict
+from typing import (
+    Any,
+    Dict,
+    Literal,
+    Optional,
+)
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+)
 from pydantic.alias_generators import to_camel
 
 
@@ -22,11 +32,15 @@ class GenerateTextRequest(BaseModel):
 
     model_config = ConfigDict(
         alias_generator=to_camel,
-        populate_by_name=True  # Allows both snake_case and camelCase input
+        populate_by_name=True,  # Allows both snake_case and camelCase input
     )
 
-    version: Literal["v1"] = Field(default="v1", description="API version, must be 'v1'")
+    version: Literal["v1"] = Field(
+        default="v1", description="API version, must be 'v1'"
+    )
     model_name: str = Field(..., min_length=1, description="Name of the model to use")
     prompt: str = Field(..., min_length=1, max_length=1000, description="Input prompt")
-    localization: Optional[Dict[str, Any]] = Field(default=None, description="Localization settings")
+    localization: Optional[Dict[str, Any]] = Field(
+        default=None, description="Localization settings"
+    )
     tags: Optional[Dict[str, Any]] = Field(default=None, description="Additional tags")

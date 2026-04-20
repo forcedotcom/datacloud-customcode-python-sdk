@@ -13,13 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Any
+from typing import Any, Dict
+
 from datacustomcode.llm_gateway.types.generate_text_response import GenerateTextResponse
 
 
 class GenerateTextResponseBuilder:
     def __init__(self):
-        self._version = "v1" # Hardcoded default for your SDK
+        self._version = "v1"  # Hardcoded default for your SDK
         self._status_code = None
         self._data = None
 

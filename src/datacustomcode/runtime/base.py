@@ -13,5 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 class BaseRuntime:
-    """Base class for datacustomcode run time """
+    """Base class for datacustomcode run time"""

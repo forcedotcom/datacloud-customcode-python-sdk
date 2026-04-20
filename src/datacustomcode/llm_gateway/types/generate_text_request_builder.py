@@ -13,6 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import (
+    Any,
+    Dict,
+    Optional,
+)
+
 from datacustomcode.llm_gateway.types.generate_text_request import GenerateTextRequest
 
 
@@ -20,8 +26,8 @@ class GenerateTextRequestBuilder:
     def __init__(self):
         self._prompt = ""
         self._model_name = ""
-        self._localization = None
-        self._tags = None
+        self._localization: Optional[Dict[str, Any]] = None
+        self._tags: Optional[Dict[str, Any]] = None
 
     def set_prompt(self, prompt: str):
         self._prompt = prompt
@@ -31,7 +37,11 @@ class GenerateTextRequestBuilder:
         self._model_name = model_name
         return self
 
-    def set_localization(self, localization: dict = None, locale: str = None):
+    def set_localization(
+        self,
+        localization: Optional[Dict[str, Any]] = None,
+        locale: Optional[str] = None,
+    ):
         """
         Set localization either from a dict or a simple locale string.
 
@@ -52,7 +62,7 @@ class GenerateTextRequestBuilder:
 
         return self
 
-    def set_tags(self, tags: dict):
+    def set_tags(self, tags: Dict[str, Any]):
         self._tags = tags
         return self
 
@@ -62,7 +72,7 @@ class GenerateTextRequestBuilder:
             prompt=self._prompt,
             model_name=self._model_name,
             localization=self._localization,
-            tags=self._tags
+            tags=self._tags,
         )
 
         return request

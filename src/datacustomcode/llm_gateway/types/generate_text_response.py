@@ -13,9 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional, Dict, Any
+from typing import (
+    Any,
+    Dict,
+    Optional,
+)
 
 from pydantic import BaseModel, Field
+
 
 class GenerateTextResponse(BaseModel):
     """Response from LLM text generation"""
@@ -38,12 +43,16 @@ class GenerateTextResponse(BaseModel):
     def text(self) -> str:
         """Generated text (convenience property)."""
         if self.is_success and self.data:
-            return self.data.get('generation', {}).get('generatedText', '')
-        return ''
+            generation = self.data.get("generation", {})
+            if isinstance(generation, dict):
+                text = generation.get("generatedText", "")
+                return str(text) if text else ""
+        return ""
 
     @property
     def error_code(self) -> str:
         """Generated text (convenience property)."""
         if self.is_error and self.data:
-            return self.data.get('errorCode', self.status_code)
-        return ''
+            error_code = self.data.get("errorCode", str(self.status_code))
+            return str(error_code)
+        return ""

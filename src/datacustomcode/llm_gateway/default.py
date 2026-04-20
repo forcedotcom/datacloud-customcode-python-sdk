@@ -16,22 +16,18 @@
 from datacustomcode.llm_gateway.base import LLMGateway
 from datacustomcode.llm_gateway.types.generate_text_request import GenerateTextRequest
 from datacustomcode.llm_gateway.types.generate_text_response import GenerateTextResponse
+from datacustomcode.llm_gateway.types.generate_text_response_builder import (
+    GenerateTextResponseBuilder,
+)
 
-from datacustomcode.llm_gateway.types.generate_text_response_builder import GenerateTextResponseBuilder
 
 class DefaultLLMGateway(LLMGateway):
-    def generate_text(
-            self,
-            request: GenerateTextRequest
-    ) -> GenerateTextResponse:
-
+    def generate_text(self, request: GenerateTextRequest) -> GenerateTextResponse:
 
         response_data = {
-            'version': 'v1',
-            'status_code': 200,
-            'data' : {
-                'generation': {'generatedText': 'Hello World'}
-            }
+            "version": "v1",
+            "status_code": 200,
+            "data": {"generation": {"generatedText": "Hello World"}},
         }
 
         return GenerateTextResponseBuilder.build(response_data)

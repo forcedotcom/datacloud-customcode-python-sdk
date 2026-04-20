@@ -16,9 +16,13 @@ from __future__ import annotations
 
 from abc import abstractmethod
 
+from datacustomcode.llm_gateway.types.generate_text_request import GenerateTextRequest
+from datacustomcode.llm_gateway.types.generate_text_response import GenerateTextResponse
+
+
 class LLMGateway:
     def __init__(self):
         pass
 
     @abstractmethod
-    def generate_text(self, GenerateTextRequest) -> GenerateTextResponse: ...
+    def generate_text(self, request: GenerateTextRequest) -> GenerateTextResponse: ...

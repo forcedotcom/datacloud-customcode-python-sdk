@@ -17,9 +17,9 @@
 import threading
 from typing import Optional
 
-from datacustomcode.runtime.base import BaseRuntime
-from datacustomcode.llm_gateway.default import DefaultLLMGateway
 from datacustomcode.file.path.default import DefaultFindFilePath
+from datacustomcode.llm_gateway.default import DefaultLLMGateway
+from datacustomcode.runtime.base import BaseRuntime
 
 
 class Runtime(BaseRuntime):
@@ -34,7 +34,7 @@ class Runtime(BaseRuntime):
 
     """
 
-    _instance: Optional['Runtime'] = None
+    _instance: Optional["Runtime"] = None
     _lock = threading.Lock()
 
     def __new__(cls):
@@ -55,7 +55,7 @@ class Runtime(BaseRuntime):
 
     def __init__(self) -> None:
         # Prevent re-initialization
-        if hasattr(self, '_initialized'):
+        if hasattr(self, "_initialized"):
             return
 
         self._initialized = True

@@ -2,9 +2,9 @@ import logging
 from typing import List
 from uuid import uuid4
 
-from datacustomcode.llm_gateway.types.generate_text_request_builder import GenerateTextRequestBuilder
-from datacustomcode.llm_gateway.types.generate_text_request import GenerateTextRequest
-from datacustomcode.llm_gateway.types.generate_text_response import GenerateTextResponse
+from datacustomcode.llm_gateway.types.generate_text_request_builder import (
+    GenerateTextRequestBuilder,
+)
 from datacustomcode.runtime.function import Runtime
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,6 @@ def function(request: dict, runTime: Runtime) -> dict:
     items = request["input"]
     output_chunks = []
     current_seq_no = 1  # Start sequence number from 1
-
 
     builder = GenerateTextRequestBuilder()
     llm_request = builder.set_prompt("Hello").set_model("").build()
