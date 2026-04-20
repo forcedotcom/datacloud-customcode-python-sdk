@@ -1,5 +1,28 @@
 # Changelog
 
+## 3.0.0
+
+### Breaking Changes
+
+- **Added  `runtime: datacustomcode.runtime.function.Runtime` to function contract for codeType `function`.
+
+  Function now mandates runtime as arguments.
+
+  **Why:** `runTime` allows access to resources ( llm_gateway / file ) available during function execution.
+
+  **Migration:** use function(request: dict, runTime: Runtime) instead od function(request: dict)
+
+  ```python
+  # Before
+  def function(request: dict):
+    pass
+
+  # After
+  def function(request: dict, runTime: Runtime):
+    pass
+  ```
+
+
 ## 2.0.0
 
 ### Breaking Changes

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import threading
+
 import pytest
 
-from datacustomcode.runtime.base import BaseRuntime
-from datacustomcode.runtime.function import Runtime
-from datacustomcode.llm_gateway.default import DefaultLLMGateway
 from datacustomcode.file.path.default import DefaultFindFilePath
+from datacustomcode.llm_gateway.default import DefaultLLMGateway
+from datacustomcode.runtime.function import Runtime
 
 
 class TestRuntimeSingleton:
@@ -70,12 +70,12 @@ class TestRuntimeProperties:
 
     def test_runtime_has_llm_gateway(self):
         """Test Runtime has llm_gateway property."""
-        assert hasattr(self.runtime, 'llm_gateway')
+        assert hasattr(self.runtime, "llm_gateway")
         assert isinstance(self.runtime.llm_gateway, DefaultLLMGateway)
 
     def test_runtime_has_file(self):
         """Test Runtime has file property."""
-        assert hasattr(self.runtime, 'file')
+        assert hasattr(self.runtime, "file")
         assert isinstance(self.runtime.file, DefaultFindFilePath)
 
     def test_runtime_initializes_only_once(self):

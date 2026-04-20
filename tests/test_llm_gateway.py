@@ -1,14 +1,18 @@
 from __future__ import annotations
 
-import pytest
 from pydantic import ValidationError
+import pytest
 
 from datacustomcode.llm_gateway.base import LLMGateway
 from datacustomcode.llm_gateway.default import DefaultLLMGateway
 from datacustomcode.llm_gateway.types.generate_text_request import GenerateTextRequest
-from datacustomcode.llm_gateway.types.generate_text_request_builder import GenerateTextRequestBuilder
+from datacustomcode.llm_gateway.types.generate_text_request_builder import (
+    GenerateTextRequestBuilder,
+)
 from datacustomcode.llm_gateway.types.generate_text_response import GenerateTextResponse
-from datacustomcode.llm_gateway.types.generate_text_response_builder import GenerateTextResponseBuilder
+from datacustomcode.llm_gateway.types.generate_text_response_builder import (
+    GenerateTextResponseBuilder,
+)
 
 
 class TestGenerateTextRequest:
@@ -86,19 +90,16 @@ class TestGenerateTextRequestBuilder:
         # Verify the localization structure
         assert request.localization is not None
         assert request.localization["defaultLocale"] == "en-US"
-        assert request.localization["inputLocales"] == [{"locale": "en-US", "probability": 1.0}]
+        assert request.localization["inputLocales"] == [
+            {"locale": "en-US", "probability": 1.0}
+        ]
         assert request.localization["expectedLocales"] == ["en-US"]
 
     def test_builder_with_tags(self):
         """Test builder with tags."""
         builder = GenerateTextRequestBuilder()
         tags = {"user": "test", "session": "123"}
-        request = (
-            builder.set_prompt("Hello")
-            .set_model("gpt-4")
-            .set_tags(tags)
-            .build()
-        )
+        request = builder.set_prompt("Hello").set_model("gpt-4").set_tags(tags).build()
         assert request.tags == tags
 
     def test_builder_validates_on_build(self):
@@ -139,8 +140,7 @@ class TestGenerateTextResponse:
     def test_text_property_success(self):
         """Test text property extracts generated text on success."""
         response = GenerateTextResponse(
-            status_code=200,
-            data={"generation": {"generatedText": "Hello world"}}
+            status_code=200, data={"generation": {"generatedText": "Hello world"}}
         )
         assert response.text == "Hello world"
 
@@ -162,15 +162,14 @@ class TestGenerateTextResponse:
     def test_error_code_property(self):
         """Test error_code property extracts error code on error."""
         response = GenerateTextResponse(
-            status_code=400,
-            data={"errorCode": "INVALID_REQUEST"}
+            status_code=400, data={"errorCode": "INVALID_REQUEST"}
         )
         assert response.error_code == "INVALID_REQUEST"
 
     def test_error_code_falls_back_to_status_code(self):
         """Test error_code falls back to status_code if no errorCode in data."""
         response = GenerateTextResponse(status_code=500, data={"message": "error"})
-        assert response.error_code == '500'
+        assert response.error_code == "500"
 
     def test_error_code_returns_empty_on_success(self):
         """Test error_code returns empty string on success."""
@@ -192,7 +191,7 @@ class TestGenerateTextResponseBuilder:
         response_dict = {
             "version": "v1",
             "status_code": 200,
-            "data": {"generation": {"generatedText": "Hello world"}}
+            "data": {"generation": {"generatedText": "Hello world"}},
         }
         response = GenerateTextResponseBuilder.build(response_dict)
         assert isinstance(response, GenerateTextResponse)

@@ -197,7 +197,7 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
             self, "_sf_cli_reader", None
         )
         if sf_cli_reader is not None:
-            return sf_cli_reader.read_dlo(name, schema) # type: ignore[no-any-return]
+            return sf_cli_reader.read_dlo(name, schema)  # type: ignore[no-any-return]
 
         query = self._build_query(name)
 
@@ -230,7 +230,7 @@ class QueryAPIDataCloudReader(BaseDataCloudReader):
             self, "_sf_cli_reader", None
         )
         if sf_cli_reader is not None:
-            return sf_cli_reader.read_dmo(name, schema) # type: ignore[no-any-return]
+            return sf_cli_reader.read_dmo(name, schema)  # type: ignore[no-any-return]
 
         query = self._build_query(name)
 
