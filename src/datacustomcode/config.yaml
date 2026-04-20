@@ -2,6 +2,7 @@ reader_config:
   type_config_name: QueryAPIDataCloudReader
   options:
     credentials_profile: default
+    default_row_limit: 1000
 
 writer_config:
   type_config_name: PrintDataCloudWriter

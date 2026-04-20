@@ -15,11 +15,18 @@ from datacustomcode.io.reader.sf_cli import API_VERSION, SFCLIDataCloudReader
 
 
 def _make_reader(
-    sf_cli_org: str = "dev1", dataspace: str | None = None
+    sf_cli_org: str = "dev1",
+    dataspace: str | None = None,
+    default_row_limit: int | None = 1000,
 ) -> SFCLIDataCloudReader:
     spark = MagicMock()
     spark.createDataFrame.return_value = MagicMock()
-    return SFCLIDataCloudReader(spark=spark, sf_cli_org=sf_cli_org, dataspace=dataspace)
+    return SFCLIDataCloudReader(
+        spark=spark,
+        sf_cli_org=sf_cli_org,
+        dataspace=dataspace,
+        default_row_limit=default_row_limit,
+    )
 
 
 def _sf_display_output(
@@ -190,7 +197,7 @@ class TestExecuteQuery:
         with patch(
             "requests.post", return_value=self._mock_response(json_body=api_response)
         ) as mock_post:
-            reader._execute_query("SELECT * FROM foo", 100)
+            reader._execute_query("SELECT * FROM foo")
 
         url = mock_post.call_args[0][0]
         assert (
@@ -203,7 +210,7 @@ class TestExecuteQuery:
         with patch(
             "requests.post", return_value=self._mock_response(json_body=api_response)
         ) as mock_post:
-            reader._execute_query("SELECT * FROM foo", 10)
+            reader._execute_query("SELECT * FROM foo")
 
         headers = mock_post.call_args.kwargs["headers"]
         assert headers["Authorization"] == "Bearer mytoken"
@@ -213,20 +220,21 @@ class TestExecuteQuery:
         with patch(
             "requests.post", return_value=self._mock_response(json_body=api_response)
         ) as mock_post:
-            reader._execute_query("SELECT * FROM foo", 10)
+            reader._execute_query("SELECT * FROM foo")
 
         params = mock_post.call_args.kwargs["params"]
         assert params["dataspace"] == "default"
 
-    def test_appends_limit_to_sql(self, reader, mock_token):
+    def test_appends_default_limit_to_sql(self, reader, mock_token):
+        """default_row_limit (1000) is automatically appended as LIMIT."""
         api_response = {"metadata": [], "data": []}
         with patch(
             "requests.post", return_value=self._mock_response(json_body=api_response)
         ) as mock_post:
-            reader._execute_query("SELECT * FROM foo", 42)
+            reader._execute_query("SELECT * FROM foo")
 
         body = mock_post.call_args.kwargs["json"]
-        assert body["sql"] == "SELECT * FROM foo LIMIT 42"
+        assert body["sql"] == "SELECT * FROM foo LIMIT 1000"
 
     def test_returns_dataframe_with_rows(self, reader, mock_token):
         api_response = {
@@ -236,7 +244,7 @@ class TestExecuteQuery:
         with patch(
             "requests.post", return_value=self._mock_response(json_body=api_response)
         ):
-            df = reader._execute_query("SELECT * FROM foo", 100)
+            df = reader._execute_query("SELECT * FROM foo")
 
         assert list(df.columns) == ["id", "name"]
         assert len(df) == 2
@@ -246,7 +254,7 @@ class TestExecuteQuery:
         with patch(
             "requests.post", return_value=self._mock_response(json_body=api_response)
         ):
-            df = reader._execute_query("SELECT * FROM foo", 100)
+            df = reader._execute_query("SELECT * FROM foo")
 
         assert list(df.columns) == ["id", "name"]
         assert len(df) == 0
@@ -257,7 +265,7 @@ class TestExecuteQuery:
             return_value=self._mock_response(status_code=401, text="Unauthorized"),
         ):
             with pytest.raises(RuntimeError, match="HTTP 401"):
-                reader._execute_query("SELECT * FROM foo", 10)
+                reader._execute_query("SELECT * FROM foo")
 
     def test_http_error_uses_json_message_when_available(self, reader, mock_token):
         error_body = [{"message": "insufficient privileges"}]
@@ -265,14 +273,14 @@ class TestExecuteQuery:
         response.json.return_value = error_body
         with patch("requests.post", return_value=response):
             with pytest.raises(RuntimeError, match="insufficient privileges"):
-                reader._execute_query("SELECT * FROM foo", 10)
+                reader._execute_query("SELECT * FROM foo")
 
     def test_http_error_falls_back_to_text_when_json_not_list(self, reader, mock_token):
         response = self._mock_response(status_code=500, text="Internal Server Error")
         response.json.return_value = {"error": "oops"}  # dict, not list
         with patch("requests.post", return_value=response):
             with pytest.raises(RuntimeError, match="Internal Server Error"):
-                reader._execute_query("SELECT * FROM foo", 10)
+                reader._execute_query("SELECT * FROM foo")
 
     def test_request_exception_raises_runtime_error(self, reader, mock_token):
         import requests as req_lib
@@ -281,7 +289,7 @@ class TestExecuteQuery:
             "requests.post", side_effect=req_lib.RequestException("connection refused")
         ):
             with pytest.raises(RuntimeError, match="Data Cloud query request failed"):
-                reader._execute_query("SELECT * FROM foo", 10)
+                reader._execute_query("SELECT * FROM foo")
 
     def test_custom_dataspace_passed_as_param(self):
         reader = _make_reader(dataspace="myspace")
@@ -293,7 +301,7 @@ class TestExecuteQuery:
                 "requests.post",
                 return_value=self._mock_response(json_body=api_response),
             ) as mock_post:
-                reader._execute_query("SELECT * FROM foo", 10)
+                reader._execute_query("SELECT * FROM foo")
 
         params = mock_post.call_args.kwargs["params"]
         assert params["dataspace"] == "myspace"
@@ -327,17 +335,7 @@ class TestReadDloAndDmo:
         ) as mock_exec:
             getattr(reader, method)(obj_name)
 
-        mock_exec.assert_called_once_with(f"SELECT * FROM {obj_name}", 1000)
-
-    @pytest.mark.parametrize("method", ["read_dlo", "read_dmo"])
-    def test_custom_row_limit(self, reader, sample_df, method):
-        with patch.object(
-            reader, "_execute_query", return_value=sample_df
-        ) as mock_exec:
-            getattr(reader, method)("SomeObj", row_limit=50)
-
-        _, row_limit_arg = mock_exec.call_args[0]
-        assert row_limit_arg == 50
+        mock_exec.assert_called_once_with(f"SELECT * FROM {obj_name}")
 
     @pytest.mark.parametrize("method", ["read_dlo", "read_dmo"])
     def test_auto_infers_schema_when_none_given(self, reader, sample_df, method):
@@ -391,3 +389,44 @@ class TestReadDloAndDmo:
             result = getattr(reader, method)("SomeObj")
 
         assert result is expected
+
+
+# ---------------------------------------------------------------------------
+# No default row limit (deployed environment)
+# ---------------------------------------------------------------------------
+
+
+class TestSFCLINoDefaultRowLimit:
+    """Tests for deployed behavior where default_row_limit is None."""
+
+    @pytest.fixture
+    def reader(self):
+        return _make_reader(default_row_limit=None)
+
+    @pytest.fixture
+    def mock_token(self, reader):
+        with patch.object(
+            reader, "_get_token", return_value=("tok", "https://org.salesforce.com")
+        ):
+            yield
+
+    def _mock_response(
+        self, status_code: int = 200, json_body: dict | None = None, text: str = ""
+    ) -> MagicMock:
+        response = MagicMock()
+        response.status_code = status_code
+        response.text = text
+        response.json.return_value = json_body or {}
+        return response
+
+    def test_execute_query_omits_limit_when_no_default(self, reader, mock_token):
+        """When default_row_limit is None, no LIMIT clause is appended."""
+        api_response = {"metadata": [{"name": "col"}], "data": [["v"]]}
+        with patch(
+            "requests.post",
+            return_value=self._mock_response(json_body=api_response),
+        ) as mock_post:
+            reader._execute_query("SELECT * FROM foo")
+
+        body = mock_post.call_args.kwargs["json"]
+        assert body["sql"] == "SELECT * FROM foo"

@@ -28,6 +28,7 @@ class TestPrintDataCloudWriter:
         reader = MagicMock()
         mock_dlo_df = MagicMock()
         mock_dlo_df.columns = ["col1", "col2"]
+        mock_dlo_df.limit.return_value = mock_dlo_df
         reader.read_dlo.return_value = mock_dlo_df
         return reader
 

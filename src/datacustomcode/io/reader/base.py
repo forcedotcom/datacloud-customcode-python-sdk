@@ -33,7 +33,6 @@ class BaseDataCloudReader(BaseDataAccessLayer):
         self,
         name: str,
         schema: Union[AtomicType, StructType, str, None] = None,
-        row_limit: int = 1000,
     ) -> PySparkDataFrame: ...
 
     @abstractmethod
@@ -41,5 +40,4 @@ class BaseDataCloudReader(BaseDataAccessLayer):
         self,
         name: str,
         schema: Union[AtomicType, StructType, str, None] = None,
-        row_limit: int = 1000,
     ) -> PySparkDataFrame: ...
