@@ -47,7 +47,7 @@ def function(request: dict, runTime: Runtime) -> dict:
     current_seq_no = 1  # Start sequence number from 1
 
     builder = GenerateTextRequestBuilder()
-    llm_request = builder.set_prompt("Hello").set_model("").build()
+    llm_request = builder.set_prompt("Hello").set_model("modelName").build()
     llm_response = runTime.llm_gateway.generate_text(llm_request)
 
     if llm_response.is_success:

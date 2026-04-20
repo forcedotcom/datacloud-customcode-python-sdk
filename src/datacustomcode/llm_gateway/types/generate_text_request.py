@@ -39,7 +39,7 @@ class GenerateTextRequest(BaseModel):
         default="v1", description="API version, must be 'v1'"
     )
     model_name: str = Field(..., min_length=1, description="Name of the model to use")
-    prompt: str = Field(..., min_length=1, max_length=1000, description="Input prompt")
+    prompt: str = Field(..., description="Input prompt")
     localization: Optional[Dict[str, Any]] = Field(
         default=None, description="Localization settings"
     )
