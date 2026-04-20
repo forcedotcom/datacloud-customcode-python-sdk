@@ -196,7 +196,7 @@ class Client:
             A PySpark DataFrame containing the DLO data.
         """
         self._record_dlo_access(name)
-        return self._reader.read_dlo(name, row_limit=row_limit)
+        return self._reader.read_dlo(name, row_limit=row_limit)  # type: ignore[no-any-return]
 
     def read_dmo(self, name: str, row_limit: int = 1000) -> PySparkDataFrame:
         """Read a DMO from Data Cloud.
@@ -209,7 +209,7 @@ class Client:
             A PySpark DataFrame containing the DMO data.
         """
         self._record_dmo_access(name)
-        return self._reader.read_dmo(name, row_limit=row_limit)
+        return self._reader.read_dmo(name, row_limit=row_limit)  # type: ignore[no-any-return]
 
     def write_to_dlo(
         self, name: str, dataframe: PySparkDataFrame, write_mode: WriteMode, **kwargs
@@ -222,7 +222,7 @@ class Client:
             write_mode: The write mode to use for writing to the DLO.
         """
         self._validate_data_layer_history_does_not_contain(DataCloudObjectType.DMO)
-        return self._writer.write_to_dlo(name, dataframe, write_mode, **kwargs)
+        return self._writer.write_to_dlo(name, dataframe, write_mode, **kwargs)  # type: ignore[no-any-return]
 
     def write_to_dmo(
         self, name: str, dataframe: PySparkDataFrame, write_mode: WriteMode, **kwargs
@@ -235,17 +235,17 @@ class Client:
             write_mode: The write mode to use for writing to the DMO.
         """
         self._validate_data_layer_history_does_not_contain(DataCloudObjectType.DLO)
-        return self._writer.write_to_dmo(name, dataframe, write_mode, **kwargs)
+        return self._writer.write_to_dmo(name, dataframe, write_mode, **kwargs)  # type: ignore[no-any-return]
 
     def call_llm_gateway(self, LLM_MODEL_ID: str, prompt: str, maxTokens: int) -> str:
         if self._proxy is None:
             raise ValueError("No proxy configured; set proxy or proxy_config")
-        return self._proxy.call_llm_gateway(LLM_MODEL_ID, prompt, maxTokens)
+        return self._proxy.call_llm_gateway(LLM_MODEL_ID, prompt, maxTokens)  # type: ignore[no-any-return]
 
     def find_file_path(self, file_name: str) -> Path:
         """Return a file path"""
 
-        return self._file.find_file_path(file_name)
+        return self._file.find_file_path(file_name)  # type: ignore[no-any-return]
 
     def _validate_data_layer_history_does_not_contain(
         self, data_cloud_object_type: DataCloudObjectType

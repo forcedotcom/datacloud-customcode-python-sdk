@@ -15,13 +15,19 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from typing import TYPE_CHECKING
 
-from datacustomcode.llm_gateway.types.generate_text_request import GenerateTextRequest
-from datacustomcode.llm_gateway.types.generate_text_response import GenerateTextResponse
+if TYPE_CHECKING:
+    from datacustomcode.llm_gateway.types.generate_text_request import (
+        GenerateTextRequest,
+    )
+    from datacustomcode.llm_gateway.types.generate_text_response import (
+        GenerateTextResponse,
+    )
 
 
 class LLMGateway:
-    def __init__(self):
+    def __init__(self) -> None:
         pass
 
     @abstractmethod

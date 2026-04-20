@@ -36,10 +36,7 @@ import yaml
 # This lets all readers and writers to be findable via config
 from datacustomcode.io import *  # noqa: F403
 from datacustomcode.io.base import BaseDataAccessLayer
-from datacustomcode.io.reader.base import BaseDataCloudReader  # noqa: TCH001
-from datacustomcode.io.writer.base import BaseDataCloudWriter  # noqa: TCH001
 from datacustomcode.proxy.base import BaseProxyAccessLayer
-from datacustomcode.proxy.client.base import BaseProxyClient  # noqa: TCH001
 from datacustomcode.spark.base import BaseSparkSessionProvider
 
 DEFAULT_CONFIG_NAME = "config.yaml"
@@ -47,6 +44,10 @@ DEFAULT_CONFIG_NAME = "config.yaml"
 
 if TYPE_CHECKING:
     from pyspark.sql import SparkSession
+
+    from datacustomcode.io.reader.base import BaseDataCloudReader
+    from datacustomcode.io.writer.base import BaseDataCloudWriter
+    from datacustomcode.proxy.client.base import BaseProxyClient
 
 
 class ForceableConfig(BaseModel):
