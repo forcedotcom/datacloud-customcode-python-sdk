@@ -23,17 +23,17 @@ from datacustomcode.llm_gateway.types.generate_text_request import GenerateTextR
 
 
 class GenerateTextRequestBuilder:
-    def __init__(self):
+    def __init__(self) -> None:
         self._prompt = ""
         self._model_name = ""
         self._localization: Optional[Dict[str, Any]] = None
         self._tags: Optional[Dict[str, Any]] = None
 
-    def set_prompt(self, prompt: str):
+    def set_prompt(self, prompt: str) -> "GenerateTextRequestBuilder":
         self._prompt = prompt
         return self
 
-    def set_model(self, model_name: str):
+    def set_model(self, model_name: str) -> "GenerateTextRequestBuilder":
         self._model_name = model_name
         return self
 
@@ -41,7 +41,7 @@ class GenerateTextRequestBuilder:
         self,
         localization: Optional[Dict[str, Any]] = None,
         locale: Optional[str] = None,
-    ):
+    ) -> "GenerateTextRequestBuilder":
         """
         Set localization either from a dict or a simple locale string.
 
@@ -62,7 +62,7 @@ class GenerateTextRequestBuilder:
 
         return self
 
-    def set_tags(self, tags: Dict[str, Any]):
+    def set_tags(self, tags: Dict[str, Any]) -> "GenerateTextRequestBuilder":
         self._tags = tags
         return self
 

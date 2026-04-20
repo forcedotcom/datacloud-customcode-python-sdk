@@ -72,7 +72,9 @@ use_parentheses = true
 
 [tool.mypy]
 check_untyped_defs = false
+explicit_package_bases = true
 ignore_missing_imports = true
+mypy_path = "src"
 no_implicit_optional = true
 plugins = [
   'pydantic.mypy'
@@ -82,8 +84,6 @@ strict_optional = true
 warn_redundant_casts = true
 warn_return_any = true
 warn_unused_configs = true
-explicit_package_bases = true
-mypy_path = "src"
 
 [tool.poetry]
 include = [
