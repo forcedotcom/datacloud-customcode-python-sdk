@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.0.0
+
+### Breaking Changes
+
+- **Removed the `row_limit` parameter from `read_dlo()` and `read_dmo()`.**
+
+  These methods no longer accept a `row_limit` argument. When running locally, reads are automatically capped at 1000 rows to prevent accidentally fetching large datasets during development. When deployed to Data Cloud, no limit is applied and all records are returned.
+
+  **Why:** The `row_limit` parameter duplicated PySpark's built-in `.limit()` and created a behavioral difference between local and deployed environments. The 1000-row safety net is now handled internally via the `default_row_limit` setting in `config.yaml`, and deployed environments naturally omit it.
+
+  **Migration:** Remove any `row_limit` arguments from your `read_dlo()` and `read_dmo()` calls. If you need a specific number of rows, use PySpark's `.limit()` on the returned DataFrame:
+
+  ```python
+  # Before
+  df = client.read_dlo("MyObject__dll", row_limit=500)
+
+  # After
+  df = client.read_dlo("MyObject__dll").limit(500)
+  ```
+
 ## 1.0.0
 
 ### Breaking Changes

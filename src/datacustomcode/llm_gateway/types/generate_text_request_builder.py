@@ -56,7 +56,11 @@ class GenerateTextRequestBuilder:
         if localization is not None:
             self._localization = localization
         elif locale is not None:
-            self._localization = {"defaultLocale": locale}
+            self._localization = {
+                "defaultLocale": locale,
+                "inputLocales": [{"locale": locale, "probability": 1.0}],
+                "expectedLocales": [locale],
+            }
         else:
             raise ValueError("Must provide either localization or locale")
 

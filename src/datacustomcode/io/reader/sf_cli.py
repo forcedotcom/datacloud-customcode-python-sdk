@@ -55,6 +55,7 @@ class SFCLIDataCloudReader(BaseDataCloudReader):
         spark: SparkSession,
         sf_cli_org: str,
         dataspace: Optional[str] = None,
+        default_row_limit: Optional[int] = None,
     ) -> None:
         """Initialize SFCLIDataCloudReader.
 
@@ -64,9 +65,13 @@ class SFCLIDataCloudReader(BaseDataCloudReader):
                 (e.g. the alias given to ``sf org login web --alias dev1``).
             dataspace: Optional dataspace identifier.  If ``None`` or
                 ``"default"`` the query runs against the default dataspace.
+            default_row_limit: Maximum number of rows to fetch automatically.
+                When ``None``, no limit is applied (all rows are returned).
+                Set via ``default_row_limit`` in ``config.yaml`` reader options.
         """
         self.spark = spark
         self.sf_cli_org = sf_cli_org
+        self._default_row_limit = default_row_limit
         self.dataspace = (
             dataspace if dataspace and dataspace != "default" else "default"
         )
@@ -132,12 +137,14 @@ class SFCLIDataCloudReader(BaseDataCloudReader):
         logger.debug(f"Fetched token from SF CLI for org '{self.sf_cli_org}'")
         return access_token, instance_url
 
-    def _execute_query(self, sql: str, row_limit: int) -> pd.DataFrame:
+    def _execute_query(self, sql: str) -> pd.DataFrame:
         """Execute *sql* against the Data Cloud REST endpoint.
+
+        The configured ``default_row_limit`` is automatically appended as a
+        ``LIMIT`` clause when set (typically for local development).
 
         Args:
             sql: Base SQL query (no ``LIMIT`` clause).
-            row_limit: Maximum rows to return.
 
         Returns:
             Pandas DataFrame with query results.
@@ -150,7 +157,10 @@ class SFCLIDataCloudReader(BaseDataCloudReader):
         url = f"{instance_url}/services/data/{API_VERSION}/ssot/query-sql"
         headers = {"Authorization": f"Bearer {access_token}"}
         params = {"dataspace": self.dataspace}
-        body = {"sql": f"{sql} LIMIT {row_limit}"}
+        if self._default_row_limit is not None:
+            body = {"sql": f"{sql} LIMIT {self._default_row_limit}"}
+        else:
+            body = {"sql": sql}
 
         logger.debug(f"Executing Data Cloud query: {body['sql']}")
 
@@ -190,19 +200,17 @@ class SFCLIDataCloudReader(BaseDataCloudReader):
         self,
         name: str,
         schema: Union[AtomicType, StructType, str, None] = None,
-        row_limit: int = 1000,
     ) -> PySparkDataFrame:
         """Read a Data Lake Object (DLO) from Data Cloud.
 
         Args:
             name: DLO name.
             schema: Optional explicit schema.
-            row_limit: Maximum rows to fetch.
 
         Returns:
             PySpark DataFrame.
         """
-        pandas_df = self._execute_query(f"SELECT * FROM {name}", row_limit)
+        pandas_df = self._execute_query(f"SELECT * FROM {name}")
         if not schema:
             schema = _pandas_to_spark_schema(pandas_df)
         return self.spark.createDataFrame(pandas_df, schema)
@@ -211,19 +219,17 @@ class SFCLIDataCloudReader(BaseDataCloudReader):
         self,
         name: str,
         schema: Union[AtomicType, StructType, str, None] = None,
-        row_limit: int = 1000,
     ) -> PySparkDataFrame:
         """Read a Data Model Object (DMO) from Data Cloud.
 
         Args:
             name: DMO name.
             schema: Optional explicit schema.
-            row_limit: Maximum rows to fetch.
 
         Returns:
             PySpark DataFrame.
         """
-        pandas_df = self._execute_query(f"SELECT * FROM {name}", row_limit)
+        pandas_df = self._execute_query(f"SELECT * FROM {name}")
         if not schema:
             schema = _pandas_to_spark_schema(pandas_df)
         return self.spark.createDataFrame(pandas_df, schema)
