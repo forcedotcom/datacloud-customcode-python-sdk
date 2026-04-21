@@ -28,7 +28,7 @@ class Runtime(BaseRuntime):
     NOTE: Do not instantiate this class directly.
     It will be provided to your function by the SDK:
 
-        def function(request: dict, client: FunctionClient) -> dict:
+        def function(request: dict, runtime: RunTime) -> dict:
             response = {...}
             return response
 
@@ -42,11 +42,11 @@ class Runtime(BaseRuntime):
         with cls._lock:
             if cls._instance is not None:
                 raise RuntimeError(
-                    "FunctionRuntime can only be instantiated once by the SDK.\n\n"
+                    "Runtime can only be instantiated once by the SDK.\n\n"
                     "Do not instantiate it yourself. Accept it as a parameter:\n\n"
-                    "  from datacustomcode.runtime import Function\n"
+                    "  from datacustomcode.runtime.function.RunTime import Function\n"
                     "  \n"
-                    "  def function(request: dict, runtime: FunctionRuntime) -> dict:\n"
+                    "  def function(request: dict, runtime: Runtime) -> dict:\n"
                     "      response = {...}\n"
                     "      return response"
                 )

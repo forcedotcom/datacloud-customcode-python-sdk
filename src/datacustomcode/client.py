@@ -119,8 +119,6 @@ class Client:
         spark_provider: Optional["BaseSparkSessionProvider"] = None,
         code_type: str = "script",
     ) -> Client:
-        if "function" in code_type:
-            return cls._new_function_client()
 
         if cls._instance is None:
             cls._instance = super().__new__(cls)
@@ -173,16 +171,6 @@ class Client:
             }
         elif (reader is not None or writer is not None) and cls._instance is not None:
             raise ValueError("Cannot set reader or writer after client is initialized")
-        return cls._instance
-
-    @classmethod
-    def _new_function_client(cls) -> Client:
-        cls._instance = super().__new__(cls)
-        cls._instance._proxy = (
-            config.proxy_config.to_object()  # type: ignore
-            if config.proxy_config is not None
-            else None
-        )
         return cls._instance
 
     def read_dlo(self, name: str) -> PySparkDataFrame:

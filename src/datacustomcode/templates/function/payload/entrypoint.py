@@ -38,7 +38,7 @@ def chunk_text(text: str, chunk_size: int = 1000) -> List[str]:
     return chunks
 
 
-def function(request: dict, runTime: Runtime) -> dict:
+def function(request: dict, runtime: Runtime) -> dict:
     logger.info("Inside Function")
     logger.info(request)
 
@@ -48,7 +48,7 @@ def function(request: dict, runTime: Runtime) -> dict:
 
     builder = GenerateTextRequestBuilder()
     llm_request = builder.set_prompt("Hello").set_model("modelName").build()
-    llm_response = runTime.llm_gateway.generate_text(llm_request)
+    llm_response = runtime.llm_gateway.generate_text(llm_request)
 
     if llm_response.is_success:
         print(llm_response.text)
