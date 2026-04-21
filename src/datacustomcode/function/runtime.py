@@ -18,8 +18,8 @@ import threading
 from typing import Optional
 
 from datacustomcode.file.path.default import DefaultFindFilePath
+from datacustomcode.function.base import BaseRuntime
 from datacustomcode.llm_gateway.default import DefaultLLMGateway
-from datacustomcode.runtime.base import BaseRuntime
 
 
 class Runtime(BaseRuntime):
