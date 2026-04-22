@@ -1,4 +1,3 @@
-
 # Copyright (c) 2025, Salesforce, Inc.
 # SPDX-License-Identifier: Apache-2
 #
@@ -17,8 +16,9 @@
 from datacustomcode.einstein_predictions.base import EinsteinPredictions
 from datacustomcode.einstein_predictions.types import (
     PredictionRequest,
-    PredictionResponse
+    PredictionResponse,
 )
+
 
 class DefaultEinsteinPredictions(EinsteinPredictions):
     CONFIG_NAME = "DefaultEinsteinPredictions"
@@ -28,8 +28,8 @@ class DefaultEinsteinPredictions(EinsteinPredictions):
 
     def predict(self, request: PredictionRequest) -> PredictionResponse:
         return PredictionResponse(
-              version="v1",
-              prediction_type=request.prediction_type,
-              status_code=200,
-              data={"results": [{"prediction": {"predictedValue": "1"}}]}
+            version="v1",
+            prediction_type=request.prediction_type,
+            status_code=200,
+            data={"results": [{"prediction": {"predictedValue": "1"}}]},
         )

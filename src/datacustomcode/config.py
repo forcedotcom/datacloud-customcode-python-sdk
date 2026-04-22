@@ -25,8 +25,13 @@ from typing import (
     cast,
 )
 
-from pydantic import (
-    Field,
+from pydantic import Field
+
+from datacustomcode.common_config import (
+    BaseConfig,
+    BaseObjectConfig,
+    ForceableConfig,
+    default_config_file,
 )
 
 # This lets all readers and writers to be findable via config
@@ -37,8 +42,6 @@ from datacustomcode.io.writer.base import BaseDataCloudWriter  # noqa: TCH002
 from datacustomcode.proxy.base import BaseProxyAccessLayer
 from datacustomcode.proxy.client.base import BaseProxyClient  # noqa: TCH002
 from datacustomcode.spark.base import BaseSparkSessionProvider
-from datacustomcode.common_config import ForceableConfig, BaseObjectConfig, BaseConfig, default_config_file
-
 
 if TYPE_CHECKING:
     from pyspark.sql import SparkSession
@@ -49,6 +52,7 @@ _T = TypeVar("_T", bound="BaseDataAccessLayer")
 
 class AccessLayerObjectConfig(BaseObjectConfig, Generic[_T]):
     type_base: ClassVar[Type[BaseDataAccessLayer]] = BaseDataAccessLayer
+
     def to_object(self, spark: SparkSession) -> _T:
         type_ = self.type_base.subclass_from_config_name(self.type_config_name)
         return cast(_T, type_(spark=spark, **self.options))
@@ -75,7 +79,9 @@ _PX = TypeVar("_PX", bound=BaseProxyAccessLayer)
 
 class ProxyAccessLayerObjectConfig(BaseObjectConfig, Generic[_PX]):
     """Config for proxy clients that take no constructor args (e.g. no spark)."""
+
     type_base: ClassVar[Type[BaseProxyAccessLayer]] = BaseProxyAccessLayer
+
     def to_object(self) -> _PX:
         type_ = self.type_base.subclass_from_config_name(self.type_config_name)
         return cast(_PX, type_(**self.options))
@@ -83,6 +89,7 @@ class ProxyAccessLayerObjectConfig(BaseObjectConfig, Generic[_PX]):
 
 class SparkProviderConfig(BaseObjectConfig, Generic[_P]):
     type_base: ClassVar[Type[BaseSparkSessionProvider]] = BaseSparkSessionProvider
+
     def to_object(self) -> _P:
         type_ = self.type_base.subclass_from_config_name(self.type_config_name)
         return cast(_P, type_(**self.options))
@@ -125,6 +132,7 @@ class ClientConfig(BaseConfig):
             self.spark_provider_config, other.spark_provider_config
         )
         return self
+
 
 """Global config object.
 

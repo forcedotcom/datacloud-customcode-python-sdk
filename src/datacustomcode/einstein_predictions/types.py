@@ -14,18 +14,19 @@
 # limitations under the License.
 
 from enum import Enum, unique
+from typing import (
+    Any,
+    Dict,
+    Literal,
+    Optional,
+)
+
 from pydantic import (
     BaseModel,
     Field,
     model_validator,
 )
 
-from typing import (
-    Literal,
-    Optional,
-    Dict,
-    Any
-)
 
 @unique
 class PredictionType(Enum):
@@ -35,37 +36,51 @@ class PredictionType(Enum):
     MULTI_OUTCOME = 4
     BINARY_CLASSIFICATION = 5
 
+
 class PredictionColumn(BaseModel):
     column_name: str = Field(min_length=1, description="Column name")
-    string_values: Optional[list[str]] = Field(default = None, min_length=1, description="Column string values")
-    double_values: Optional[list[float]] = Field(default = None, min_length=1, description="Column double values")
-    boolean_values: Optional[list[bool]] = Field(default = None, min_length=1, description="Column boolean values")
-    date_values: Optional[list[str]] = Field(default = None, min_length=1, description="Column date values")
-    datetime_values: Optional[list[str]] = Field(default = None, min_length=1, description="Column datetime values")
+    string_values: Optional[list[str]] = Field(
+        default=None, min_length=1, description="Column string values"
+    )
+    double_values: Optional[list[float]] = Field(
+        default=None, min_length=1, description="Column double values"
+    )
+    boolean_values: Optional[list[bool]] = Field(
+        default=None, min_length=1, description="Column boolean values"
+    )
+    date_values: Optional[list[str]] = Field(
+        default=None, min_length=1, description="Column date values"
+    )
+    datetime_values: Optional[list[str]] = Field(
+        default=None, min_length=1, description="Column datetime values"
+    )
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def validate_exactly_one_value_type(self):
-        set_count = sum([
-            self.string_values is not None,
-            self.double_values is not None,
-            self.boolean_values is not None,
-            self.date_values is not None,
-            self.datetime_values is not None
-        ])
+        set_count = sum(
+            [
+                self.string_values is not None,
+                self.double_values is not None,
+                self.boolean_values is not None,
+                self.date_values is not None,
+                self.datetime_values is not None,
+            ]
+        )
 
         if set_count != 1:
             raise ValueError("Exactly one value type must be set")
 
         return self
 
+
 class PredictionColumBuilder:
     def __init__(self) -> None:
-        self._column_name: str = None
-        self._string_values: list[str] = None
-        self._double_values: list[float] = None
-        self._boolean_values: list[bool] = None
-        self._date_values: list[str] = None
-        self._datetime_values: list[str] = None
+        self._column_name: Optional[str] = None
+        self._string_values: Optional[list[str]] = None
+        self._double_values: Optional[list[float]] = None
+        self._boolean_values: Optional[list[bool]] = None
+        self._date_values: Optional[list[str]] = None
+        self._datetime_values: Optional[list[str]] = None
 
     def set_column_name(self, column_name: str) -> "PredictionColumBuilder":
         self._column_name = column_name
@@ -79,7 +94,9 @@ class PredictionColumBuilder:
         self._double_values = double_values
         return self
 
-    def set_boolean_values(self, boolean_values: list[bool]) -> "PredictionColumBuilder":
+    def set_boolean_values(
+        self, boolean_values: list[bool]
+    ) -> "PredictionColumBuilder":
         self._boolean_values = boolean_values
         return self
 
@@ -87,37 +104,49 @@ class PredictionColumBuilder:
         self._date_values = date_values
         return self
 
-    def set_datetime_values(self, datetime_values: list[str]) -> "PredictionColumBuilder":
+    def set_datetime_values(
+        self, datetime_values: list[str]
+    ) -> "PredictionColumBuilder":
         self._datetime_values = datetime_values
         return self
 
     def build(self) -> PredictionColumn:
         return PredictionColumn(
-            column_name = self._column_name,
-            string_values = self._string_values,
-            double_values = self._double_values,
-            boolean_values = self._boolean_values,
-            date_values = self._date_values,
-            datetime_values = self._datetime_values
+            column_name=self._column_name,
+            string_values=self._string_values,
+            double_values=self._double_values,
+            boolean_values=self._boolean_values,
+            date_values=self._date_values,
+            datetime_values=self._datetime_values,
         )
+
 
 class PredictionRequest(BaseModel):
     version: Literal["v1"] = Field(
         default="v1", description="API version, must be 'v1'"
     )
     prediction_type: PredictionType = Field(description="Prediction type")
-    model_api_name: str = Field(min_length=1, description="API name of the model to use")
-    prediction_columns: list[PredictionColumn] = Field(min_length=1, description="List of prediction columns")
-    settings: Optional[Dict[str, Any]] = Field(default=None, description="Settings for the prediction request")
+    model_api_name: str = Field(
+        min_length=1, description="API name of the model to use"
+    )
+    prediction_columns: list[PredictionColumn] = Field(
+        min_length=1, description="List of prediction columns"
+    )
+    settings: Optional[Dict[str, Any]] = Field(
+        default=None, description="Settings for the prediction request"
+    )
+
 
 class PredictionRequestBuilder:
     def __init__(self) -> None:
-        self._prediction_type: PredictionType = None
-        self._model_api_name: str = None
+        self._prediction_type: Optional[PredictionType] = None
+        self._model_api_name: Optional[str] = None
         self._prediction_columns: list[PredictionColumn] = []
-        self._settings: Dict[str, Any] = None
+        self._settings: Optional[Dict[str, Any]] = None
 
-    def set_prediction_type(self, prediction_type: PredictionType) -> "PredictionRequestBuilder":
+    def set_prediction_type(
+        self, prediction_type: PredictionType
+    ) -> "PredictionRequestBuilder":
         self._prediction_type = prediction_type
         return self
 
@@ -126,8 +155,7 @@ class PredictionRequestBuilder:
         return self
 
     def set_prediction_columns(
-        self,
-        prediction_columns: list[PredictionColumn]
+        self, prediction_columns: list[PredictionColumn]
     ) -> "PredictionRequestBuilder":
         self._prediction_columns = prediction_columns
         return self
@@ -141,9 +169,10 @@ class PredictionRequestBuilder:
             prediction_type=self._prediction_type,
             model_api_name=self._model_api_name,
             prediction_columns=self._prediction_columns,
-            settings=self._settings
+            settings=self._settings,
         )
-    
+
+
 class PredictionResponse(BaseModel):
     version: Literal["v1"] = Field(default="v1", description="API version")
     prediction_type: PredictionType = Field(description="Prediction type")
@@ -153,4 +182,3 @@ class PredictionResponse(BaseModel):
     @property
     def is_success(self) -> bool:
         return self.status_code == 200
-

@@ -22,24 +22,33 @@ from typing import (
     cast,
 )
 
+from datacustomcode.common_config import (
+    BaseConfig,
+    BaseObjectConfig,
+    default_config_file,
+)
 from datacustomcode.einstein_predictions.base import EinsteinPredictions
-from datacustomcode.common_config import BaseObjectConfig, BaseConfig, default_config_file
 
 _E = TypeVar("_E", bound=EinsteinPredictions)
 
+
 class EinsteinPredictionsObjectConfig(BaseObjectConfig, Generic[_E]):
-    type_base: ClassVar[Type[EinsteinPredictions]] = EinsteinPredictions
+    type_base: ClassVar[Type[EinsteinPredictions]] = EinsteinPredictions  # type: ignore[type-abstract]
+
     def to_object(self) -> _E:
         type_ = self.type_base.subclass_from_config_name(self.type_config_name)
         return cast(_E, type_(**self.options))
 
 
 class EinsteinPredictionsConfig(BaseConfig):
-    einstein_predictions_config: Union[EinsteinPredictionsObjectConfig[EinsteinPredictions], None] = None
+    einstein_predictions_config: Union[
+        EinsteinPredictionsObjectConfig[EinsteinPredictions], None
+    ] = None
+
     def update(self, other: "EinsteinPredictionsConfig") -> "EinsteinPredictionsConfig":
         def merge(
             config_a: Union[EinsteinPredictionsObjectConfig, None],
-            config_b: Union[EinsteinPredictionsObjectConfig, None]
+            config_b: Union[EinsteinPredictionsObjectConfig, None],
         ) -> Union[EinsteinPredictionsObjectConfig, None]:
             if config_a is not None and config_a.force:
                 return config_a
@@ -51,6 +60,7 @@ class EinsteinPredictionsConfig(BaseConfig):
             self.einstein_predictions_config, other.einstein_predictions_config
         )
         return self
+
 
 # Global Einstein Predictions config instance
 einstein_predictions_config = EinsteinPredictionsConfig()

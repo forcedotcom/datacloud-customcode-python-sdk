@@ -84,7 +84,10 @@ class Runtime(BaseRuntime):
         if self._einstein_predictions is None:
             if einstein_predictions_config.einstein_predictions_config is None:
                 raise RuntimeError(
-                    "Einstein Predictions is not configured.Add 'einstein_predictions_config' section to config.yaml"
+                    "Einstein Predictions is not configured. Add "
+                    "'einstein_predictions_config' section to config.yaml"
                 )
-            self._einstein_predictions = einstein_predictions_config.einstein_predictions_config.to_object()
+            self._einstein_predictions = (
+                einstein_predictions_config.einstein_predictions_config.to_object()
+            )
         return self._einstein_predictions

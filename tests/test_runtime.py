@@ -2,10 +2,10 @@ import threading
 
 import pytest
 
+from datacustomcode.einstein_predictions.impl.default import DefaultEinsteinPredictions
 from datacustomcode.file.path.default import DefaultFindFilePath
 from datacustomcode.function.runtime import Runtime
 from datacustomcode.llm_gateway.default import DefaultLLMGateway
-from datacustomcode.einstein_predictions.impl.default import DefaultEinsteinPredictions
 
 
 class TestRuntimeSingleton:

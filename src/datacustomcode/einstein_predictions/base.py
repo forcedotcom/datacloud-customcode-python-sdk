@@ -15,8 +15,12 @@
 
 from abc import ABC, abstractmethod
 
-from datacustomcode.einstein_predictions.types import (PredictionRequest, PredictionResponse)
+from datacustomcode.einstein_predictions.types import (
+    PredictionRequest,
+    PredictionResponse,
+)
 from datacustomcode.mixin import UserExtendableNamedConfigMixin
+
 
 class EinsteinPredictions(ABC, UserExtendableNamedConfigMixin):
     CONFIG_NAME: str

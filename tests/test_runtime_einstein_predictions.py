@@ -13,16 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from datacustomcode.einstein_predictions_config import EinsteinPredictionsObjectConfig
 from datacustomcode.einstein_predictions.base import EinsteinPredictions
 from datacustomcode.einstein_predictions.types import (
+    PredictionColumn,
     PredictionRequest,
     PredictionResponse,
     PredictionType,
-    PredictionColumn,
 )
+from datacustomcode.einstein_predictions_config import EinsteinPredictionsObjectConfig
+
+
 class TestCustomEinsteinPredictionsImplementation:
-    """Test that other implemenations are supported"""
+    """Test that other implementations are supported"""
 
     def test_custom_implementation_is_discoverable(self):
         class CustomEinsteinPredictions(EinsteinPredictions):
@@ -37,9 +39,7 @@ class TestCustomEinsteinPredictionsImplementation:
                     version="v1",
                     prediction_type=request.prediction_type,
                     status_code=200,
-                    data={"results": [{
-                        "predictedValue": 1
-                    }]}
+                    data={"results": [{"predictedValue": 1}]},
                 )
 
         available_names = EinsteinPredictions.available_config_names()
@@ -51,7 +51,7 @@ class TestCustomEinsteinPredictionsImplementation:
         # Verify we can create via config
         ep_config = EinsteinPredictionsObjectConfig(
             type_config_name="CustomEinsteinPredictions",
-            options={"custom_param": "my_value"}
+            options={"custom_param": "my_value"},
         )
         instance = ep_config.to_object()
         assert isinstance(instance, CustomEinsteinPredictions)
@@ -62,10 +62,8 @@ class TestCustomEinsteinPredictionsImplementation:
             model_api_name="test",
             prediction_columns=[
                 PredictionColumn(column_name="col1", double_values=[1.0])
-            ]
+            ],
         )
         response = instance.predict(request)
         assert response.is_success is True
-        assert response.data["results"] == [{
-            "predictedValue": 1
-        }]
+        assert response.data["results"] == [{"predictedValue": 1}]
