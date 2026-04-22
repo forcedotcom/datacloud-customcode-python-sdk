@@ -11,7 +11,7 @@ from datacustomcode.config import (
     AccessLayerObjectConfig,
     ClientConfig,
     SparkConfig,
-    _defaults,
+    default_config_file,
     config,
 )
 from datacustomcode.io.base import BaseDataAccessLayer
@@ -298,8 +298,8 @@ class TestConfigLoading:
             os.unlink(temp_path)
 
     def test_defaults(self):
-        # Just verify that _defaults function exists and returns a string path
-        result = _defaults()
+        # Just verify that default_config_file function exists and returns a string path
+        result = default_config_file()
         assert isinstance(result, str)
         assert result.endswith("config.yaml")
 

@@ -1,4 +1,3 @@
-
 # Copyright (c) 2025, Salesforce, Inc.
 # SPDX-License-Identifier: Apache-2
 #
@@ -15,21 +14,9 @@
 # limitations under the License.
 
 from datacustomcode.einstein_predictions.base import EinsteinPredictions
-from datacustomcode.einstein_predictions.types import (
-    PredictionRequest,
-    PredictionResponse
-)
+from datacustomcode.einstein_predictions.impl.default import DefaultEinsteinPredictions
 
-class DefaultEinsteinPredictions(EinsteinPredictions):
-    CONFIG_NAME = "DefaultEinsteinPredictions"
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-    def predict(self, request: PredictionRequest) -> PredictionResponse:
-        return PredictionResponse(
-              version="v1",
-              prediction_type=request.prediction_type,
-              status_code=200,
-              data={"results": [{"prediction": {"predictedValue": "1"}}]}
-        )
+__all__ = [
+    "EinsteinPredictions",
+    "DefaultEinsteinPredictions",
+]

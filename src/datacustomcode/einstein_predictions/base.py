@@ -16,7 +16,13 @@
 from abc import ABC, abstractmethod
 
 from datacustomcode.einstein_predictions.types import (PredictionRequest, PredictionResponse)
+from datacustomcode.mixin import UserExtendableNamedConfigMixin
 
-class EinsteinPredictions(ABC):
+class EinsteinPredictions(ABC, UserExtendableNamedConfigMixin):
+    CONFIG_NAME: str
+
+    def __init__(self, **kwargs):
+        pass
+
     @abstractmethod
     def predict(self, request: PredictionRequest) -> PredictionResponse: ...

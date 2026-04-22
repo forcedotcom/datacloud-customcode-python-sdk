@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import threading
 
 import pytest
@@ -7,6 +5,7 @@ import pytest
 from datacustomcode.file.path.default import DefaultFindFilePath
 from datacustomcode.function.runtime import Runtime
 from datacustomcode.llm_gateway.default import DefaultLLMGateway
+from datacustomcode.einstein_predictions.impl.default import DefaultEinsteinPredictions
 
 
 class TestRuntimeSingleton:
@@ -72,6 +71,8 @@ class TestRuntimeProperties:
         """Test Runtime has llm_gateway property."""
         assert hasattr(self.runtime, "llm_gateway")
         assert isinstance(self.runtime.llm_gateway, DefaultLLMGateway)
+        assert hasattr(self.runtime, "einstein_predictions")
+        assert isinstance(self.runtime.einstein_predictions, DefaultEinsteinPredictions)
 
     def test_runtime_has_file(self):
         """Test Runtime has file property."""
