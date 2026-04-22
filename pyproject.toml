@@ -72,7 +72,9 @@ use_parentheses = true
 
 [tool.mypy]
 check_untyped_defs = false
+explicit_package_bases = true
 ignore_missing_imports = true
+mypy_path = "src"
 no_implicit_optional = true
 plugins = [
   'pydantic.mypy'
@@ -99,7 +101,7 @@ click = "^8.1.8"
 loguru = "^0.7.3"
 numpy = "*"
 pandas = "*"
-pydantic = "^1.8.2 || ^2.0.0"
+pydantic = "2.13.1"
 pyspark = "3.5.1"
 python = ">=3.10,<3.12"
 pyyaml = "^6.0"

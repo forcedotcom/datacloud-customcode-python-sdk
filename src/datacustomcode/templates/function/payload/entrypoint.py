@@ -2,6 +2,11 @@ import logging
 from typing import List
 from uuid import uuid4
 
+from datacustomcode.function import Runtime
+from datacustomcode.llm_gateway.types.generate_text_request_builder import (
+    GenerateTextRequestBuilder,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -33,13 +38,22 @@ def chunk_text(text: str, chunk_size: int = 1000) -> List[str]:
     return chunks
 
 
-def function(request: dict) -> dict:
+def function(request: dict, runtime: Runtime) -> dict:
     logger.info("Inside Function")
     logger.info(request)
 
     items = request["input"]
     output_chunks = []
     current_seq_no = 1  # Start sequence number from 1
+
+    builder = GenerateTextRequestBuilder()
+    llm_request = builder.set_prompt("Hello").set_model("modelName").build()
+    llm_response = runtime.llm_gateway.generate_text(llm_request)
+
+    if llm_response.is_success:
+        print(llm_response.text)
+    else:
+        print(llm_response.error_code)
 
     for item in items:
         # Item is DocElement as dict
@@ -107,7 +121,7 @@ if __name__ == "__main__":
     }
 
     # Run the function
-    result = function(test_request)
+    result = function(test_request, Runtime())
 
     # Print the results in a more readable format
     print("\nChunking Results:")
