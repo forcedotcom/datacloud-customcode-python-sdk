@@ -5,8 +5,8 @@ import threading
 import pytest
 
 from datacustomcode.file.path.default import DefaultFindFilePath
+from datacustomcode.function.runtime import Runtime
 from datacustomcode.llm_gateway.default import DefaultLLMGateway
-from datacustomcode.runtime.function import Runtime
 
 
 class TestRuntimeSingleton:

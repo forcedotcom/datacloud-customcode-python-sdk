@@ -2,10 +2,10 @@ import logging
 from typing import List
 from uuid import uuid4
 
+from datacustomcode.function import Runtime
 from datacustomcode.llm_gateway.types.generate_text_request_builder import (
     GenerateTextRequestBuilder,
 )
-from datacustomcode.runtime.function import Runtime
 
 logger = logging.getLogger(__name__)
 
