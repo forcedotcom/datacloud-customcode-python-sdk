@@ -14,8 +14,10 @@
 # limitations under the License.
 from __future__ import annotations
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
+
+from datacustomcode.mixin import UserExtendableNamedConfigMixin
 
 if TYPE_CHECKING:
     from datacustomcode.llm_gateway.types.generate_text_request import (
@@ -26,8 +28,10 @@ if TYPE_CHECKING:
     )
 
 
-class LLMGateway:
-    def __init__(self) -> None:
+class LLMGateway(ABC, UserExtendableNamedConfigMixin):
+    CONFIG_NAME: str
+
+    def __init__(self, **kwargs):
         pass
 
     @abstractmethod
