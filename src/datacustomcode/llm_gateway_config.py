@@ -41,9 +41,7 @@ class LLMGatewayObjectConfig(BaseObjectConfig, Generic[_E]):
 
 
 class LLMGatewayConfig(BaseConfig):
-    llm_gateway_config: Union[
-        LLMGatewayObjectConfig[LLMGateway], None
-    ] = None
+    llm_gateway_config: Union[LLMGatewayObjectConfig[LLMGateway], None] = None
 
     def update(self, other: "LLMGatewayConfig") -> "LLMGatewayConfig":
         def merge(

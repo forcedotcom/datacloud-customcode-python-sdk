@@ -19,10 +19,7 @@ import tempfile
 import yaml
 
 from datacustomcode.llm_gateway.default import DefaultLLMGateway
-from datacustomcode.llm_gateway_config import (
-    LLMGatewayConfig,
-    LLMGatewayObjectConfig,
-)
+from datacustomcode.llm_gateway_config import LLMGatewayConfig, LLMGatewayObjectConfig
 
 
 class TestLLMGatewayConfigUpdate:
@@ -61,18 +58,14 @@ class TestLLMGatewayConfigUpdate:
 
         config1.update(config2)
 
-        assert (
-            config1.llm_gateway_config.type_config_name == "ForcedImplementation"
-        )
+        assert config1.llm_gateway_config.type_config_name == "ForcedImplementation"
         assert config1.llm_gateway_config.options == {"forced": True}
         assert config1.llm_gateway_config.force is True
 
 
 class TestLLMGatewayConfigLoad:
     def test_load_from_yaml_file(self):
-        config_data = {
-            "llm_gateway_config": {"type_config_name": "DefaultLLMGateway"}
-        }
+        config_data = {"llm_gateway_config": {"type_config_name": "DefaultLLMGateway"}}
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -83,9 +76,7 @@ class TestLLMGatewayConfigLoad:
             config.load(temp_file)
 
             assert config.llm_gateway_config is not None
-            assert (
-                config.llm_gateway_config.type_config_name == "DefaultLLMGateway"
-            )
+            assert config.llm_gateway_config.type_config_name == "DefaultLLMGateway"
             llm_gateway = config.llm_gateway_config.to_object()
             assert llm_gateway is not None
             assert isinstance(llm_gateway, DefaultLLMGateway)
