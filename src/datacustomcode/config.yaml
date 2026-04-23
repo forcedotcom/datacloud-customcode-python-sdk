@@ -23,3 +23,7 @@ proxy_config:
   type_config_name: LocalProxyClientProvider
   options:
     credentials_profile: default
+
+einstein_predictions_config:
+  type_config_name: DefaultEinsteinPredictions
+  options: {}

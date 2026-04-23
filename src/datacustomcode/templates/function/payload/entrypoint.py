@@ -2,6 +2,11 @@ import logging
 from typing import List
 from uuid import uuid4
 
+from datacustomcode.einstein_predictions.types import (
+    PredictionColumBuilder,
+    PredictionRequestBuilder,
+    PredictionType,
+)
 from datacustomcode.function import Runtime
 from datacustomcode.llm_gateway.types.generate_text_request_builder import (
     GenerateTextRequestBuilder,
@@ -38,6 +43,28 @@ def chunk_text(text: str, chunk_size: int = 1000) -> List[str]:
     return chunks
 
 
+def make_einstein_prediction(runtime: Runtime) -> None:
+    column = (
+        PredictionColumBuilder()
+        .set_column_name("col1")
+        .set_string_values(["str1", "str2"])
+        .build()
+    )
+    prediction_request = (
+        PredictionRequestBuilder()
+        .set_prediction_type(PredictionType.REGRESSION)
+        .set_model_api_name("regressionModel")
+        .set_prediction_columns([column])
+        .build()
+    )
+
+    prediction_response = runtime.einstein_predictions.predict(prediction_request)
+    print(
+        f"Einstein prediction results - success: {prediction_response.is_success} \
+           response data: {prediction_response.data}"
+    )
+
+
 def function(request: dict, runtime: Runtime) -> dict:
     logger.info("Inside Function")
     logger.info(request)
@@ -45,6 +72,8 @@ def function(request: dict, runtime: Runtime) -> dict:
     items = request["input"]
     output_chunks = []
     current_seq_no = 1  # Start sequence number from 1
+
+    make_einstein_prediction(runtime)
 
     builder = GenerateTextRequestBuilder()
     llm_request = builder.set_prompt("Hello").set_model("modelName").build()

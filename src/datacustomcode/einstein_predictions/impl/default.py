@@ -12,27 +12,24 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
-
-from datacustomcode.mixin import UserExtendableNamedConfigMixin
-
-if TYPE_CHECKING:
-    from datacustomcode.llm_gateway.types.generate_text_request import (
-        GenerateTextRequest,
-    )
-    from datacustomcode.llm_gateway.types.generate_text_response import (
-        GenerateTextResponse,
-    )
+from datacustomcode.einstein_predictions.base import EinsteinPredictions
+from datacustomcode.einstein_predictions.types import (
+    PredictionRequest,
+    PredictionResponse,
+)
 
 
-class LLMGateway(ABC, UserExtendableNamedConfigMixin):
-    CONFIG_NAME: str
+class DefaultEinsteinPredictions(EinsteinPredictions):
+    CONFIG_NAME = "DefaultEinsteinPredictions"
 
     def __init__(self, **kwargs):
-        pass
+        super().__init__(**kwargs)
 
-    @abstractmethod
-    def generate_text(self, request: GenerateTextRequest) -> GenerateTextResponse: ...
+    def predict(self, request: PredictionRequest) -> PredictionResponse:
+        return PredictionResponse(
+            version="v1",
+            prediction_type=request.prediction_type,
+            status_code=200,
+            data={"results": [{"prediction": {"predictedValue": 1.0}}]},
+        )

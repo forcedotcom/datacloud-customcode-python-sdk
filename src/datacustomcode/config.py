@@ -14,7 +14,6 @@
 # limitations under the License.
 from __future__ import annotations
 
-import os
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -26,12 +25,14 @@ from typing import (
     cast,
 )
 
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
+from pydantic import Field
+
+from datacustomcode.common_config import (
+    BaseConfig,
+    BaseObjectConfig,
+    ForceableConfig,
+    default_config_file,
 )
-import yaml
 
 # This lets all readers and writers to be findable via config
 from datacustomcode.io import *  # noqa: F403
@@ -42,36 +43,15 @@ from datacustomcode.proxy.base import BaseProxyAccessLayer
 from datacustomcode.proxy.client.base import BaseProxyClient  # noqa: TCH002
 from datacustomcode.spark.base import BaseSparkSessionProvider
 
-DEFAULT_CONFIG_NAME = "config.yaml"
-
-
 if TYPE_CHECKING:
     from pyspark.sql import SparkSession
-
-
-class ForceableConfig(BaseModel):
-    force: bool = Field(
-        default=False,
-        description="If True, this takes precedence over parameters passed to the "
-        "initializer of the client.",
-    )
 
 
 _T = TypeVar("_T", bound="BaseDataAccessLayer")
 
 
-class AccessLayerObjectConfig(ForceableConfig, Generic[_T]):
-    model_config = ConfigDict(validate_default=True, extra="forbid")
+class AccessLayerObjectConfig(BaseObjectConfig, Generic[_T]):
     type_base: ClassVar[Type[BaseDataAccessLayer]] = BaseDataAccessLayer
-    type_config_name: str = Field(
-        description="The config name of the object to create. "
-        "For metrics, this would might be 'ipmnormal'. For custom classes, you can "
-        "assign a name to a class variable `CONFIG_NAME` and reference it here.",
-    )
-    options: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Options passed to the constructor.",
-    )
 
     def to_object(self, spark: SparkSession) -> _T:
         type_ = self.type_base.subclass_from_config_name(self.type_config_name)
@@ -97,35 +77,25 @@ _P = TypeVar("_P", bound=BaseSparkSessionProvider)
 _PX = TypeVar("_PX", bound=BaseProxyAccessLayer)
 
 
-class ProxyAccessLayerObjectConfig(ForceableConfig, Generic[_PX]):
+class ProxyAccessLayerObjectConfig(BaseObjectConfig, Generic[_PX]):
     """Config for proxy clients that take no constructor args (e.g. no spark)."""
 
-    model_config = ConfigDict(validate_default=True, extra="forbid")
     type_base: ClassVar[Type[BaseProxyAccessLayer]] = BaseProxyAccessLayer
-    type_config_name: str = Field(
-        description="CONFIG_NAME of the proxy client (e.g. 'LocalProxyClient').",
-    )
-    options: dict[str, Any] = Field(default_factory=dict)
 
     def to_object(self) -> _PX:
         type_ = self.type_base.subclass_from_config_name(self.type_config_name)
         return cast(_PX, type_(**self.options))
 
 
-class SparkProviderConfig(ForceableConfig, Generic[_P]):
-    model_config = ConfigDict(validate_default=True, extra="forbid")
+class SparkProviderConfig(BaseObjectConfig, Generic[_P]):
     type_base: ClassVar[Type[BaseSparkSessionProvider]] = BaseSparkSessionProvider
-    type_config_name: str = Field(
-        description="CONFIG_NAME of the Spark session provider."
-    )
-    options: dict[str, Any] = Field(default_factory=dict)
 
     def to_object(self) -> _P:
         type_ = self.type_base.subclass_from_config_name(self.type_config_name)
         return cast(_P, type_(**self.options))
 
 
-class ClientConfig(BaseModel):
+class ClientConfig(BaseConfig):
     reader_config: Union[AccessLayerObjectConfig[BaseDataCloudReader], None] = None
     writer_config: Union[AccessLayerObjectConfig[BaseDataCloudWriter], None] = None
     proxy_config: Union[ProxyAccessLayerObjectConfig[BaseProxyClient], None] = None
@@ -163,31 +133,10 @@ class ClientConfig(BaseModel):
         )
         return self
 
-    def load(self, config_path: str) -> ClientConfig:
-        """Load a config from a file and update this config with it.
 
-        Args:
-            config_path: The path to the config file
-
-        Returns:
-            Self, with updated values from the loaded config.
-        """
-        with open(config_path, "r") as f:
-            config_data = yaml.safe_load(f)
-        loaded_config = ClientConfig.model_validate(config_data)
-
-        return self.update(loaded_config)
-
-
-config = ClientConfig()
 """Global config object.
 
 This is the object that makes config accessible globally and globally mutable.
 """
-
-
-def _defaults() -> str:
-    return os.path.join(os.path.dirname(__file__), DEFAULT_CONFIG_NAME)
-
-
-config.load(_defaults())
+config = ClientConfig()
+config.load(default_config_file())

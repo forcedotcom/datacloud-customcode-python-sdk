@@ -22,6 +22,8 @@ from datacustomcode.llm_gateway.types.generate_text_response_builder import (
 
 
 class DefaultLLMGateway(LLMGateway):
+    CONFIG_NAME = "DefaultLLMGateway"
+
     def generate_text(self, request: GenerateTextRequest) -> GenerateTextResponse:
 
         response_data = {

@@ -17,6 +17,8 @@
 import threading
 from typing import Optional
 
+from datacustomcode.einstein_predictions.base import EinsteinPredictions
+from datacustomcode.einstein_predictions_config import einstein_predictions_config
 from datacustomcode.file.path.default import DefaultFindFilePath
 from datacustomcode.function.base import BaseRuntime
 from datacustomcode.llm_gateway.default import DefaultLLMGateway
@@ -65,6 +67,7 @@ class Runtime(BaseRuntime):
         # Initialize resources
         self._llm_gateway = DefaultLLMGateway()
         self._file = DefaultFindFilePath()
+        self._einstein_predictions: Optional[EinsteinPredictions] = None
 
     @property
     def llm_gateway(self) -> DefaultLLMGateway:
@@ -75,3 +78,16 @@ class Runtime(BaseRuntime):
     def file(self) -> DefaultFindFilePath:
         """Access file operations."""
         return self._file
+
+    @property
+    def einstein_predictions(self) -> EinsteinPredictions:
+        if self._einstein_predictions is None:
+            if einstein_predictions_config.einstein_predictions_config is None:
+                raise RuntimeError(
+                    "Einstein Predictions is not configured. Add "
+                    "'einstein_predictions_config' section to config.yaml"
+                )
+            self._einstein_predictions = (
+                einstein_predictions_config.einstein_predictions_config.to_object()
+            )
+        return self._einstein_predictions
