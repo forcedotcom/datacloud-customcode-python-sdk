@@ -142,7 +142,7 @@ class TestPredictionRequestBuilder:
         request = (
             PredictionRequestBuilder()
             .set_prediction_type(PredictionType.CLUSTERING)
-            .set_model("cluster_model")
+            .set_model_api_name("cluster_model")
             .set_prediction_columns(
                 [PredictionColumn(column_name="test_col", double_values=[1.0])]
             )

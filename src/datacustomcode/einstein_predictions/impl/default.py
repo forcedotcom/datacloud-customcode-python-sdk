@@ -31,5 +31,5 @@ class DefaultEinsteinPredictions(EinsteinPredictions):
             version="v1",
             prediction_type=request.prediction_type,
             status_code=200,
-            data={"results": [{"prediction": {"predictedValue": "1"}}]},
+            data={"results": [{"prediction": {"predictedValue": 1.0}}]},
         )

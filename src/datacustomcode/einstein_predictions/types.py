@@ -150,7 +150,7 @@ class PredictionRequestBuilder:
         self._prediction_type = prediction_type
         return self
 
-    def set_model(self, model_api_name: str) -> "PredictionRequestBuilder":
+    def set_model_api_name(self, model_api_name: str) -> "PredictionRequestBuilder":
         self._model_api_name = model_api_name
         return self
 
