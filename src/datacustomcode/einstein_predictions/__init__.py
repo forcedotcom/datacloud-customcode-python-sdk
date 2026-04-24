@@ -17,6 +17,6 @@ from datacustomcode.einstein_predictions.base import EinsteinPredictions
 from datacustomcode.einstein_predictions.impl.default import DefaultEinsteinPredictions
 
 __all__ = [
-    "EinsteinPredictions",
     "DefaultEinsteinPredictions",
+    "EinsteinPredictions",
 ]
