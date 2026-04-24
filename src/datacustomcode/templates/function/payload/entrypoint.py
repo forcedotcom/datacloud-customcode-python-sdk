@@ -65,16 +65,7 @@ def make_einstein_prediction(runtime: Runtime) -> None:
     )
 
 
-def function(request: dict, runtime: Runtime) -> dict:
-    logger.info("Inside Function")
-    logger.info(request)
-
-    items = request["input"]
-    output_chunks = []
-    current_seq_no = 1  # Start sequence number from 1
-
-    make_einstein_prediction(runtime)
-
+def generate_text(runtime: Runtime):
     builder = GenerateTextRequestBuilder()
     llm_request = builder.set_prompt("Hello").set_model("modelName").build()
     llm_response = runtime.llm_gateway.generate_text(llm_request)
@@ -83,6 +74,17 @@ def function(request: dict, runtime: Runtime) -> dict:
         print(llm_response.text)
     else:
         print(llm_response.error_code)
+
+def function(request: dict, runtime: Runtime) -> dict:
+    logger.info("Inside Function")
+    logger.info(request)
+
+    items = request["input"]
+    output_chunks = []
+    current_seq_no = 1  # Start sequence number from 1
+
+    generate_text(runtime)
+    make_einstein_prediction(runtime)
 
     for item in items:
         # Item is DocElement as dict

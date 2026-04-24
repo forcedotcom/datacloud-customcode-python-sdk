@@ -39,8 +39,6 @@ from datacustomcode.io import *  # noqa: F403
 from datacustomcode.io.base import BaseDataAccessLayer
 from datacustomcode.io.reader.base import BaseDataCloudReader  # noqa: TCH002
 from datacustomcode.io.writer.base import BaseDataCloudWriter  # noqa: TCH002
-from datacustomcode.proxy.base import BaseProxyAccessLayer
-from datacustomcode.proxy.client.base import BaseProxyClient  # noqa: TCH002
 from datacustomcode.spark.base import BaseSparkSessionProvider
 
 if TYPE_CHECKING:
@@ -74,18 +72,6 @@ class SparkConfig(ForceableConfig):
 
 _P = TypeVar("_P", bound=BaseSparkSessionProvider)
 
-_PX = TypeVar("_PX", bound=BaseProxyAccessLayer)
-
-
-class ProxyAccessLayerObjectConfig(BaseObjectConfig, Generic[_PX]):
-    """Config for proxy clients that take no constructor args (e.g. no spark)."""
-
-    type_base: ClassVar[Type[BaseProxyAccessLayer]] = BaseProxyAccessLayer
-
-    def to_object(self) -> _PX:
-        type_ = self.type_base.subclass_from_config_name(self.type_config_name)
-        return cast(_PX, type_(**self.options))
-
 
 class SparkProviderConfig(BaseObjectConfig, Generic[_P]):
     type_base: ClassVar[Type[BaseSparkSessionProvider]] = BaseSparkSessionProvider
@@ -98,7 +84,6 @@ class SparkProviderConfig(BaseObjectConfig, Generic[_P]):
 class ClientConfig(BaseConfig):
     reader_config: Union[AccessLayerObjectConfig[BaseDataCloudReader], None] = None
     writer_config: Union[AccessLayerObjectConfig[BaseDataCloudWriter], None] = None
-    proxy_config: Union[ProxyAccessLayerObjectConfig[BaseProxyClient], None] = None
     spark_config: Union[SparkConfig, None] = None
     spark_provider_config: Union[
         SparkProviderConfig[BaseSparkSessionProvider], None
@@ -126,7 +111,6 @@ class ClientConfig(BaseConfig):
 
         self.reader_config = merge(self.reader_config, other.reader_config)
         self.writer_config = merge(self.writer_config, other.writer_config)
-        self.proxy_config = merge(self.proxy_config, other.proxy_config)
         self.spark_config = merge(self.spark_config, other.spark_config)
         self.spark_provider_config = merge(
             self.spark_provider_config, other.spark_provider_config
