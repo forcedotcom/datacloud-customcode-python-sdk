@@ -60,14 +60,14 @@ def make_einstein_prediction(runtime: Runtime) -> None:
 
     prediction_response = runtime.einstein_predictions.predict(prediction_request)
     print(
-        f"Einstein prediction results - success: {prediction_response.is_success} \
-           response data: {prediction_response.data}"
+        f"Einstein prediction results - success: [{prediction_response.is_success}] \
+response data: {prediction_response.data}"
     )
 
 
 def generate_text(runtime: Runtime):
     builder = GenerateTextRequestBuilder()
-    llm_request = builder.set_prompt("Hello").set_model("modelName").build()
+    llm_request = builder.set_prompt("Generate 2 dog names").set_model("sfdc_ai__DefaultGPT52").build()
     llm_response = runtime.llm_gateway.generate_text(llm_request)
 
     if llm_response.is_success:
