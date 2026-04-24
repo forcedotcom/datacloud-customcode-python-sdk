@@ -83,8 +83,11 @@ def function(request: dict, runtime: Runtime) -> dict:
     output_chunks = []
     current_seq_no = 1  # Start sequence number from 1
 
-    generate_text(runtime)
-    make_einstein_prediction(runtime)
+    """
+    You can use your AI models configured in Salesforce to generate texts or predict an outcome
+    """
+    # generate_text(runtime)
+    # make_einstein_prediction(runtime)
 
     for item in items:
         # Item is DocElement as dict
