@@ -154,48 +154,51 @@ class TestDeployArgContract:
         "--cpu-size", "CPU_2XL",
     ]  # fmt: skip
 
-    @patch("datacustomcode.deploy._retrieve_access_token_from_sf_cli")
+    @patch("datacustomcode.token_provider.SFCLITokenProvider")
     @patch("datacustomcode.deploy.deploy_full")
     @patch("datacustomcode.cli.find_base_directory")
     @patch("datacustomcode.cli.get_package_type")
     def test_accepts_required_flags(
-        self, mock_pkg_type, mock_find_base, mock_deploy_full, mock_sf_cli_token
+        self, mock_pkg_type, mock_find_base, mock_deploy_full, mock_sf_cli_provider
     ):
         mock_find_base.return_value = "payload"
         mock_pkg_type.return_value = "script"
-        mock_sf_cli_token.return_value = AccessTokenResponse(
+        mock_provider_instance = mock_sf_cli_provider.return_value
+        mock_provider_instance.get_token.return_value = AccessTokenResponse(
             access_token="tok", instance_url="https://example.com"
         )
         runner = CliRunner()
         result = runner.invoke(deploy, self._BASE_ARGS)
         assert result.exit_code != 2, result.output
 
-    @patch("datacustomcode.deploy._retrieve_access_token_from_sf_cli")
+    @patch("datacustomcode.token_provider.SFCLITokenProvider")
     @patch("datacustomcode.deploy.deploy_full")
     @patch("datacustomcode.cli.find_base_directory")
     @patch("datacustomcode.cli.get_package_type")
     def test_accepts_network_flag(
-        self, mock_pkg_type, mock_find_base, mock_deploy_full, mock_sf_cli_token
+        self, mock_pkg_type, mock_find_base, mock_deploy_full, mock_sf_cli_provider
     ):
         mock_find_base.return_value = "payload"
         mock_pkg_type.return_value = "script"
-        mock_sf_cli_token.return_value = AccessTokenResponse(
+        mock_provider_instance = mock_sf_cli_provider.return_value
+        mock_provider_instance.get_token.return_value = AccessTokenResponse(
             access_token="tok", instance_url="https://example.com"
         )
         runner = CliRunner()
         result = runner.invoke(deploy, [*self._BASE_ARGS, "--network", "custom"])
         assert result.exit_code != 2, result.output
 
-    @patch("datacustomcode.deploy._retrieve_access_token_from_sf_cli")
+    @patch("datacustomcode.token_provider.SFCLITokenProvider")
     @patch("datacustomcode.deploy.deploy_full")
     @patch("datacustomcode.cli.find_base_directory")
     @patch("datacustomcode.cli.get_package_type")
     def test_accepts_function_invoke_opt_flag(
-        self, mock_pkg_type, mock_find_base, mock_deploy_full, mock_sf_cli_token
+        self, mock_pkg_type, mock_find_base, mock_deploy_full, mock_sf_cli_provider
     ):
         mock_find_base.return_value = "payload"
         mock_pkg_type.return_value = "function"
-        mock_sf_cli_token.return_value = AccessTokenResponse(
+        mock_provider_instance = mock_sf_cli_provider.return_value
+        mock_provider_instance.get_token.return_value = AccessTokenResponse(
             access_token="tok", instance_url="https://example.com"
         )
         runner = CliRunner()

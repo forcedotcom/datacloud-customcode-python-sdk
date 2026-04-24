@@ -26,4 +26,10 @@ proxy_config:
 
 einstein_predictions_config:
   type_config_name: DefaultEinsteinPredictions
-  options: {}
+  options:
+    credentials_profile: default
+
+llm_gateway_config:
+  type_config_name: DefaultLLMGateway
+  options:
+    credentials_profile: default
