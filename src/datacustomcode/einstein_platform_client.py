@@ -19,7 +19,6 @@ from typing import (
     Optional,
 )
 
-from abc import ABC
 from loguru import logger
 
 from datacustomcode.token_provider import (
@@ -29,7 +28,7 @@ from datacustomcode.token_provider import (
 )
 
 
-class EinsteinPlatformClient(ABC):
+class EinsteinPlatformClient:
     EINSTEIN_PLATFORM_URL = "https://api.salesforce.com/einstein/platform/v1"
     EINSTEIN_WARNING_MESSAGE = (
         "If your code uses Einstein APIs, make sure you have "

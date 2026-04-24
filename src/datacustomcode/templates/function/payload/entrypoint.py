@@ -67,7 +67,8 @@ response data: {prediction_response.data}"
 
 def generate_text(runtime: Runtime):
     builder = GenerateTextRequestBuilder()
-    llm_request = builder.set_prompt("Generate 2 dog names").set_model("sfdc_ai__DefaultGPT52").build()
+    llm_request = builder.set_prompt("Generate 2 dog names").\
+        set_model("sfdc_ai__DefaultGPT52").build()
     llm_response = runtime.llm_gateway.generate_text(llm_request)
 
     if llm_response.is_success:
@@ -84,7 +85,8 @@ def function(request: dict, runtime: Runtime) -> dict:
     current_seq_no = 1  # Start sequence number from 1
 
     """
-    You can use your AI models configured in Salesforce to generate texts or predict an outcome
+    You can use your AI models configured in Salesforce
+    to generate texts or predict an outcome
     """
     # generate_text(runtime)
     # make_einstein_prediction(runtime)
