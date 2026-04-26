@@ -907,7 +907,7 @@ class TestDataTransformConfig:
         mock_exists.return_value = False
         with pytest.raises(
             FileNotFoundError,
-            match="config.json not found at /test/dir/payload/config.json",
+            match=r"config\.json not found at /test/dir/payload/config\.json",
         ):
             get_config("/test/dir/payload")
 
@@ -918,7 +918,7 @@ class TestDataTransformConfig:
         mock_exists.return_value = True
         with pytest.raises(
             ValueError,
-            match="config.json at /test/dir/payload/config.json is not valid JSON",
+            match=r"config\.json at /test/dir/payload/config\.json is not valid JSON",
         ):
             get_config("/test/dir/payload")
 
@@ -929,8 +929,8 @@ class TestDataTransformConfig:
         mock_exists.return_value = True
         with pytest.raises(
             ValueError,
-            match="config.json at /test/dir/payload/config.json is missing "
-            "required fields: entryPoint, dataspace, permissions",
+            match=r"config\.json at /test/dir/payload/config\.json is missing "
+            r"required fields: entryPoint, dataspace, permissions",
         ):
             get_config("/test/dir/payload")
 

@@ -19,12 +19,10 @@ from typing import (
     Optional,
 )
 
-from loguru import logger
 import requests
+from loguru import logger
 
 from datacustomcode.einstein_platform_client import EinsteinPlatformClient
-
-
 from datacustomcode.llm_gateway.base import LLMGateway
 from datacustomcode.llm_gateway.types.generate_text_request import GenerateTextRequest
 from datacustomcode.llm_gateway.types.generate_text_response import GenerateTextResponse
@@ -50,9 +48,7 @@ class DefaultLLMGateway(EinsteinPlatformClient, LLMGateway):
             f"{request.model_name}/generations"
         )
 
-        payload: Dict[str, Any] = {
-            "prompt": request.prompt
-        }
+        payload: Dict[str, Any] = {"prompt": request.prompt}
 
         if request.localization:
             payload["localization"] = request.localization
@@ -76,6 +72,5 @@ class DefaultLLMGateway(EinsteinPlatformClient, LLMGateway):
             raise RuntimeError(f"Generate text request failed: {e}") from e
 
         return GenerateTextResponse(
-            status_code=response.status_code,
-            data=self.parse_response(response)
+            status_code=response.status_code, data=self.parse_response(response)
         )

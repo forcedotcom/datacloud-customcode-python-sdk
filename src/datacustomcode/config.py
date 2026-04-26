@@ -37,8 +37,8 @@ from datacustomcode.common_config import (
 # This lets all readers and writers to be findable via config
 from datacustomcode.io import *  # noqa: F403
 from datacustomcode.io.base import BaseDataAccessLayer
-from datacustomcode.io.reader.base import BaseDataCloudReader  # noqa: TCH002
-from datacustomcode.io.writer.base import BaseDataCloudWriter  # noqa: TCH002
+from datacustomcode.io.reader.base import BaseDataCloudReader
+from datacustomcode.io.writer.base import BaseDataCloudWriter
 from datacustomcode.spark.base import BaseSparkSessionProvider
 
 if TYPE_CHECKING:
@@ -53,7 +53,7 @@ class AccessLayerObjectConfig(BaseObjectConfig, Generic[_T]):
 
     def to_object(self, spark: SparkSession) -> _T:
         type_ = self.type_base.subclass_from_config_name(self.type_config_name)
-        return cast(_T, type_(spark=spark, **self.options))
+        return cast("_T", type_(spark=spark, **self.options))
 
 
 class SparkConfig(ForceableConfig):
@@ -78,7 +78,7 @@ class SparkProviderConfig(BaseObjectConfig, Generic[_P]):
 
     def to_object(self) -> _P:
         type_ = self.type_base.subclass_from_config_name(self.type_config_name)
-        return cast(_P, type_(**self.options))
+        return cast("_P", type_(**self.options))
 
 
 class ClientConfig(BaseConfig):

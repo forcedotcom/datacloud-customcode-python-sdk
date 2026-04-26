@@ -72,7 +72,7 @@ class TestDefaultFindFilePath:
 
             with pytest.raises(
                 FileNotFoundError,
-                match="File 'test.txt' not found in any search location",
+                match=r"File 'test\.txt' not found in any search location",
             ):
                 finder.find_file_path("test.txt")
 

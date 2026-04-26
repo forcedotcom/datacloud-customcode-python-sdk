@@ -170,7 +170,7 @@ def do_oauth_browser_flow(
 
     # Start callback server
     click.echo(f"\nStarting local callback server on {redirect_uri}...")
-    server, actual_port = _run_oauth_callback_server(redirect_uri, auth_code_queue)
+    server, _actual_port = _run_oauth_callback_server(redirect_uri, auth_code_queue)
 
     # Build authorization URL with final redirect_uri
     auth_url = (

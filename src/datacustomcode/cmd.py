@@ -104,6 +104,6 @@ def _cmd_output(
 
 
 def cmd_output(*cmd: str, **kwargs: Any) -> Union[str, None]:
-    returncode, stdout_b, stderr_b = _cmd_output(*cmd, **kwargs)
+    _returncode, stdout_b, _stderr_b = _cmd_output(*cmd, **kwargs)
     stdout = stdout_b.decode() if stdout_b is not None else None
     return stdout

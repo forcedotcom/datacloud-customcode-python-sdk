@@ -524,8 +524,8 @@ class TestDcConfigJson:
             # Should raise ValueError when dataspace field is missing
             with pytest.raises(
                 ValueError,
-                match="dataspace must be defined. Please add a 'dataspace' field to "
-                "the config.json file.",
+                match=r"dataspace must be defined\. Please add a 'dataspace' field to "
+                r"the config\.json file\.",
             ):
                 update_config(temp_path)
         finally:

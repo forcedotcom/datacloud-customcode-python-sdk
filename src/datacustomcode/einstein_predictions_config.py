@@ -37,7 +37,7 @@ class EinsteinPredictionsObjectConfig(BaseObjectConfig, Generic[_E]):
 
     def to_object(self) -> _E:
         type_ = self.type_base.subclass_from_config_name(self.type_config_name)
-        return cast(_E, type_(**self.options))
+        return cast("_E", type_(**self.options))
 
 
 class EinsteinPredictionsConfig(BaseConfig):
