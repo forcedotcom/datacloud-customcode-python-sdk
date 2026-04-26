@@ -90,7 +90,9 @@ def function(request: dict, runtime: Runtime) -> dict:
 
     """
     You can use your AI models configured in Salesforce
-    to generate texts or predict an outcome
+    to generate texts or predict an outcome.
+    First configure an external client app before using these AI APIs
+    https://developer.salesforce.com/docs/ai/agentforce/guide/agent-api-get-started.html#create-a-salesforce-app"
     """
     # generate_text(runtime)
     # make_einstein_prediction(runtime)

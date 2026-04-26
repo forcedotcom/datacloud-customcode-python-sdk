@@ -95,8 +95,7 @@ class DefaultEinsteinPredictions(EinsteinPlatformClient, EinsteinPredictions):
             if not response.ok and not response.text:
                 error_msg = (
                     f"Einstein Prediction request failed: {api_url} - "
-                    f"{response.status_code} {response.reason}. "
-                    f"{self.EINSTEIN_WARNING_MESSAGE}"
+                    f"{response.status_code} {response.reason}"
                 )
                 logger.error(error_msg)
         except requests.exceptions.RequestException as e:

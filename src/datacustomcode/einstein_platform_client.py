@@ -30,13 +30,6 @@ from datacustomcode.token_provider import (
 
 class EinsteinPlatformClient:
     EINSTEIN_PLATFORM_URL = "https://api.salesforce.com/einstein/platform/v1"
-    EINSTEIN_WARNING_MESSAGE = (
-        "If your code uses Einstein APIs, make sure you have "
-        'configured the SDK to use "client_credentials" auth type. '
-        "Refer to https://developer.salesforce.com/docs/ai/agentforce/"
-        "guide/agent-api-get-started.html#create-a-salesforce-app "
-        "to create your external client app."
-    )
 
     def __init__(
         self,
