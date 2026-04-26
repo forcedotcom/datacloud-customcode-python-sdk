@@ -19,8 +19,8 @@ from typing import (
     Optional,
 )
 
-import requests
 from loguru import logger
+import requests
 
 from datacustomcode.einstein_platform_client import EinsteinPlatformClient
 from datacustomcode.llm_gateway.base import LLMGateway
@@ -44,8 +44,7 @@ class DefaultLLMGateway(EinsteinPlatformClient, LLMGateway):
 
     def generate_text(self, request: GenerateTextRequest) -> GenerateTextResponse:
         api_url = (
-            f"{self.EINSTEIN_PLATFORM_URL}/models/"
-            f"{request.model_name}/generations"
+            f"{self.EINSTEIN_PLATFORM_URL}/models/{request.model_name}/generations"
         )
 
         payload: Dict[str, Any] = {"prompt": request.prompt}

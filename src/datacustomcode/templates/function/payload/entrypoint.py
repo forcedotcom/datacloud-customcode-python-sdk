@@ -80,8 +80,6 @@ def generate_text(runtime: Runtime):
         print(llm_response.error_code)
 
 
-
-
 def function(request: dict, runtime: Runtime) -> dict:
     logger.info("Inside Function")
     logger.info(request)
