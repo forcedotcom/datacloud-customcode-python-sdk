@@ -29,12 +29,15 @@ from datacustomcode.token_provider import (
 
 
 class EinsteinPlatformClient:
-    EINSTEIN_PLATFORM_URL = "https://api.salesforce.com/einstein/platform/v1"
+    EINSTEIN_PLATFORM_MODELS_URL = (
+        "https://api.salesforce.com/einstein/platform/v1/models"
+    )
 
     def __init__(
         self,
         credentials_profile: Optional[str] = None,
         sf_cli_org: Optional[str] = None,
+        **kwargs: Any,
     ):
         if sf_cli_org:
             self._token_provider: TokenProvider = SFCLITokenProvider(sf_cli_org)
@@ -44,6 +47,7 @@ class EinsteinPlatformClient:
             self._token_provider = CredentialsTokenProvider(profile)
             logger.debug(f"Using credentials token provider with profile: {profile}")
         self.token_response = None
+        super().__init__(**kwargs)
 
     def get_headers(self):
         if self.token_response is None:

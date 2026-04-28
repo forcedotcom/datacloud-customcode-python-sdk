@@ -13,11 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import (
-    Any,
-    Dict,
-    Optional,
-)
+from typing import Any, Dict
 
 from loguru import logger
 import requests
@@ -26,25 +22,17 @@ from datacustomcode.einstein_platform_client import EinsteinPlatformClient
 from datacustomcode.llm_gateway.base import LLMGateway
 from datacustomcode.llm_gateway.types.generate_text_request import GenerateTextRequest
 from datacustomcode.llm_gateway.types.generate_text_response import GenerateTextResponse
+from datacustomcode.llm_gateway.types.generate_text_response_builder import (
+    GenerateTextResponseBuilder,
+)
 
 
 class DefaultLLMGateway(EinsteinPlatformClient, LLMGateway):
     CONFIG_NAME = "DefaultLLMGateway"
 
-    def __init__(
-        self,
-        credentials_profile: Optional[str] = None,
-        sf_cli_org: Optional[str] = None,
-        **kwargs,
-    ):
-        EinsteinPlatformClient.__init__(
-            self, credentials_profile=credentials_profile, sf_cli_org=sf_cli_org
-        )
-        LLMGateway.__init__(self, **kwargs)
-
     def generate_text(self, request: GenerateTextRequest) -> GenerateTextResponse:
         api_url = (
-            f"{self.EINSTEIN_PLATFORM_URL}/models/{request.model_name}/generations"
+            f"{self.EINSTEIN_PLATFORM_MODELS_URL}/{request.model_name}/generations"
         )
 
         payload: Dict[str, Any] = {"prompt": request.prompt}
@@ -69,6 +57,8 @@ class DefaultLLMGateway(EinsteinPlatformClient, LLMGateway):
             logger.error(f"Generate text request failed: {api_url} {e}")
             raise RuntimeError(f"Generate text request failed: {e}") from e
 
-        return GenerateTextResponse(
-            status_code=response.status_code, data=self.parse_response(response)
-        )
+        response_dict = {
+            "status_code": response.status_code,
+            "data": self.parse_response(response),
+        }
+        return GenerateTextResponseBuilder.build(response_dict)

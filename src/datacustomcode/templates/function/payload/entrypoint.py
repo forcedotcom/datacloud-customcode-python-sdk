@@ -59,7 +59,7 @@ def make_einstein_prediction(runtime: Runtime) -> None:
     )
 
     prediction_response = runtime.einstein_predictions.predict(prediction_request)
-    print(
+    logger.info(
         f"Einstein prediction results - success: [{prediction_response.is_success}] "
         f"response data: {prediction_response.data}"
     )
@@ -73,11 +73,10 @@ def generate_text(runtime: Runtime):
         .build()
     )
     llm_response = runtime.llm_gateway.generate_text(llm_request)
-
-    if llm_response.is_success:
-        print(llm_response.text)
-    else:
-        print(llm_response.error_code)
+    logger.info(
+        f"LLM Gateway generate text results - success: [{llm_response.is_success}] "
+        f"response data: {llm_response.data}"
+    )
 
 
 def function(request: dict, runtime: Runtime) -> dict:

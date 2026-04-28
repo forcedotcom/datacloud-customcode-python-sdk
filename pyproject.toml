@@ -107,6 +107,7 @@ python = ">=3.10,<3.12"
 pyyaml = "^6.0"
 salesforce-cdp-connector = ">=1.0.19"
 setuptools_scm = "^7.1.0"
+requests = "2.33.1"
 
 [tool.poetry.group.dev.dependencies]
 build = "*"

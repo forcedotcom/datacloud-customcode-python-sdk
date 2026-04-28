@@ -18,7 +18,6 @@ from typing import (
     ClassVar,
     Dict,
     List,
-    Optional,
 )
 
 from loguru import logger
@@ -43,17 +42,6 @@ class DefaultEinsteinPredictions(EinsteinPlatformClient, EinsteinPredictions):
         PredictionType.MULTI_OUTCOME: "multi-outcome",
     }
 
-    def __init__(
-        self,
-        credentials_profile: Optional[str] = None,
-        sf_cli_org: Optional[str] = None,
-        **kwargs,
-    ):
-        EinsteinPlatformClient.__init__(
-            self, credentials_profile=credentials_profile, sf_cli_org=sf_cli_org
-        )
-        EinsteinPredictions.__init__(self, **kwargs)
-
     def predict(self, request: PredictionRequest) -> PredictionResponse:
         endpoint = self.ENDPOINT_MAP.get(request.prediction_type)
         if not endpoint:
@@ -63,8 +51,7 @@ class DefaultEinsteinPredictions(EinsteinPlatformClient, EinsteinPredictions):
             )
 
         api_url = (
-            f"{self.EINSTEIN_PLATFORM_URL}/models/"
-            f"{request.model_api_name}/{endpoint}"
+            f"{self.EINSTEIN_PLATFORM_MODELS_URL}/{request.model_api_name}/{endpoint}"
         )
 
         prediction_columns: List[Dict[str, Any]] = []
