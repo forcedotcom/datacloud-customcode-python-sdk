@@ -15,9 +15,6 @@
 
 from typing import Any, Dict
 
-from loguru import logger
-import requests
-
 from datacustomcode.einstein_platform_client import EinsteinPlatformClient
 from datacustomcode.llm_gateway.base import LLMGateway
 from datacustomcode.llm_gateway.types.generate_text_request import GenerateTextRequest
@@ -42,21 +39,7 @@ class DefaultLLMGateway(EinsteinPlatformClient, LLMGateway):
         if request.tags:
             payload["tags"] = request.tags
 
-        logger.debug(f"Making Generate text request: {api_url}")
-        try:
-            response = requests.post(
-                api_url, json=payload, headers=self.get_headers(), timeout=180
-            )
-            if not response.ok and not response.text:
-                error_msg = (
-                    f"Generate text request failed: {api_url} - "
-                    f"{response.status_code} {response.reason}"
-                )
-                logger.error(error_msg)
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Generate text request failed: {api_url} {e}")
-            raise RuntimeError(f"Generate text request failed: {e}") from e
-
+        response = self.make_post_request(api_url, payload)
         response_dict = {
             "status_code": response.status_code,
             "data": self.parse_response(response),

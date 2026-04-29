@@ -20,6 +20,7 @@ from typing import (
 )
 
 from loguru import logger
+import requests
 
 from datacustomcode.token_provider import (
     CredentialsTokenProvider,
@@ -49,7 +50,7 @@ class EinsteinPlatformClient:
         self.token_response = None
         super().__init__(**kwargs)
 
-    def get_headers(self):
+    def _get_headers(self):
         if self.token_response is None:
             self.token_response = self._token_provider.get_token()
 
@@ -59,6 +60,23 @@ class EinsteinPlatformClient:
             "x-sfdc-app-context": "EinsteinGPT",
             "x-client-feature-id": "ai-platform-models-connected-app",
         }
+
+    def make_post_request(self, url, payload):
+        try:
+            response = requests.post(
+                url, json=payload, headers=self._get_headers(), timeout=180
+            )
+            if not response.ok:
+                error_msg = (
+                    f"Request to {url} failed. "
+                    f"Reason: {response.status_code} {response.reason} - "
+                    f"Response body: {response.text}"
+                )
+                logger.error(error_msg)
+            return response
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request to {url} failed: {e}")
+            raise RuntimeError(f"Request to {url} failed {e}") from e
 
     def parse_response(self, response):
         response_data: Dict[str, Any] = {}

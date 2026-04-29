@@ -20,9 +20,6 @@ from typing import (
     List,
 )
 
-from loguru import logger
-import requests
-
 from datacustomcode.einstein_platform_client import EinsteinPlatformClient
 from datacustomcode.einstein_predictions.base import EinsteinPredictions
 from datacustomcode.einstein_predictions.types import (
@@ -74,21 +71,7 @@ class DefaultEinsteinPredictions(EinsteinPlatformClient, EinsteinPredictions):
         if request.settings:
             payload["settings"] = request.settings
 
-        logger.debug(f"Making Einstein prediction request to: {api_url}")
-        try:
-            response = requests.post(
-                api_url, json=payload, headers=self.get_headers(), timeout=180
-            )
-            if not response.ok and not response.text:
-                error_msg = (
-                    f"Einstein Prediction request failed: {api_url} - "
-                    f"{response.status_code} {response.reason}"
-                )
-                logger.error(error_msg)
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Einstein Prediction request failed: {api_url} {e}")
-            raise RuntimeError(f"Einstein Prediction request failed: {e}") from e
-
+        response = self.make_post_request(api_url, payload)
         return PredictionResponse(
             prediction_type=request.prediction_type,
             status_code=response.status_code,
