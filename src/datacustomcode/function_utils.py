@@ -165,6 +165,30 @@ def get_request_type(entrypoint_path: str) -> Optional[Any]:
     return request_type
 
 
+def _generate_model_sample_data(model_type):
+    """Generate sample data for all fields in a Pydantic model.
+
+    Args:
+        model_type: A Pydantic model class
+
+    Returns:
+        Dictionary with sample data for all fields
+    """
+    from pydantic_core import PydanticUndefined
+
+    sample_data = {}
+    for field_name, field_info in model_type.model_fields.items():
+        # Check if field has a real default value
+        if field_info.default is not PydanticUndefined:
+            sample_data[field_name] = field_info.default
+        else:
+            # Required field or field without default - generate sample
+            sample_data[field_name] = generate_sample_value(
+                field_info.annotation, field_name
+            )
+    return sample_data
+
+
 def generate_sample_value(field_type, field_name: str):
     """Generate a sample value based on field type.
 
@@ -197,14 +221,8 @@ def generate_sample_value(field_type, field_name: str):
     elif field_type is bool:
         return True
     elif hasattr(field_type, "model_fields"):
-        # Nested Pydantic model
-        nested_data = {}
-        for nested_field_name, nested_field_info in field_type.model_fields.items():
-            if nested_field_info.is_required():
-                nested_data[nested_field_name] = generate_sample_value(
-                    nested_field_info.annotation, nested_field_name
-                )
-        return nested_data
+        # Nested Pydantic model - use shared helper
+        return _generate_model_sample_data(field_type)
     else:
         return None
 
@@ -228,16 +246,8 @@ def generate_test_json(entrypoint_path: str, output_path: str) -> None:
     if not hasattr(request_type, "model_fields"):
         raise ValueError(f"Request parameter type must be a Pydantic model")
 
-    # Generate sample data
-    sample_data = {}
-    for field_name, field_info in request_type.model_fields.items():
-        if field_info.is_required():
-            sample_data[field_name] = generate_sample_value(
-                field_info.annotation, field_name
-            )
-        elif field_info.default is not None:
-            sample_data[field_name] = field_info.default
-
+    # Generate sample data for ALL fields (use defaults where available)
+    sample_data = _generate_model_sample_data(request_type)
     sample_instance = request_type(**sample_data)
 
     # Write to file
