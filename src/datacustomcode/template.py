@@ -17,6 +17,8 @@ import shutil
 
 from loguru import logger
 
+from datacustomcode.constants import FEATURE_TEMPLATE_MAPPING
+
 script_template_dir = os.path.join(os.path.dirname(__file__), "templates", "script")
 function_template_dir = os.path.join(os.path.dirname(__file__), "templates", "function")
 
@@ -37,22 +39,17 @@ def copy_script_template(target_dir: str) -> None:
             shutil.copy2(source, destination)
 
 
-MAPPED_FOLDER = {"SearchIndexChunking": "chunking"}
-
-
 def copy_function_template(target_dir: str, use_in_feature: str) -> None:
     os.makedirs(target_dir, exist_ok=True)
 
-    if use_in_feature and use_in_feature in MAPPED_FOLDER:
-        feature_function_template_dir = os.path.join(
-            function_template_dir, MAPPED_FOLDER[use_in_feature]
-        )
-    else:
-        feature_function_template_dir = function_template_dir
-
-    for item in os.listdir(feature_function_template_dir):
-        source = os.path.join(feature_function_template_dir, item)
+    # First, copy common files from base function template
+    for item in os.listdir(function_template_dir):
+        source = os.path.join(function_template_dir, item)
         destination = os.path.join(target_dir, item)
+
+        # Skip feature-specific subdirectories
+        if os.path.isdir(source) and item in FEATURE_TEMPLATE_MAPPING.values():
+            continue
 
         if os.path.isdir(source):
             logger.debug(f"Copying directory {source} to {destination}...")
@@ -60,5 +57,22 @@ def copy_function_template(target_dir: str, use_in_feature: str) -> None:
         else:
             logger.debug(f"Copying file {source} to {destination}...")
             shutil.copy2(source, destination)
+
+    # Then, copy feature-specific files (overwriting if needed)
+    if use_in_feature and use_in_feature in FEATURE_TEMPLATE_MAPPING:
+        feature_function_template_dir = os.path.join(
+            function_template_dir, FEATURE_TEMPLATE_MAPPING[use_in_feature]
+        )
+
+        for item in os.listdir(feature_function_template_dir):
+            source = os.path.join(feature_function_template_dir, item)
+            destination = os.path.join(target_dir, item)
+
+            if os.path.isdir(source):
+                logger.debug(f"Copying feature-specific directory {source} to {destination}...")
+                shutil.copytree(source, destination, dirs_exist_ok=True)
+            else:
+                logger.debug(f"Copying feature-specific file {source} to {destination}...")
+                shutil.copy2(source, destination)
 
 

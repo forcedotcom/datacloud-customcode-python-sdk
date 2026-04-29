@@ -15,6 +15,7 @@
 
 """Utilities for inspecting and working with function entrypoints."""
 
+import ast
 import importlib.util
 import inspect
 import json
@@ -105,6 +106,93 @@ def get_function_signature_types(
     response_type_name = get_type_name(response_type)
 
     return request_type, response_type, request_type_name, response_type_name
+
+
+def inspect_function_types_static(entrypoint_path: str) -> Tuple[Optional[str], Optional[str]]:
+    """Inspect function types using static AST parsing (no imports).
+
+    This parses the Python file without executing it, so it doesn't
+    require dependencies to be installed.
+
+    Args:
+        entrypoint_path: Path to the entrypoint.py file
+
+    Returns:
+        Tuple of (request_type_name, response_type_name)
+    """
+    try:
+        with open(entrypoint_path, 'r') as f:
+            tree = ast.parse(f.read(), filename=entrypoint_path)
+
+        # Find the 'function' definition
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name == "function":
+                # Get request type (first parameter annotation)
+                request_type_name = None
+                if node.args.args and len(node.args.args) > 0:
+                    first_param = node.args.args[0]
+                    if first_param.annotation:
+                        request_type_name = _get_type_name_from_ast(first_param.annotation)
+
+                # Get response type (return annotation)
+                response_type_name = None
+                if node.returns:
+                    response_type_name = _get_type_name_from_ast(node.returns)
+
+                return request_type_name, response_type_name
+
+        return None, None
+    except Exception:
+        return None, None
+
+
+def _get_type_name_from_ast(annotation) -> Optional[str]:
+    """Extract type name from an AST annotation node."""
+    if isinstance(annotation, ast.Name):
+        # Simple type: MyType
+        return annotation.id
+    elif isinstance(annotation, ast.Attribute):
+        # Module.Type - just return the type name
+        return annotation.attr
+    elif isinstance(annotation, ast.Subscript):
+        # Generic type: List[MyType], Optional[MyType]
+        # Return the base type name
+        return _get_type_name_from_ast(annotation.value)
+    return None
+
+
+def _import_pydantic_model(entrypoint_path: str, type_name: str) -> Optional[Any]:
+    """Import a Pydantic model by finding its import statement.
+
+    Parses the entrypoint to find where the type is imported from,
+    then imports just that module (not the entrypoint itself).
+
+    Args:
+        entrypoint_path: Path to entrypoint.py
+        type_name: Name of the type to import (e.g., "SearchIndexChunkingV1Request")
+
+    Returns:
+        The Pydantic model class, or None if not found
+    """
+    try:
+        with open(entrypoint_path, 'r') as f:
+            tree = ast.parse(f.read(), filename=entrypoint_path)
+
+        # Find where this type is imported from
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                # from module import Type1, Type2
+                for alias in node.names:
+                    if alias.name == type_name:
+                        # Found it! Import from the module
+                        module_name = node.module
+                        if module_name:
+                            module = importlib.import_module(module_name)
+                            return getattr(module, type_name, None)
+
+        return None
+    except Exception:
+        return None
 
 
 def inspect_function_types(
@@ -230,17 +318,29 @@ def generate_sample_value(field_type, field_name: str):
 def generate_test_json(entrypoint_path: str, output_path: str) -> None:
     """Generate a sample test.json file for a function.
 
+    First tries static AST parsing to get type names, then uses those
+    to import only the Pydantic model classes (not the entrypoint).
+
     Args:
         entrypoint_path: Path to the function entrypoint.py
         output_path: Output path for test.json
 
     Raises:
-        ImportError: If the module cannot be loaded
-        AttributeError: If the function is not found
-        ValueError: If the request type is not a Pydantic model
+        ImportError: If the Pydantic model cannot be loaded
+        ValueError: If the request type is not found or not a Pydantic model
     """
-    # Get the request type
-    request_type = get_request_type(entrypoint_path)
+    # First, get the type name using static parsing (no imports)
+    request_type_name, _ = inspect_function_types_static(entrypoint_path)
+
+    if not request_type_name:
+        raise ValueError("Could not determine request type from function signature")
+
+    # Now try to import the Pydantic model class
+    # Look for it in the entrypoint's imports
+    request_type = _import_pydantic_model(entrypoint_path, request_type_name)
+
+    if not request_type:
+        raise ValueError(f"Could not import Pydantic model: {request_type_name}")
 
     # Check if it's a Pydantic model
     if not hasattr(request_type, "model_fields"):

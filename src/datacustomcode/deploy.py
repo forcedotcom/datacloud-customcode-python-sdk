@@ -35,6 +35,10 @@ from pydantic import BaseModel
 import requests
 
 from datacustomcode.cmd import cmd_output
+from datacustomcode.constants import (
+    REQUEST_TYPE_TO_FEATURE,
+    USE_IN_FEATURE_MAPPING_FOR_CONNECT_API,
+)
 from datacustomcode.scan import find_base_directory, get_package_type
 
 DATA_CUSTOM_CODE_PATH = "services/data/v63.0/ssot/data-custom-code"
@@ -65,22 +69,13 @@ def _sanitize_api_name(name: str) -> str:
     return sanitized
 
 
-# Mapping from user-facing feature names to internal API names
-USE_IN_FEATURE_MAPPING_FOR_CONNECT_API = {
-    "SearchIndexChunking": "UnstructuredChunking",
-}
-
-# Mapping from Pydantic request/response types to feature names
-REQUEST_TYPE_TO_FEATURE = {
-    "SearchIndexChunkingV1Request": "SearchIndexChunking",
-    "SearchIndexChunkingV1Response": "SearchIndexChunking",
-}
-
 def infer_use_in_feature(entrypoint_path: str) -> Union[str, None]:
     """Infer the use_in_feature from function signature.
 
     Checks both the request parameter type and return type annotation.
     Both must map to the same feature for a valid inference.
+
+    Uses static AST parsing to avoid importing dependencies.
 
     Args:
         entrypoint_path: Path to the entrypoint.py file
@@ -88,9 +83,9 @@ def infer_use_in_feature(entrypoint_path: str) -> Union[str, None]:
     Returns:
         The feature name if both request and response match, None otherwise
     """
-    from datacustomcode.function_utils import inspect_function_types
+    from datacustomcode.function_utils import inspect_function_types_static
 
-    request_type_name, response_type_name = inspect_function_types(entrypoint_path)
+    request_type_name, response_type_name = inspect_function_types_static(entrypoint_path)
 
     if not request_type_name or not response_type_name:
         return None

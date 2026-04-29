@@ -27,6 +27,13 @@ from loguru import logger
 
 from datacustomcode import AuthType
 from datacustomcode.auth import configure_oauth_tokens
+from datacustomcode.constants import (
+    CONFIG_FILE,
+    ENTRYPOINT_FILE,
+    PAYLOAD_DIR,
+    TEST_FILE,
+    TESTS_DIR,
+)
 from datacustomcode.scan import find_base_directory, get_package_type
 
 
@@ -85,9 +92,9 @@ def _generate_function_test_file(entrypoint_path: str) -> Optional[str]:
     """
     from datacustomcode.function_utils import generate_test_json
 
-    tests_dir = os.path.join(os.path.dirname(entrypoint_path), "tests")
+    tests_dir = os.path.join(os.path.dirname(entrypoint_path), TESTS_DIR)
     os.makedirs(tests_dir, exist_ok=True)
-    test_json_path = os.path.join(tests_dir, "test.json")
+    test_json_path = os.path.join(tests_dir, TEST_FILE)
 
     try:
         generate_test_json(entrypoint_path, test_json_path)
@@ -236,7 +243,7 @@ def deploy(
 
     if package_type == "function":
         # Infer use_in_feature from function signature
-        entrypoint_path = os.path.join(path, "entrypoint.py")
+        entrypoint_path = os.path.join(path, ENTRYPOINT_FILE)
         use_in_feature = infer_use_in_feature(entrypoint_path)
         if use_in_feature:
             logger.info(f"Inferred use_in_feature: {use_in_feature}")
@@ -288,11 +295,9 @@ def init(directory: str, code_type: str, use_in_feature: Optional[str]):
     if code_type == "script":
         copy_script_template(directory)
     elif code_type == "function":
-        # Default to SearchIndexChunking if not provided
-        feature = use_in_feature
-        copy_function_template(directory, feature)
-    entrypoint_path = os.path.join(directory, "payload", "entrypoint.py")
-    config_location = os.path.join(os.path.dirname(entrypoint_path), "config.json")
+        copy_function_template(directory, use_in_feature)
+    entrypoint_path = os.path.join(directory, PAYLOAD_DIR, ENTRYPOINT_FILE)
+    config_location = os.path.join(os.path.dirname(entrypoint_path), CONFIG_FILE)
 
     # Write package type to SDK-specific config
     sdk_config = {"type": code_type}
@@ -344,7 +349,7 @@ def init(directory: str, code_type: str, use_in_feature: Optional[str]):
 def scan(filename: str, config: str, dry_run: bool, no_requirements: bool):
     from datacustomcode.scan import update_config, write_requirements_file
 
-    config_location = config or os.path.join(os.path.dirname(filename), "config.json")
+    config_location = config or os.path.join(os.path.dirname(filename), CONFIG_FILE)
     click.echo(
         "Dumping scan results to config file: "
         + click.style(config_location, fg="blue", bold=True)
