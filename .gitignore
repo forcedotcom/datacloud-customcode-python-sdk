@@ -85,3 +85,6 @@ _version.py
 .terraform
 .terraform.lock.hcl
 terraform.tfstate*
+
+# Local spec docs
+scripts/schema.md

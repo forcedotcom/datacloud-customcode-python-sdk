@@ -15,6 +15,7 @@
 
 from datacustomcode.client import Client
 from datacustomcode.credentials import AuthType, Credentials
+from datacustomcode.entry_func import entry_func
 from datacustomcode.io.reader.query_api import QueryAPIDataCloudReader
 from datacustomcode.io.writer.print import PrintDataCloudWriter
 
@@ -24,4 +25,5 @@ __all__ = [
     "Credentials",
     "PrintDataCloudWriter",
     "QueryAPIDataCloudReader",
+    "entry_func",
 ]
