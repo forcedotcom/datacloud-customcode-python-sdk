@@ -19,25 +19,17 @@ from typing import (
     Type,
     TypeVar,
     Union,
-    cast,
 )
 
-from datacustomcode.common_config import (
-    BaseConfig,
-    BaseObjectConfig,
-    default_config_file,
-)
+from datacustomcode.common_config import BaseConfig, default_config_file
+from datacustomcode.einstein_platform_config import CredentialsObjectConfig
 from datacustomcode.einstein_predictions.base import EinsteinPredictions
 
 _E = TypeVar("_E", bound=EinsteinPredictions)
 
 
-class EinsteinPredictionsObjectConfig(BaseObjectConfig, Generic[_E]):
-    type_base: ClassVar[Type[EinsteinPredictions]] = EinsteinPredictions  # type: ignore[type-abstract]
-
-    def to_object(self) -> _E:
-        type_ = self.type_base.subclass_from_config_name(self.type_config_name)
-        return cast(_E, type_(**self.options))
+class EinsteinPredictionsObjectConfig(CredentialsObjectConfig, Generic[_E]):
+    type_to_create: ClassVar[Type[EinsteinPredictions]] = EinsteinPredictions  # type: ignore[type-abstract]
 
 
 class EinsteinPredictionsConfig(BaseConfig):

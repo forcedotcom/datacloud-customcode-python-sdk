@@ -25,10 +25,12 @@ from typing import (
 )
 
 from datacustomcode.config import config
+from datacustomcode.einstein_predictions_config import einstein_predictions_config
+from datacustomcode.llm_gateway_config import llm_gateway_config
 from datacustomcode.scan import find_base_directory, get_package_type
 
 
-def _set_config_option(config_obj, key: str, value: str) -> None:
+def _set_config_option(config_obj, key: str, value: Optional[str]) -> None:
     """Set an option on a config object if it exists and has options attribute.
 
     Args:
@@ -36,8 +38,31 @@ def _set_config_option(config_obj, key: str, value: str) -> None:
         key: Option key to set
         value: Option value to set
     """
-    if config_obj and hasattr(config_obj, "options"):
+    if config_obj and hasattr(config_obj, "options") and value is not None:
         config_obj.options[key] = value
+
+
+def _update_config_options(profile: Optional[str], sf_cli_org: Optional[str]):
+    if sf_cli_org:
+        config_key = "sf_cli_org"
+        _set_config_option(config.reader_config, config_key, sf_cli_org)
+        _set_config_option(config.writer_config, config_key, sf_cli_org)
+        _set_config_option(
+            einstein_predictions_config.einstein_predictions_config,
+            config_key,
+            sf_cli_org,
+        )
+        _set_config_option(
+            llm_gateway_config.llm_gateway_config, config_key, sf_cli_org
+        )
+    elif profile != "default":
+        config_key = "credentials_profile"
+        _set_config_option(config.reader_config, config_key, profile)
+        _set_config_option(config.writer_config, config_key, profile)
+        _set_config_option(
+            einstein_predictions_config.einstein_predictions_config, config_key, profile
+        )
+        _set_config_option(llm_gateway_config.llm_gateway_config, config_key, profile)
 
 
 def run_entrypoint(
@@ -47,7 +72,7 @@ def run_entrypoint(
     profile: str,
     sf_cli_org: Optional[str] = None,
 ) -> None:
-    """Run the entrypoint script with the given config and dependencies.
+    """Run the entrypoint for script or function with the given config and dependencies.
 
     Args:
         entrypoint: The entrypoint script to run.
@@ -98,12 +123,8 @@ def run_entrypoint(
         _set_config_option(config.reader_config, "dataspace", dataspace)
         _set_config_option(config.writer_config, "dataspace", dataspace)
 
-    if sf_cli_org:
-        _set_config_option(config.reader_config, "sf_cli_org", sf_cli_org)
-        _set_config_option(config.writer_config, "sf_cli_org", sf_cli_org)
-    elif profile != "default":
-        _set_config_option(config.reader_config, "credentials_profile", profile)
-        _set_config_option(config.writer_config, "credentials_profile", profile)
+    _update_config_options(profile, sf_cli_org)
+
     for dependency in dependencies:
         try:
             importlib.import_module(dependency)

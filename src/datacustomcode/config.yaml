@@ -19,11 +19,12 @@ spark_config:
     spark.sql.execution.arrow.pyspark.enabled: 'true'
     spark.driver.extraJavaOptions: -Djava.security.manager=allow
 
-proxy_config:
-  type_config_name: LocalProxyClientProvider
+einstein_predictions_config:
+  type_config_name: DefaultEinsteinPredictions
   options:
     credentials_profile: default
 
-einstein_predictions_config:
-  type_config_name: DefaultEinsteinPredictions
-  options: {}
+llm_gateway_config:
+  type_config_name: DefaultLLMGateway
+  options:
+    credentials_profile: default

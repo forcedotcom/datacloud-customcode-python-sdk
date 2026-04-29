@@ -59,9 +59,23 @@ def make_einstein_prediction(runtime: Runtime) -> None:
     )
 
     prediction_response = runtime.einstein_predictions.predict(prediction_request)
-    print(
-        f"Einstein prediction results - success: {prediction_response.is_success} \
-           response data: {prediction_response.data}"
+    logger.info(
+        f"Einstein prediction results - success: [{prediction_response.is_success}] "
+        f"response data: {prediction_response.data}"
+    )
+
+
+def generate_text(runtime: Runtime):
+    builder = GenerateTextRequestBuilder()
+    llm_request = (
+        builder.set_prompt("Generate 2 dog names")
+        .set_model("sfdc_ai__DefaultGPT52")
+        .build()
+    )
+    llm_response = runtime.llm_gateway.generate_text(llm_request)
+    logger.info(
+        f"LLM Gateway generate text results - success: [{llm_response.is_success}] "
+        f"response data: {llm_response.data}"
     )
 
 
@@ -73,16 +87,14 @@ def function(request: dict, runtime: Runtime) -> dict:
     output_chunks = []
     current_seq_no = 1  # Start sequence number from 1
 
-    make_einstein_prediction(runtime)
-
-    builder = GenerateTextRequestBuilder()
-    llm_request = builder.set_prompt("Hello").set_model("modelName").build()
-    llm_response = runtime.llm_gateway.generate_text(llm_request)
-
-    if llm_response.is_success:
-        print(llm_response.text)
-    else:
-        print(llm_response.error_code)
+    """
+    You can use your AI models configured in Salesforce
+    to generate texts or predict an outcome.
+    First configure an external client app before using these AI APIs
+    https://developer.salesforce.com/docs/ai/agentforce/guide/agent-api-get-started.html#create-a-salesforce-app"
+    """
+    # generate_text(runtime)
+    # make_einstein_prediction(runtime)
 
     for item in items:
         # Item is DocElement as dict

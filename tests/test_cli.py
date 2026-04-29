@@ -72,11 +72,14 @@ class TestInit:
 
 class TestDeploy:
     @patch("datacustomcode.deploy.deploy_full")
-    @patch("datacustomcode.credentials.Credentials.from_available")
-    def test_deploy_command_success(self, mock_credentials, mock_deploy_full):
+    @patch("datacustomcode.token_provider.CredentialsTokenProvider")
+    def test_deploy_command_success(self, mock_token_provider, mock_deploy_full):
         """Test successful deploy command."""
-        # Mock credentials
-        mock_creds = mock_credentials.return_value
+        # Mock token provider
+        mock_provider_instance = mock_token_provider.return_value
+        mock_provider_instance.get_token.return_value = AccessTokenResponse(
+            access_token="test_token", instance_url="https://instance.example.com"
+        )
 
         runner = CliRunner()
         with runner.isolated_filesystem():
@@ -86,7 +89,7 @@ class TestDeploy:
             result = runner.invoke(deploy, ["--name", "test-job", "--version", "1.0.0"])
 
             assert result.exit_code == 0
-            mock_credentials.assert_called_once()
+            mock_token_provider.assert_called_once_with("default")
             mock_deploy_full.assert_called_once()
 
             # Check that deploy_full was called with correct arguments
@@ -97,14 +100,20 @@ class TestDeploy:
             )  # metadata (hyphen sanitized to underscore)
             assert call_args[0][1].version == "1.0.0"
             assert call_args[0][1].description == "Custom Data Transform Code"
-            assert call_args[0][2] == mock_creds  # credentials
+            assert call_args[0][2].access_token == "test_token"
+            assert call_args[0][2].instance_url == "https://instance.example.com"
 
     @patch("datacustomcode.deploy.deploy_full")
-    @patch("datacustomcode.credentials.Credentials.from_available")
+    @patch("datacustomcode.token_provider.CredentialsTokenProvider")
     def test_deploy_command_function_invoke_options(
-        self, mock_credentials, mock_deploy_full
+        self, mock_token_provider, mock_deploy_full
     ):
         """Test deploy command with function invoke options."""
+        mock_provider_instance = mock_token_provider.return_value
+        mock_provider_instance.get_token.return_value = AccessTokenResponse(
+            access_token="test_token", instance_url="https://instance.example.com"
+        )
+
         runner = CliRunner()
         with runner.isolated_filesystem():
             # Create test payload directory
@@ -123,13 +132,13 @@ class TestDeploy:
             call_args = mock_deploy_full.call_args
             assert call_args[0][1].functionInvokeOptions == ["option1", "option2"]
 
-    @patch("datacustomcode.credentials.Credentials.from_available")
-    def test_deploy_command_credentials_error(self, mock_credentials):
+    @patch("datacustomcode.token_provider.CredentialsTokenProvider")
+    def test_deploy_command_credentials_error(self, mock_token_provider):
         """Test deploy command when credentials are not available."""
-        # Mock credentials to raise ValueError
-        mock_credentials.side_effect = ValueError(
-            "Credentials not found in env or ini file. "
-            "Run `datacustomcode configure` to create a credentials file."
+        # Mock token provider to raise RuntimeError
+        mock_provider_instance = mock_token_provider.return_value
+        mock_provider_instance.get_token.side_effect = RuntimeError(
+            "Failed to refresh access token"
         )
 
         runner = CliRunner()
@@ -140,12 +149,17 @@ class TestDeploy:
             result = runner.invoke(deploy, ["--name", "test-job"])
 
             assert result.exit_code == 1
-            assert "Error: Credentials not found in env or ini file" in result.output
+            assert "Error: Failed to refresh access token" in result.output
 
     @patch("datacustomcode.deploy.deploy_full")
-    @patch("datacustomcode.credentials.Credentials.from_available")
-    def test_deploy_command_custom_path(self, mock_credentials, mock_deploy_full):
+    @patch("datacustomcode.token_provider.CredentialsTokenProvider")
+    def test_deploy_command_custom_path(self, mock_token_provider, mock_deploy_full):
         """Test deploy command with custom path."""
+        mock_provider_instance = mock_token_provider.return_value
+        mock_provider_instance.get_token.return_value = AccessTokenResponse(
+            access_token="test_token", instance_url="https://instance.example.com"
+        )
+
         runner = CliRunner()
         with runner.isolated_filesystem():
             # Create test directory
@@ -163,11 +177,16 @@ class TestDeploy:
             assert call_args[0][0] == "custom_path"  # path
 
     @patch("datacustomcode.deploy.deploy_full")
-    @patch("datacustomcode.credentials.Credentials.from_available")
+    @patch("datacustomcode.token_provider.CredentialsTokenProvider")
     def test_deploy_command_custom_description(
-        self, mock_credentials, mock_deploy_full
+        self, mock_token_provider, mock_deploy_full
     ):
         """Test deploy command with custom description."""
+        mock_provider_instance = mock_token_provider.return_value
+        mock_provider_instance.get_token.return_value = AccessTokenResponse(
+            access_token="test_token", instance_url="https://instance.example.com"
+        )
+
         runner = CliRunner()
         with runner.isolated_filesystem():
             # Create test payload directory
@@ -185,13 +204,13 @@ class TestDeploy:
             assert call_args[0][1].description == "Custom description"
 
     @patch("datacustomcode.deploy.deploy_full")
-    @patch("datacustomcode.deploy._retrieve_access_token_from_sf_cli")
-    def test_deploy_command_sf_cli_org(self, mock_sf_cli_token, mock_deploy_full):
+    @patch("datacustomcode.token_provider.SFCLITokenProvider")
+    def test_deploy_command_sf_cli_org(self, mock_sf_cli_provider, mock_deploy_full):
         """Test deploy command with --sf-cli-org flag."""
-        mock_token = AccessTokenResponse(
+        mock_provider_instance = mock_sf_cli_provider.return_value
+        mock_provider_instance.get_token.return_value = AccessTokenResponse(
             access_token="test_token", instance_url="https://test.salesforce.com"
         )
-        mock_sf_cli_token.return_value = mock_token
 
         runner = CliRunner()
         with runner.isolated_filesystem():
@@ -201,15 +220,20 @@ class TestDeploy:
             )
 
             assert result.exit_code == 0
-            mock_sf_cli_token.assert_called_once_with("my-org")
+            mock_sf_cli_provider.assert_called_once_with("my-org")
             mock_deploy_full.assert_called_once()
             call_args = mock_deploy_full.call_args
-            assert call_args[0][2] == mock_token  # AccessTokenResponse passed directly
+            # Check AccessTokenResponse passed directly
+            assert call_args[0][2].access_token == "test_token"
+            assert call_args[0][2].instance_url == "https://test.salesforce.com"
 
-    @patch("datacustomcode.deploy._retrieve_access_token_from_sf_cli")
-    def test_deploy_command_sf_cli_org_error(self, mock_sf_cli_token):
+    @patch("datacustomcode.token_provider.SFCLITokenProvider")
+    def test_deploy_command_sf_cli_org_error(self, mock_sf_cli_provider):
         """Test deploy command when --sf-cli-org fails."""
-        mock_sf_cli_token.side_effect = RuntimeError("sf command not found")
+        mock_provider_instance = mock_sf_cli_provider.return_value
+        mock_provider_instance.get_token.side_effect = RuntimeError(
+            "sf command not found"
+        )
 
         runner = CliRunner()
         with runner.isolated_filesystem():

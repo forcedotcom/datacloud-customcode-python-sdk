@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any, Dict
+
+from datacustomcode.einstein_platform_client import EinsteinPlatformClient
 from datacustomcode.llm_gateway.base import LLMGateway
 from datacustomcode.llm_gateway.types.generate_text_request import GenerateTextRequest
 from datacustomcode.llm_gateway.types.generate_text_response import GenerateTextResponse
@@ -21,15 +24,24 @@ from datacustomcode.llm_gateway.types.generate_text_response_builder import (
 )
 
 
-class DefaultLLMGateway(LLMGateway):
+class DefaultLLMGateway(EinsteinPlatformClient, LLMGateway):
     CONFIG_NAME = "DefaultLLMGateway"
 
     def generate_text(self, request: GenerateTextRequest) -> GenerateTextResponse:
+        api_url = (
+            f"{self.EINSTEIN_PLATFORM_MODELS_URL}/{request.model_name}/generations"
+        )
 
-        response_data = {
-            "version": "v1",
-            "status_code": 200,
-            "data": {"generation": {"generatedText": "Hello World"}},
+        payload: Dict[str, Any] = {"prompt": request.prompt}
+
+        if request.localization:
+            payload["localization"] = request.localization
+        if request.tags:
+            payload["tags"] = request.tags
+
+        response = self.make_post_request(api_url, payload)
+        response_dict = {
+            "status_code": response.status_code,
+            "data": self.parse_response(response),
         }
-
-        return GenerateTextResponseBuilder.build(response_data)
+        return GenerateTextResponseBuilder.build(response_dict)

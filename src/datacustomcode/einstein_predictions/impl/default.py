@@ -13,23 +13,67 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import (
+    Any,
+    ClassVar,
+    Dict,
+    List,
+)
+
+from datacustomcode.einstein_platform_client import EinsteinPlatformClient
 from datacustomcode.einstein_predictions.base import EinsteinPredictions
 from datacustomcode.einstein_predictions.types import (
     PredictionRequest,
     PredictionResponse,
+    PredictionType,
 )
 
 
-class DefaultEinsteinPredictions(EinsteinPredictions):
+class DefaultEinsteinPredictions(EinsteinPlatformClient, EinsteinPredictions):
     CONFIG_NAME = "DefaultEinsteinPredictions"
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    ENDPOINT_MAP: ClassVar[dict[PredictionType, str]] = {
+        PredictionType.REGRESSION: "regression",
+        PredictionType.CLUSTERING: "clustering",
+        PredictionType.CLASSIFICATION: "classification",
+        PredictionType.BINARY_CLASSIFICATION: "binary-classification",
+        PredictionType.MULTI_OUTCOME: "multi-outcome",
+    }
 
     def predict(self, request: PredictionRequest) -> PredictionResponse:
+        endpoint = self.ENDPOINT_MAP.get(request.prediction_type)
+        if not endpoint:
+            raise RuntimeError(
+                f"Unknown prediction type: {request.prediction_type}. "
+                f"Valid types: {list(self.ENDPOINT_MAP.keys())}"
+            )
+
+        api_url = (
+            f"{self.EINSTEIN_PLATFORM_MODELS_URL}/{request.model_api_name}/{endpoint}"
+        )
+
+        prediction_columns: List[Dict[str, Any]] = []
+        for col in request.prediction_columns:
+            col_data: Dict[str, Any] = {"columnName": col.column_name}
+            if col.string_values:
+                col_data["stringValues"] = col.string_values
+            if col.double_values:
+                col_data["doubleValues"] = col.double_values
+            if col.boolean_values:
+                col_data["booleanValues"] = col.boolean_values
+            if col.date_values:
+                col_data["dateValues"] = col.date_values
+            if col.datetime_values:
+                col_data["datetimeValues"] = col.datetime_values
+            prediction_columns.append(col_data)
+
+        payload: Dict[str, Any] = {"predictionColumns": prediction_columns}
+
+        if request.settings:
+            payload["settings"] = request.settings
+
+        response = self.make_post_request(api_url, payload)
         return PredictionResponse(
-            version="v1",
             prediction_type=request.prediction_type,
-            status_code=200,
-            data={"results": [{"prediction": {"predictedValue": 1.0}}]},
+            status_code=response.status_code,
+            data=self.parse_response(response),
         )

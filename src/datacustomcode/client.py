@@ -33,7 +33,6 @@ if TYPE_CHECKING:
 
     from datacustomcode.io.reader.base import BaseDataCloudReader
     from datacustomcode.io.writer.base import BaseDataCloudWriter, WriteMode
-    from datacustomcode.proxy.client.base import BaseProxyClient
     from datacustomcode.spark.base import BaseSparkSessionProvider
 
 
@@ -107,7 +106,6 @@ class Client:
     _reader: BaseDataCloudReader
     _writer: BaseDataCloudWriter
     _file: DefaultFindFilePath
-    _proxy: Optional[BaseProxyClient]
     _data_layer_history: dict[DataCloudObjectType, set[str]]
     _code_type: str
 
@@ -115,7 +113,6 @@ class Client:
         cls,
         reader: Optional[BaseDataCloudReader] = None,
         writer: Optional["BaseDataCloudWriter"] = None,
-        proxy: Optional[BaseProxyClient] = None,
         spark_provider: Optional["BaseSparkSessionProvider"] = None,
         code_type: str = "script",
     ) -> Client:
@@ -222,11 +219,6 @@ class Client:
         """
         self._validate_data_layer_history_does_not_contain(DataCloudObjectType.DLO)
         return self._writer.write_to_dmo(name, dataframe, write_mode, **kwargs)  # type: ignore[no-any-return]
-
-    def call_llm_gateway(self, LLM_MODEL_ID: str, prompt: str, maxTokens: int) -> str:
-        if self._proxy is None:
-            raise ValueError("No proxy configured; set proxy or proxy_config")
-        return self._proxy.call_llm_gateway(LLM_MODEL_ID, prompt, maxTokens)  # type: ignore[no-any-return]
 
     def find_file_path(self, file_name: str) -> Path:
         """Return a file path"""

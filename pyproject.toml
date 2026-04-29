@@ -105,6 +105,7 @@ pydantic = "2.13.1"
 pyspark = "3.5.1"
 python = ">=3.10,<3.12"
 pyyaml = "^6.0"
+requests = "2.33.1"
 salesforce-cdp-connector = ">=1.0.19"
 setuptools_scm = "^7.1.0"
 

@@ -148,7 +148,7 @@ class TestRunOAuthCallbackServer:
         mock_server.server_address = ("localhost", 5555)
         mock_tcpserver.return_value = mock_server
 
-        server, port = _run_oauth_callback_server(redirect_uri, auth_code_queue)
+        _server, port = _run_oauth_callback_server(redirect_uri, auth_code_queue)
 
         assert port == 5555
         mock_tcpserver.assert_called_once()
@@ -186,7 +186,7 @@ class TestRunOAuthCallbackServer:
         mock_server.server_address = ("localhost", 8080)
         mock_tcpserver.return_value = mock_server
 
-        server, port = _run_oauth_callback_server(redirect_uri, auth_code_queue)
+        _server, port = _run_oauth_callback_server(redirect_uri, auth_code_queue)
 
         assert port == 8080
         mock_tcpserver.assert_called_once()

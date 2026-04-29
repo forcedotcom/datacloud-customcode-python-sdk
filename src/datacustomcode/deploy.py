@@ -19,11 +19,9 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import tempfile
 import time
 from typing import (
-    TYPE_CHECKING,
     Any,
     Callable,
     Dict,
@@ -37,15 +35,10 @@ from pydantic import BaseModel
 import requests
 
 from datacustomcode.cmd import cmd_output
-from datacustomcode.credentials import AuthType
 from datacustomcode.scan import find_base_directory, get_package_type
-
-if TYPE_CHECKING:
-    from datacustomcode.credentials import Credentials
 
 DATA_CUSTOM_CODE_PATH = "services/data/v63.0/ssot/data-custom-code"
 DATA_TRANSFORMS_PATH = "services/data/v63.0/ssot/data-transforms"
-AUTH_PATH = "services/oauth2/token"
 WAIT_FOR_DEPLOYMENT_TIMEOUT = 3000
 
 # Available compute types for Data Cloud deployments.
@@ -161,80 +154,6 @@ def _make_api_call(
 class AccessTokenResponse(BaseModel):
     access_token: str
     instance_url: str
-
-
-def _retrieve_access_token(credentials: Credentials) -> AccessTokenResponse:
-    """Get an access token for the Salesforce API."""
-    logger.debug("Getting oauth token...")
-
-    url = f"{credentials.login_url.rstrip('/')}/{AUTH_PATH.lstrip('/')}"
-
-    if credentials.auth_type == AuthType.OAUTH_TOKENS:
-        data = {
-            "grant_type": "refresh_token",
-            "refresh_token": credentials.refresh_token,
-            "client_id": credentials.client_id,
-            "client_secret": credentials.client_secret,
-        }
-    elif credentials.auth_type == AuthType.CLIENT_CREDENTIALS:
-        data = {
-            "grant_type": "client_credentials",
-            "client_id": credentials.client_id,
-            "client_secret": credentials.client_secret,
-        }
-    else:
-        raise ValueError(f"Unsupported auth_type: {credentials.auth_type}")
-
-    response = _make_api_call(url, "POST", data=data)
-    return AccessTokenResponse(**response)
-
-
-def _retrieve_access_token_from_sf_cli(sf_cli_org: str) -> AccessTokenResponse:
-    """Get an access token from the Salesforce CLI."""
-    try:
-        result = subprocess.run(
-            ["sf", "org", "display", "--target-org", sf_cli_org, "--json"],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=30,
-        )
-    except FileNotFoundError as exc:
-        raise RuntimeError(
-            "The 'sf' command was not found. "
-            "Please install Salesforce CLI: https://developer.salesforce.com/tools/salesforcecli"
-        ) from exc
-    except subprocess.TimeoutExpired as exc:
-        raise RuntimeError(
-            f"'sf org display' timed out for org '{sf_cli_org}'"
-        ) from exc
-    except subprocess.CalledProcessError as exc:
-        raise RuntimeError(
-            f"'sf org display' failed for org '{sf_cli_org}'.\n"
-            f"Ensure the org is authenticated via 'sf org login web'.\n"
-            f"stderr: {exc.stderr.strip()}"
-        ) from exc
-
-    try:
-        data = json.loads(result.stdout)
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(f"Failed to parse 'sf org display' output: {exc}") from exc
-
-    if data.get("status") != 0:
-        raise RuntimeError(
-            f"SF CLI error for org '{sf_cli_org}': "
-            f"{data.get('message', 'unknown error')}"
-        )
-
-    org_result = data.get("result", {})
-    access_token = org_result.get("accessToken")
-    instance_url = org_result.get("instanceUrl")
-    if not access_token or not instance_url:
-        raise RuntimeError(
-            f"'sf org display' did not return an access token or instance URL "
-            f"for org '{sf_cli_org}'"
-        )
-    return AccessTokenResponse(access_token=access_token, instance_url=instance_url)
 
 
 class CreateDeploymentResponse(BaseModel):
@@ -567,16 +486,11 @@ def zip(
 def deploy_full(
     directory: str,
     metadata: CodeExtensionMetadata,
-    credentials: Union["Credentials", AccessTokenResponse],
+    access_token: AccessTokenResponse,
     docker_network: str,
     callback=None,
 ) -> AccessTokenResponse:
     """Deploy a data transform in the DataCloud."""
-    if isinstance(credentials, AccessTokenResponse):
-        access_token = credentials
-    else:
-        access_token = _retrieve_access_token(credentials)
-
     # prepare payload
     config = get_config(directory)
 
@@ -587,7 +501,6 @@ def deploy_full(
     wait_for_deployment(access_token, metadata, callback)
 
     # create data transform
-
     if isinstance(config, DataTransformConfig):
         create_data_transform(directory, access_token, metadata, config)
     return access_token

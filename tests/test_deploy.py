@@ -1,6 +1,5 @@
 """Tests for the deploy module."""
 
-import json
 from unittest.mock import (
     ANY,
     MagicMock,
@@ -12,7 +11,6 @@ import zipfile
 import pytest
 import requests
 
-from datacustomcode.credentials import AuthType, Credentials
 from datacustomcode.deploy import (
     DloPermission,
     Permissions,
@@ -28,8 +26,6 @@ with patch("datacustomcode.version.get_version", return_value="1.2.3"):
         DataTransformConfig,
         DeploymentsResponse,
         _make_api_call,
-        _retrieve_access_token,
-        _retrieve_access_token_from_sf_cli,
         _sanitize_api_name,
         create_data_transform,
         create_deployment,
@@ -598,58 +594,6 @@ class TestMakeApiCall:
             _make_api_call("https://example.com", "GET")
 
 
-class TestRetrieveAccessToken:
-    @patch("datacustomcode.deploy._make_api_call")
-    def test_retrieve_access_token(self, mock_make_api_call):
-        """Test retrieving access token."""
-        credentials = Credentials(
-            login_url="https://example.com",
-            client_id="id",
-            auth_type=AuthType.OAUTH_TOKENS,
-            refresh_token="refresh",
-            client_secret="secret",
-        )
-
-        mock_make_api_call.return_value = {
-            "access_token": "test_token",
-            "instance_url": "https://instance.example.com",
-        }
-
-        result = _retrieve_access_token(credentials)
-
-        mock_make_api_call.assert_called_once()
-        call_args = mock_make_api_call.call_args
-        assert call_args.kwargs["data"]["grant_type"] == "refresh_token"
-        assert call_args.kwargs["data"]["refresh_token"] == "refresh"
-        assert isinstance(result, AccessTokenResponse)
-        assert result.access_token == "test_token"
-        assert result.instance_url == "https://instance.example.com"
-
-    @patch("datacustomcode.deploy._make_api_call")
-    def test_retrieve_access_token_client_credentials(self, mock_make_api_call):
-        """Test retrieving access token with client credentials flow."""
-        credentials = Credentials(
-            login_url="https://example.com",
-            client_id="id",
-            auth_type=AuthType.CLIENT_CREDENTIALS,
-            client_secret="secret",
-        )
-
-        mock_make_api_call.return_value = {
-            "access_token": "test_token",
-            "instance_url": "https://instance.example.com",
-        }
-
-        result = _retrieve_access_token(credentials)
-
-        mock_make_api_call.assert_called_once()
-        call_args = mock_make_api_call.call_args
-        assert call_args.kwargs["data"]["grant_type"] == "client_credentials"
-        assert isinstance(result, AccessTokenResponse)
-        assert result.access_token == "test_token"
-        assert result.instance_url == "https://instance.example.com"
-
-
 class TestCreateDeployment:
     @patch("datacustomcode.deploy._make_api_call")
     def test_create_deployment_success(self, mock_make_api_call):
@@ -963,7 +907,7 @@ class TestDataTransformConfig:
         mock_exists.return_value = False
         with pytest.raises(
             FileNotFoundError,
-            match="config.json not found at /test/dir/payload/config.json",
+            match=r"config\.json not found at /test/dir/payload/config\.json",
         ):
             get_config("/test/dir/payload")
 
@@ -974,7 +918,7 @@ class TestDataTransformConfig:
         mock_exists.return_value = True
         with pytest.raises(
             ValueError,
-            match="config.json at /test/dir/payload/config.json is not valid JSON",
+            match=r"config\.json at /test/dir/payload/config\.json is not valid JSON",
         ):
             get_config("/test/dir/payload")
 
@@ -985,8 +929,8 @@ class TestDataTransformConfig:
         mock_exists.return_value = True
         with pytest.raises(
             ValueError,
-            match="config.json at /test/dir/payload/config.json is missing "
-            "required fields: entryPoint, dataspace, permissions",
+            match=r"config\.json at /test/dir/payload/config\.json is missing "
+            r"required fields: entryPoint, dataspace, permissions",
         ):
             get_config("/test/dir/payload")
 
@@ -1048,10 +992,8 @@ class TestDeployFull:
     @patch("datacustomcode.deploy.upload_zip")
     @patch("datacustomcode.deploy.zip")
     @patch("datacustomcode.deploy.create_deployment")
-    @patch("datacustomcode.deploy._retrieve_access_token")
     def test_deploy_full(
         self,
-        mock_retrieve_token,
         mock_create_deployment,
         mock_zip,
         mock_upload_zip,
@@ -1070,13 +1012,6 @@ class TestDeployFull:
             ),
         )
         mock_get_config.return_value = data_transform_config
-        credentials = Credentials(
-            login_url="https://example.com",
-            client_id="id",
-            auth_type=AuthType.OAUTH_TOKENS,
-            refresh_token="refresh",
-            client_secret="secret",
-        )
         metadata = CodeExtensionMetadata(
             name="test_job",
             version="1.0.0",
@@ -1090,16 +1025,14 @@ class TestDeployFull:
         access_token = AccessTokenResponse(
             access_token="test_token", instance_url="https://instance.example.com"
         )
-        mock_retrieve_token.return_value = access_token
         mock_create_deployment.return_value = CreateDeploymentResponse(
             fileUploadUrl="https://upload.example.com"
         )
 
         # Call function
-        result = deploy_full("/test/dir", metadata, credentials, "default", callback)
+        result = deploy_full("/test/dir", metadata, access_token, "default", callback)
 
         # Assertions
-        mock_retrieve_token.assert_called_once_with(credentials)
         mock_get_config.assert_called_once_with("/test/dir")
         mock_create_deployment.assert_called_once_with(access_token, metadata)
         mock_zip.assert_called_once_with("/test/dir", "default", "script")
@@ -1110,7 +1043,6 @@ class TestDeployFull:
         )
         assert result == access_token
 
-    @patch("datacustomcode.deploy._retrieve_access_token")
     @patch("datacustomcode.deploy.get_config")
     @patch("datacustomcode.deploy.create_deployment")
     @patch("datacustomcode.deploy.zip")
@@ -1125,7 +1057,6 @@ class TestDeployFull:
         mock_zip,
         mock_create_deployment,
         mock_get_config,
-        mock_retrieve_token,
     ):
         """Test full deployment process using client credentials auth."""
         data_transform_config = DataTransformConfig(
@@ -1138,12 +1069,6 @@ class TestDeployFull:
             ),
         )
         mock_get_config.return_value = data_transform_config
-        credentials = Credentials(
-            login_url="https://example.com",
-            client_id="id",
-            auth_type=AuthType.CLIENT_CREDENTIALS,
-            client_secret="secret",
-        )
         metadata = CodeExtensionMetadata(
             name="test_job",
             version="1.0.0",
@@ -1156,14 +1081,12 @@ class TestDeployFull:
         access_token = AccessTokenResponse(
             access_token="test_token", instance_url="https://instance.example.com"
         )
-        mock_retrieve_token.return_value = access_token
         mock_create_deployment.return_value = CreateDeploymentResponse(
             fileUploadUrl="https://upload.example.com"
         )
 
-        result = deploy_full("/test/dir", metadata, credentials, "default", callback)
+        result = deploy_full("/test/dir", metadata, access_token, "default", callback)
 
-        mock_retrieve_token.assert_called_once_with(credentials)
         mock_get_config.assert_called_once_with("/test/dir")
         mock_create_deployment.assert_called_once_with(access_token, metadata)
         mock_zip.assert_called_once_with("/test/dir", "default", "script")
@@ -1199,7 +1122,6 @@ class TestRunDataTransform:
 
 
 class TestDeployFullWithDockerIntegration:
-    @patch("datacustomcode.deploy._retrieve_access_token")
     @patch("datacustomcode.deploy.create_deployment")
     @patch("datacustomcode.deploy.zip")
     @patch("datacustomcode.deploy.upload_zip")
@@ -1216,16 +1138,8 @@ class TestDeployFullWithDockerIntegration:
         mock_upload_zip,
         mock_zip,
         mock_create_deployment,
-        mock_retrieve_token,
     ):
         """Test full deployment process with Docker dependency building."""
-        credentials = Credentials(
-            login_url="https://example.com",
-            client_id="id",
-            auth_type=AuthType.OAUTH_TOKENS,
-            refresh_token="refresh",
-            client_secret="secret",
-        )
         metadata = CodeExtensionMetadata(
             name="test_job",
             version="1.0.0",
@@ -1249,27 +1163,17 @@ class TestDeployFullWithDockerIntegration:
         access_token = AccessTokenResponse(
             access_token="test_token", instance_url="https://instance.example.com"
         )
-        mock_retrieve_token.return_value = access_token
         mock_create_deployment.return_value = CreateDeploymentResponse(
             fileUploadUrl="https://upload.example.com"
         )
 
         # Mock that requirements.txt exists and has dependencies
         mock_has_requirements.return_value = True
-        data_transform_config = DataTransformConfig(
-            sdkVersion="1.0.0",
-            entryPoint="entrypoint.py",
-            dataspace="test_dataspace",
-            permissions=Permissions(
-                read=DloPermission(dlo=["input_dlo"]),
-                write=DloPermission(dlo=["output_dlo"]),
-            ),
-        )
+
         # Call function
-        result = deploy_full("/test/dir", metadata, credentials, "default", callback)
+        result = deploy_full("/test/dir", metadata, access_token, "default", callback)
 
         # Assertions
-        mock_retrieve_token.assert_called_once_with(credentials)
         mock_get_config.assert_called_once_with("/test/dir")
         mock_create_deployment.assert_called_once_with(access_token, metadata)
         mock_zip.assert_called_once_with("/test/dir", "default", "script")
@@ -1281,104 +1185,6 @@ class TestDeployFullWithDockerIntegration:
         assert result == access_token
 
 
-class TestRetrieveAccessTokenFromSFCLI:
-    """Tests for _retrieve_access_token_from_sf_cli."""
-
-    SF_CLI_OUTPUT = json.dumps(
-        {
-            "status": 0,
-            "result": {
-                "accessToken": "sf_access_token",
-                "instanceUrl": "https://sf.salesforce.com",
-            },
-        }
-    )
-
-    @patch("datacustomcode.deploy.subprocess.run")
-    def test_happy_path(self, mock_run):
-        """Successful sf org display returns AccessTokenResponse."""
-        mock_run.return_value = MagicMock(stdout=self.SF_CLI_OUTPUT, returncode=0)
-
-        result = _retrieve_access_token_from_sf_cli("my-org")
-
-        assert result.access_token == "sf_access_token"
-        assert result.instance_url == "https://sf.salesforce.com"
-        mock_run.assert_called_once_with(
-            ["sf", "org", "display", "--target-org", "my-org", "--json"],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=30,
-        )
-
-    @patch("datacustomcode.deploy.subprocess.run")
-    def test_file_not_found(self, mock_run):
-        """FileNotFoundError raised when sf CLI is not installed."""
-        mock_run.side_effect = FileNotFoundError("No such file or directory: 'sf'")
-
-        with pytest.raises(RuntimeError, match="'sf' command was not found"):
-            _retrieve_access_token_from_sf_cli("my-org")
-
-    @patch("datacustomcode.deploy.subprocess.run")
-    def test_timeout_expired(self, mock_run):
-        """TimeoutExpired raised when sf CLI times out."""
-        import subprocess
-
-        mock_run.side_effect = subprocess.TimeoutExpired(cmd="sf", timeout=30)
-
-        with pytest.raises(RuntimeError, match="timed out"):
-            _retrieve_access_token_from_sf_cli("my-org")
-
-    @patch("datacustomcode.deploy.subprocess.run")
-    def test_called_process_error(self, mock_run):
-        """CalledProcessError raised when sf CLI exits non-zero."""
-        import subprocess
-
-        mock_run.side_effect = subprocess.CalledProcessError(
-            returncode=1, cmd="sf", stderr="Org not found"
-        )
-
-        with pytest.raises(RuntimeError, match="failed for org"):
-            _retrieve_access_token_from_sf_cli("my-org")
-
-    @patch("datacustomcode.deploy.subprocess.run")
-    def test_json_decode_error(self, mock_run):
-        """RuntimeError raised when output is not valid JSON."""
-        mock_run.return_value = MagicMock(stdout="not-json", returncode=0)
-
-        with pytest.raises(RuntimeError, match="Failed to parse"):
-            _retrieve_access_token_from_sf_cli("my-org")
-
-    @patch("datacustomcode.deploy.subprocess.run")
-    def test_nonzero_status_in_json(self, mock_run):
-        """RuntimeError raised when JSON status field is non-zero."""
-        output = json.dumps({"status": 1, "message": "org not found"})
-        mock_run.return_value = MagicMock(stdout=output, returncode=0)
-
-        with pytest.raises(RuntimeError, match="SF CLI error"):
-            _retrieve_access_token_from_sf_cli("my-org")
-
-    @patch("datacustomcode.deploy.subprocess.run")
-    def test_missing_access_token(self, mock_run):
-        """RuntimeError raised when accessToken is absent."""
-        output = json.dumps(
-            {"status": 0, "result": {"instanceUrl": "https://sf.salesforce.com"}}
-        )
-        mock_run.return_value = MagicMock(stdout=output, returncode=0)
-
-        with pytest.raises(RuntimeError, match="did not return"):
-            _retrieve_access_token_from_sf_cli("my-org")
-
-    @patch("datacustomcode.deploy.subprocess.run")
-    def test_missing_instance_url(self, mock_run):
-        """RuntimeError raised when instanceUrl is absent."""
-        output = json.dumps({"status": 0, "result": {"accessToken": "sf_access_token"}})
-        mock_run.return_value = MagicMock(stdout=output, returncode=0)
-
-        with pytest.raises(RuntimeError, match="did not return"):
-            _retrieve_access_token_from_sf_cli("my-org")
-
-
 class TestDeployFullWithAccessTokenResponse:
     """Test deploy_full when passed an AccessTokenResponse directly."""
 
@@ -1388,10 +1194,8 @@ class TestDeployFullWithAccessTokenResponse:
     @patch("datacustomcode.deploy.zip")
     @patch("datacustomcode.deploy.create_deployment")
     @patch("datacustomcode.deploy.get_config")
-    @patch("datacustomcode.deploy._retrieve_access_token")
     def test_deploy_full_with_access_token_response_skips_token_exchange(
         self,
-        mock_retrieve_token,
         mock_get_config,
         mock_create_deployment,
         mock_zip,
@@ -1399,7 +1203,7 @@ class TestDeployFullWithAccessTokenResponse:
         mock_wait,
         mock_create_transform,
     ):
-        """deploy_full skips token exchange when given an AccessTokenResponse."""
+        """deploy_full now only accepts AccessTokenResponse."""
         access_token = AccessTokenResponse(
             access_token="direct_token", instance_url="https://instance.example.com"
         )
@@ -1417,7 +1221,6 @@ class TestDeployFullWithAccessTokenResponse:
 
         result = deploy_full("/test/dir", metadata, access_token, "default")
 
-        mock_retrieve_token.assert_not_called()
         mock_create_deployment.assert_called_once_with(access_token, metadata)
         assert result == access_token
 

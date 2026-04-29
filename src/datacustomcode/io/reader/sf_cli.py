@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import json
 import logging
-import subprocess
 from typing import (
     TYPE_CHECKING,
     Final,
@@ -29,6 +28,7 @@ import requests
 
 from datacustomcode.io.reader.base import BaseDataCloudReader
 from datacustomcode.io.reader.utils import _pandas_to_spark_schema
+from datacustomcode.token_provider import SFCLITokenProvider
 
 if TYPE_CHECKING:
     from pyspark.sql import DataFrame as PySparkDataFrame, SparkSession
@@ -78,64 +78,9 @@ class SFCLIDataCloudReader(BaseDataCloudReader):
         logger.debug(f"Initialized SFCLIDataCloudReader for org '{sf_cli_org}'")
 
     def _get_token(self) -> tuple[str, str]:
-        """Fetch a fresh access token and instance URL from the SF CLI.
-
-        Returns:
-            ``(access_token, instance_url)``
-
-        Raises:
-            RuntimeError: If the ``sf`` command is not on PATH, times out, or
-                returns an error.
-        """
-        try:
-            result = subprocess.run(
-                ["sf", "org", "display", "--target-org", self.sf_cli_org, "--json"],
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=30,
-            )
-        except FileNotFoundError as exc:
-            raise RuntimeError(
-                "The 'sf' command was not found.  "
-                "Please install Salesforce CLI: https://developer.salesforce.com/tools/salesforcecli"
-            ) from exc
-        except subprocess.TimeoutExpired as exc:
-            raise RuntimeError(
-                f"'sf org display' timed out for org '{self.sf_cli_org}'"
-            ) from exc
-        except subprocess.CalledProcessError as exc:
-            raise RuntimeError(
-                f"'sf org display' failed for org '{self.sf_cli_org}'.\n"
-                f"Ensure the org is authenticated via 'sf org login web'.\n"
-                f"stderr: {exc.stderr.strip()}"
-            ) from exc
-
-        try:
-            data = json.loads(result.stdout)
-        except json.JSONDecodeError as exc:
-            raise RuntimeError(
-                f"Failed to parse 'sf org display' output: {exc}"
-            ) from exc
-
-        if data.get("status") != 0:
-            raise RuntimeError(
-                f"SF CLI error for org '{self.sf_cli_org}': "
-                f"{data.get('message', 'unknown error')}"
-            )
-
-        org_result = data.get("result", {})
-        access_token = org_result.get("accessToken")
-        instance_url = org_result.get("instanceUrl")
-
-        if not access_token or not instance_url:
-            raise RuntimeError(
-                f"'sf org display' did not return an access token or instance URL "
-                f"for org '{self.sf_cli_org}'"
-            )
-
+        token_response = SFCLITokenProvider(self.sf_cli_org).get_token()
         logger.debug(f"Fetched token from SF CLI for org '{self.sf_cli_org}'")
-        return access_token, instance_url
+        return token_response.access_token, token_response.instance_url
 
     def _execute_query(self, sql: str) -> pd.DataFrame:
         """Execute *sql* against the Data Cloud REST endpoint.

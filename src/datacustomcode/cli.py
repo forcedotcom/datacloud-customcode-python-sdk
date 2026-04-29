@@ -179,13 +179,14 @@ def deploy(
     function_invoke_opt: str,
     sf_cli_org: Optional[str],
 ):
-    from datacustomcode.credentials import Credentials
     from datacustomcode.deploy import (
         COMPUTE_TYPES,
-        AccessTokenResponse,
         CodeExtensionMetadata,
-        _retrieve_access_token_from_sf_cli,
         deploy_full,
+    )
+    from datacustomcode.token_provider import (
+        CredentialsTokenProvider,
+        SFCLITokenProvider,
     )
 
     logger.debug("Deploying project")
@@ -220,22 +221,15 @@ def deploy(
             function_invoke_options = function_invoke_opt.split(",")
             metadata.functionInvokeOptions = function_invoke_options
 
-    auth: Union[Credentials, AccessTokenResponse]
-    if sf_cli_org:
-        try:
-            auth = _retrieve_access_token_from_sf_cli(sf_cli_org)
-        except RuntimeError as e:
-            click.secho(f"Error: {e}", fg="red")
-            raise click.Abort() from None
-    else:
-        try:
-            auth = Credentials.from_available(profile=profile)
-        except ValueError as e:
-            click.secho(
-                f"Error: {e}",
-                fg="red",
-            )
-            raise click.Abort() from None
+    try:
+        if sf_cli_org:
+            auth = SFCLITokenProvider(sf_cli_org).get_token()
+        else:
+            auth = CredentialsTokenProvider(profile).get_token()
+    except RuntimeError as e:
+        click.secho(f"Error: {e}", fg="red")
+        raise click.Abort() from None
+
     deploy_full(path, metadata, auth, network)
 
 

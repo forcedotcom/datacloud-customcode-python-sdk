@@ -121,8 +121,12 @@ class TestPandasToSparkSchema:
             assert field_dict[field_name].nullable
 
         # Verify the actual pandas dtypes to ensure our test data has the expected types
-        assert str(df["datetime_ns"].dtype) == "datetime64[ns]"
-        assert str(df["datetime_ns_utc"].dtype) == "datetime64[ns, UTC]"
+        # Pandas may use 'ns' or 'us' precision depending on version
+        assert str(df["datetime_ns"].dtype) in ["datetime64[ns]", "datetime64[us]"]
+        assert str(df["datetime_ns_utc"].dtype) in [
+            "datetime64[ns, UTC]",
+            "datetime64[us, UTC]",
+        ]
         assert str(df["datetime_ms"].dtype) == "datetime64[ms]"
         assert str(df["datetime_ms_utc"].dtype) == "datetime64[ms]"
 

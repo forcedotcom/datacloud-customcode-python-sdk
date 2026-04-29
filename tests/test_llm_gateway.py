@@ -3,8 +3,6 @@ from __future__ import annotations
 from pydantic import ValidationError
 import pytest
 
-from datacustomcode.llm_gateway.base import LLMGateway
-from datacustomcode.llm_gateway.default import DefaultLLMGateway
 from datacustomcode.llm_gateway.types.generate_text_request import GenerateTextRequest
 from datacustomcode.llm_gateway.types.generate_text_request_builder import (
     GenerateTextRequestBuilder,
@@ -210,28 +208,3 @@ class TestGenerateTextResponseBuilder:
         response = GenerateTextResponseBuilder.build(response_dict)
         assert response.status_code == 200
         assert response.version == "v1"  # Default value
-
-
-class TestDefaultLLMGateway:
-    """Test DefaultLLMGateway implementation."""
-
-    def test_default_gateway_is_llm_gateway(self):
-        """Test DefaultLLMGateway inherits from LLMGateway."""
-        gateway = DefaultLLMGateway()
-        assert isinstance(gateway, LLMGateway)
-
-    def test_generate_text_returns_response(self):
-        """Test generate_text returns GenerateTextResponse."""
-        gateway = DefaultLLMGateway()
-        request = GenerateTextRequest(model_name="gpt-4", prompt="Hello")
-        response = gateway.generate_text(request)
-        assert isinstance(response, GenerateTextResponse)
-
-    def test_generate_text_success_response(self):
-        """Test generate_text returns successful response."""
-        gateway = DefaultLLMGateway()
-        request = GenerateTextRequest(model_name="gpt-4", prompt="Hello")
-        response = gateway.generate_text(request)
-        assert response.is_success is True
-        assert response.status_code == 200
-        assert len(response.text) > 0
