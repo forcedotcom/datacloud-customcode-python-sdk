@@ -69,10 +69,12 @@ def copy_function_template(target_dir: str, use_in_feature: str) -> None:
             destination = os.path.join(target_dir, item)
 
             if os.path.isdir(source):
-                logger.debug(f"Copying feature-specific directory {source} to {destination}...")
+                logger.debug(
+                    f"Copying feature-specific directory {source} to {destination}..."
+                )
                 shutil.copytree(source, destination, dirs_exist_ok=True)
             else:
-                logger.debug(f"Copying feature-specific file {source} to {destination}...")
+                logger.debug(
+                    f"Copying feature-specific file {source} to {destination}..."
+                )
                 shutil.copy2(source, destination)
-
-

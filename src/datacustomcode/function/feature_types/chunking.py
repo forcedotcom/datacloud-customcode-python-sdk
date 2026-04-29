@@ -22,7 +22,6 @@ from typing import (
     Any,
     Dict,
     List,
-    Literal,
 )
 
 from pydantic import BaseModel, Field
@@ -76,7 +75,10 @@ class SearchIndexChunkingV1Request(BaseModel):
 
 class SearchIndexChunkingV1Response(BaseModel):
     """Batch response for UDS chunking"""
+
     output: List[SearchIndexChunkOutput] = Field(
         default_factory=list, description="Flat list of chunks from all docs"
     )
-    status: SearchIndexStatusResponse = Field(..., description="Overall operation status")
+    status: SearchIndexStatusResponse = Field(
+        ..., description="Overall operation status"
+    )

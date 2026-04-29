@@ -19,9 +19,12 @@ import ast
 import importlib.util
 import inspect
 import json
-import sys
 import typing
-from typing import Any, Optional, Tuple
+from typing import (
+    Any,
+    Optional,
+    Tuple,
+)
 
 
 def load_function_module(entrypoint_path: str, module_name: str = "function_module"):
@@ -59,7 +62,7 @@ def get_function_callable(module):
         AttributeError: If module doesn't have a 'function' attribute
     """
     if not hasattr(module, "function"):
-        raise AttributeError(f"Module does not have a 'function' callable")
+        raise AttributeError("Module does not have a 'function' callable")
     return module.function
 
 
@@ -108,7 +111,9 @@ def get_function_signature_types(
     return request_type, response_type, request_type_name, response_type_name
 
 
-def inspect_function_types_static(entrypoint_path: str) -> Tuple[Optional[str], Optional[str]]:
+def inspect_function_types_static(
+    entrypoint_path: str,
+) -> Tuple[Optional[str], Optional[str]]:
     """Inspect function types using static AST parsing (no imports).
 
     This parses the Python file without executing it, so it doesn't
@@ -121,7 +126,7 @@ def inspect_function_types_static(entrypoint_path: str) -> Tuple[Optional[str], 
         Tuple of (request_type_name, response_type_name)
     """
     try:
-        with open(entrypoint_path, 'r') as f:
+        with open(entrypoint_path, "r") as f:
             tree = ast.parse(f.read(), filename=entrypoint_path)
 
         # Find the 'function' definition
@@ -132,7 +137,9 @@ def inspect_function_types_static(entrypoint_path: str) -> Tuple[Optional[str], 
                 if node.args.args and len(node.args.args) > 0:
                     first_param = node.args.args[0]
                     if first_param.annotation:
-                        request_type_name = _get_type_name_from_ast(first_param.annotation)
+                        request_type_name = _get_type_name_from_ast(
+                            first_param.annotation
+                        )
 
                 # Get response type (return annotation)
                 response_type_name = None
@@ -175,7 +182,7 @@ def _import_pydantic_model(entrypoint_path: str, type_name: str) -> Optional[Any
         The Pydantic model class, or None if not found
     """
     try:
-        with open(entrypoint_path, 'r') as f:
+        with open(entrypoint_path, "r") as f:
             tree = ast.parse(f.read(), filename=entrypoint_path)
 
         # Find where this type is imported from
@@ -344,7 +351,7 @@ def generate_test_json(entrypoint_path: str, output_path: str) -> None:
 
     # Check if it's a Pydantic model
     if not hasattr(request_type, "model_fields"):
-        raise ValueError(f"Request parameter type must be a Pydantic model")
+        raise ValueError("Request parameter type must be a Pydantic model")
 
     # Generate sample data for ALL fields (use defaults where available)
     sample_data = _generate_model_sample_data(request_type)

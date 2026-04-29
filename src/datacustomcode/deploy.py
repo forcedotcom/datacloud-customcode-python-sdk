@@ -35,10 +35,7 @@ from pydantic import BaseModel
 import requests
 
 from datacustomcode.cmd import cmd_output
-from datacustomcode.constants import (
-    REQUEST_TYPE_TO_FEATURE,
-    USE_IN_FEATURE_MAPPING_FOR_CONNECT_API,
-)
+from datacustomcode.constants import REQUEST_TYPE_TO_FEATURE
 from datacustomcode.scan import find_base_directory, get_package_type
 
 DATA_CUSTOM_CODE_PATH = "services/data/v63.0/ssot/data-custom-code"
@@ -85,7 +82,9 @@ def infer_use_in_feature(entrypoint_path: str) -> Union[str, None]:
     """
     from datacustomcode.function_utils import inspect_function_types_static
 
-    request_type_name, response_type_name = inspect_function_types_static(entrypoint_path)
+    request_type_name, response_type_name = inspect_function_types_static(
+        entrypoint_path
+    )
 
     if not request_type_name or not response_type_name:
         return None

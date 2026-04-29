@@ -177,7 +177,9 @@ def run_function_with_test(entrypoint: str, test_file: str) -> None:
     try:
         request = request_type(**test_data)
     except Exception as e:
-        raise ValueError(f"Failed to parse test data as {request_type.__name__}: {e}") from e
+        raise ValueError(
+            f"Failed to parse test data as {request_type.__name__}: {e}"
+        ) from e
 
     # Import Runtime
     from datacustomcode.function import Runtime

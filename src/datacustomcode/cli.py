@@ -210,8 +210,8 @@ def deploy(
 ):
     from datacustomcode.deploy import (
         COMPUTE_TYPES,
-        CodeExtensionMetadata,
         USE_IN_FEATURE_MAPPING_FOR_CONNECT_API,
+        CodeExtensionMetadata,
         deploy_full,
         infer_use_in_feature,
     )
@@ -255,7 +255,9 @@ def deploy(
             raise click.Abort()
 
         # Map user-provided feature names to API names
-        mapped_feature = USE_IN_FEATURE_MAPPING_FOR_CONNECT_API.get(use_in_feature, use_in_feature)
+        mapped_feature = USE_IN_FEATURE_MAPPING_FOR_CONNECT_API.get(
+            use_in_feature, use_in_feature
+        )
         metadata.functionInvokeOptions = [mapped_feature]
 
     try:
@@ -286,10 +288,7 @@ def init(directory: str, code_type: str, use_in_feature: Optional[str]):
         update_config,
         write_sdk_config,
     )
-    from datacustomcode.template import (
-        copy_function_template,
-        copy_script_template,
-    )
+    from datacustomcode.template import copy_function_template, copy_script_template
 
     click.echo("Copying template to " + click.style(directory, fg="blue", bold=True))
     if code_type == "script":
@@ -397,5 +396,10 @@ def run(
     from datacustomcode.run import run_entrypoint
 
     run_entrypoint(
-        entrypoint, config_file, dependencies, profile, test_file=test_with, sf_cli_org=sf_cli_org
+        entrypoint,
+        config_file,
+        dependencies,
+        profile,
+        test_file=test_with,
+        sf_cli_org=sf_cli_org,
     )
