@@ -28,7 +28,7 @@ from typing import (
 from pydantic import BaseModel, Field
 
 
-class DocElement(BaseModel):
+class SearchIndexDocElement(BaseModel):
     """Document element to be chunked"""
 
     text: str = Field(..., description="Text content to be chunked")
@@ -37,7 +37,7 @@ class DocElement(BaseModel):
     )
 
 
-class ChunkOutput(BaseModel):
+class SearchIndexChunkOutput(BaseModel):
     """Output chunk from the chunking process"""
 
     chunk_id: str = Field(..., description="UUID for this chunk")
@@ -55,20 +55,17 @@ class ChunkOutput(BaseModel):
     )
 
 
-class StatusResponse(BaseModel):
+class SearchIndexStatusResponse(BaseModel):
     """Status response for operation"""
 
     status_type: str = Field(..., description="'success' or 'error'")
     status_message: str = Field(..., description="Human-readable status")
 
 
-class UdsChunkingV1BatchRequest(BaseModel):
+class SearchIndexChunkingV1Request(BaseModel):
     """Batch request for UDS chunking"""
 
-    version: Literal["v1"] = Field(
-        default="v1", description="API version, must be 'v1'"
-    )
-    input: List[DocElement] = Field(
+    input: List[SearchIndexDocElement] = Field(
         ..., min_length=1, description="List of documents (min 1)"
     )
     max_characters: int = Field(..., description="Max chars per chunk (default: 100)")
@@ -77,13 +74,9 @@ class UdsChunkingV1BatchRequest(BaseModel):
     )
 
 
-class UdsChunkingV1BatchResponse(BaseModel):
+class SearchIndexChunkingV1Response(BaseModel):
     """Batch response for UDS chunking"""
-
-    version: Literal["v1"] = Field(
-        default="v1", description="API version, must be 'v1'"
-    )
-    output: List[ChunkOutput] = Field(
+    output: List[SearchIndexChunkOutput] = Field(
         default_factory=list, description="Flat list of chunks from all docs"
     )
-    status: StatusResponse = Field(..., description="Overall operation status")
+    status: SearchIndexStatusResponse = Field(..., description="Overall operation status")

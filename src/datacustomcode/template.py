@@ -37,11 +37,21 @@ def copy_script_template(target_dir: str) -> None:
             shutil.copy2(source, destination)
 
 
-def copy_function_template(target_dir: str) -> None:
+MAPPED_FOLDER = {"SearchIndexChunking": "chunking"}
+
+
+def copy_function_template(target_dir: str, use_in_feature: str) -> None:
     os.makedirs(target_dir, exist_ok=True)
 
-    for item in os.listdir(function_template_dir):
-        source = os.path.join(function_template_dir, item)
+    if use_in_feature and use_in_feature in MAPPED_FOLDER:
+        feature_function_template_dir = os.path.join(
+            function_template_dir, MAPPED_FOLDER[use_in_feature]
+        )
+    else:
+        feature_function_template_dir = function_template_dir
+
+    for item in os.listdir(feature_function_template_dir):
+        source = os.path.join(feature_function_template_dir, item)
         destination = os.path.join(target_dir, item)
 
         if os.path.isdir(source):
@@ -50,3 +60,17 @@ def copy_function_template(target_dir: str) -> None:
         else:
             logger.debug(f"Copying file {source} to {destination}...")
             shutil.copy2(source, destination)
+
+
+# Re-export generate_test_json from function_utils for backwards compatibility
+def generate_test_json(entrypoint_path: str, output_path: str) -> None:
+    """Generate a sample test.json file for a function.
+
+    Args:
+        entrypoint_path: Path to the function entrypoint.py
+        output_path: Output path for test.json
+    """
+    from datacustomcode.function_utils import generate_test_json as _generate_test_json
+
+    _generate_test_json(entrypoint_path, output_path)
+    logger.debug(f"Generated test JSON at {output_path}")
