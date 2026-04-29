@@ -259,6 +259,7 @@ jobs:
       run: |
         sf data-code-extension function run \
           --entrypoint testFunction/payload/entrypoint.py \
+          --test_with testFunction/payload/tests/test.json \
           -o dev1 || {
           echo "::error::sf data-code-extension function run FAILED. Check mock server output above; the --entrypoint flag or SF CLI org auth contract may have changed."
           exit 1
