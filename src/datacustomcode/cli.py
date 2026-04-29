@@ -280,7 +280,7 @@ def deploy(
 @click.option(
     "--use-in-feature",
     default="SearchIndexChunking",
-    help="Feature to invoke the function (only applicable for functions). If not provided, will be inferred from function signature.",
+    help="Feature where this function will be used (only applicable for function).",
 )
 def init(directory: str, code_type: str, use_in_feature: Optional[str]):
     from datacustomcode.scan import (
@@ -331,7 +331,7 @@ def init(directory: str, code_type: str, use_in_feature: Optional[str]):
             click.echo(
                 "Test your function locally with "
                 + click.style(
-                    f"datacustomcode run {entrypoint_path} --test_with {test_json_path}",
+                    f"datacustomcode run {entrypoint_path} --test-with {test_json_path}",
                     fg="blue",
                     bold=True,
                 )
@@ -375,7 +375,7 @@ def scan(filename: str, config: str, dry_run: bool, no_requirements: bool):
 @click.option("--dependencies", default=[], multiple=True)
 @click.option("--profile", default="default")
 @click.option(
-    "--test_with",
+    "--test-with",
     default=None,
     type=click.Path(exists=True),
     help="Path to test JSON file for function testing",
