@@ -565,9 +565,11 @@ class TestDcConfigJson:
             if os.path.exists(config_path):
                 os.remove(config_path)
 
-
     def test_update_config_updates_entrypoint(self):
-        """Test that update_config() updates the entryPoint field when scanning a renamed file."""
+        """
+        Test that update_config() updates the entryPoint field
+        when scanning a renamed file.
+        """
         content = textwrap.dedent(
             """
             from datacustomcode.client import Client
