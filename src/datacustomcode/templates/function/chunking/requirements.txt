@@ -1,0 +1,2 @@
+# Packages required for the chunking function
+langchain-text-splitters>=0.3.0
