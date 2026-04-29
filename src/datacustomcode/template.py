@@ -62,15 +62,3 @@ def copy_function_template(target_dir: str, use_in_feature: str) -> None:
             shutil.copy2(source, destination)
 
 
-# Re-export generate_test_json from function_utils for backwards compatibility
-def generate_test_json(entrypoint_path: str, output_path: str) -> None:
-    """Generate a sample test.json file for a function.
-
-    Args:
-        entrypoint_path: Path to the function entrypoint.py
-        output_path: Output path for test.json
-    """
-    from datacustomcode.function_utils import generate_test_json as _generate_test_json
-
-    _generate_test_json(entrypoint_path, output_path)
-    logger.debug(f"Generated test JSON at {output_path}")

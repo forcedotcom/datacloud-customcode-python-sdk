@@ -191,11 +191,7 @@ def run_function_with_test(entrypoint: str, test_file: str) -> None:
     print("RESULT:")
     print("=" * 80)
     if hasattr(result, "model_dump"):
-        # Pydantic v2
         print(json.dumps(result.model_dump(), indent=2))
-    elif hasattr(result, "dict"):
-        # Pydantic v1
-        print(json.dumps(result.dict(), indent=2))
     else:
         print(result)
     print("=" * 80)

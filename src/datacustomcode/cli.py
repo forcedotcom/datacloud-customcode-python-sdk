@@ -83,7 +83,7 @@ def _generate_function_test_file(entrypoint_path: str) -> Optional[str]:
     Returns:
         Path to generated test.json, or None if generation failed
     """
-    from datacustomcode.template import generate_test_json
+    from datacustomcode.function_utils import generate_test_json
 
     tests_dir = os.path.join(os.path.dirname(entrypoint_path), "tests")
     os.makedirs(tests_dir, exist_ok=True)
@@ -91,6 +91,7 @@ def _generate_function_test_file(entrypoint_path: str) -> Optional[str]:
 
     try:
         generate_test_json(entrypoint_path, test_json_path)
+        logger.debug(f"Generated test JSON at {test_json_path}")
         return test_json_path
     except Exception as e:
         logger.warning(f"Could not generate test.json: {e}")
