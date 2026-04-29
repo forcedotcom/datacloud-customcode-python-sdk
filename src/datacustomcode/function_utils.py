@@ -79,7 +79,7 @@ def get_type_name(type_annotation: Any) -> Optional[str]:
         return None
 
     if hasattr(type_annotation, "__name__"):
-        return type_annotation.__name__
+        return str(type_annotation.__name__)
 
     return str(type_annotation)
 
@@ -230,14 +230,14 @@ def inspect_function_types(
         return None, None
 
 
-def get_request_type(entrypoint_path: str) -> Optional[Any]:
+def get_request_type(entrypoint_path: str) -> Any:
     """Get the request type annotation from a function entrypoint.
 
     Args:
         entrypoint_path: Path to the entrypoint.py file
 
     Returns:
-        The request type (Pydantic model class), or None if not found
+        The request type (Pydantic model class)
 
     Raises:
         ImportError: If the module cannot be loaded

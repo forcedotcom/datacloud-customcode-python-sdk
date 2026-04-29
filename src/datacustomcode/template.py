@@ -14,6 +14,7 @@
 # limitations under the License.
 import os
 import shutil
+from typing import Optional
 
 from loguru import logger
 
@@ -39,7 +40,7 @@ def copy_script_template(target_dir: str) -> None:
             shutil.copy2(source, destination)
 
 
-def copy_function_template(target_dir: str, use_in_feature: str) -> None:
+def copy_function_template(target_dir: str, use_in_feature: Optional[str]) -> None:
     os.makedirs(target_dir, exist_ok=True)
 
     # First, copy common files from base function template

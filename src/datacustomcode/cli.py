@@ -208,9 +208,9 @@ def deploy(
     network: str,
     sf_cli_org: Optional[str],
 ):
+    from datacustomcode.constants import USE_IN_FEATURE_MAPPING_FOR_CONNECT_API
     from datacustomcode.deploy import (
         COMPUTE_TYPES,
-        USE_IN_FEATURE_MAPPING_FOR_CONNECT_API,
         CodeExtensionMetadata,
         deploy_full,
         infer_use_in_feature,
