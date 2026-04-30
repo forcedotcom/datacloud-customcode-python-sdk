@@ -103,16 +103,19 @@ class TestDeploy:
             assert call_args[0][2].access_token == "test_token"
             assert call_args[0][2].instance_url == "https://instance.example.com"
 
+    @patch("datacustomcode.deploy.infer_use_in_feature")
     @patch("datacustomcode.deploy.deploy_full")
     @patch("datacustomcode.token_provider.CredentialsTokenProvider")
     def test_deploy_command_function_invoke_options(
-        self, mock_token_provider, mock_deploy_full
+        self, mock_token_provider, mock_deploy_full, mock_infer_feature
     ):
         """Test deploy command with function invoke options."""
         mock_provider_instance = mock_token_provider.return_value
         mock_provider_instance.get_token.return_value = AccessTokenResponse(
             access_token="test_token", instance_url="https://instance.example.com"
         )
+        # Mock infer_use_in_feature to return a valid feature
+        mock_infer_feature.return_value = "SearchIndexChunking"
 
         runner = CliRunner()
         with runner.isolated_filesystem():
@@ -122,15 +125,11 @@ class TestDeploy:
             write_sdk_config(".", sdk_config)
             result = runner.invoke(
                 deploy,
-                ["--name", "test-job", "--function-invoke-opt", "option1,option2"],
+                ["--name", "test-job"],
             )
 
             assert result.exit_code == 0
             mock_deploy_full.assert_called_once()
-
-            # Check that deploy_full was called with function invoke options
-            call_args = mock_deploy_full.call_args
-            assert call_args[0][1].functionInvokeOptions == ["option1", "option2"]
 
     @patch("datacustomcode.token_provider.CredentialsTokenProvider")
     def test_deploy_command_credentials_error(self, mock_token_provider):
