@@ -19,19 +19,10 @@ import shutil
 import sys
 import tempfile
 import textwrap
-from typing import List
 
 import pytest
-from pydantic import BaseModel
 
 from datacustomcode import function_utils
-
-
-class SampleRequest(BaseModel):
-    message: str
-    count: int = 5
-    tags: List[str] = []
-    version: str = "v1"
 
 
 @pytest.fixture
