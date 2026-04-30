@@ -28,9 +28,7 @@ from datacustomcode import function_utils
 @pytest.fixture
 def sample_entrypoint():
     """Create a temporary entrypoint file with a function."""
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".py", delete=False
-    ) as temp_file:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as temp_file:
         entrypoint_content = textwrap.dedent(
             """
             from typing import List
@@ -62,9 +60,7 @@ def sample_entrypoint():
 @pytest.fixture
 def entrypoint_no_annotations():
     """Create an entrypoint with no type annotations."""
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".py", delete=False
-    ) as temp_file:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as temp_file:
         entrypoint_content = textwrap.dedent(
             """
             def function(request):
@@ -117,6 +113,7 @@ def test_inspect_function_types_static(sample_entrypoint, entrypoint_no_annotati
     assert req_name is None
     assert resp_name is None
 
+
 def test_inspect_function_types(sample_entrypoint):
     """Test dynamic inspection of function types."""
     req_name, resp_name = function_utils.inspect_function_types(sample_entrypoint)
@@ -139,7 +136,7 @@ def test_get_request_type(sample_entrypoint, entrypoint_no_annotations):
 
 
 def test_generate_test_json():
-    """Test generating test.json file from entrypoint with simple and complex nested types."""
+    """Test generating test.json with simple and complex nested types."""
     temp_dir = tempfile.mkdtemp()
     models_file = os.path.join(temp_dir, "test_models.py")
 

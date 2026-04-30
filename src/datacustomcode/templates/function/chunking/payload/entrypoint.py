@@ -66,6 +66,9 @@ def function(
         output=chunks,
         status=SearchIndexStatusResponse(
             status_type="success",
-            status_message=f"Successfully chunked {len(request.input)} documents into {len(chunks)} chunks",
+            status_message=(
+                f"Successfully chunked {len(request.input)} documents "
+                f"into {len(chunks)} chunks"
+            ),
         ),
     )

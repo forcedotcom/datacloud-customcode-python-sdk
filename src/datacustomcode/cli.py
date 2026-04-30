@@ -249,7 +249,8 @@ def deploy(
             logger.info(f"Inferred use_in_feature: {use_in_feature}")
         else:
             click.secho(
-                "Error: Could not infer function invoke options. Please provide --use-in-feature",
+                "Error: Could not infer function invoke options. "
+                "Please provide --use-in-feature",
                 fg="red",
             )
             raise click.Abort()
@@ -331,7 +332,8 @@ def init(directory: str, code_type: str, use_in_feature: Optional[str]):
             click.echo(
                 "Test your function locally with "
                 + click.style(
-                    f"datacustomcode run {entrypoint_path} --test-with {test_json_path}",
+                    f"datacustomcode run {entrypoint_path} "
+                    f"--test-with {test_json_path}",
                     fg="blue",
                     bold=True,
                 )

@@ -164,7 +164,8 @@ def run_function_with_test(entrypoint: str, test_file: str) -> None:
         load_function_module,
     )
 
-    # Import the entrypoint module in the current environment (with all dependencies loaded)
+    # Import the entrypoint module in the current environment
+    # (with all dependencies loaded)
     module = load_function_module(entrypoint, "entrypoint_module")
     function_callable = get_function_callable(module)
     request_type = get_request_type(entrypoint)

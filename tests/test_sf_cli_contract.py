@@ -188,6 +188,7 @@ class TestDeployArgContract:
         result = runner.invoke(deploy, [*self._BASE_ARGS, "--network", "custom"])
         assert result.exit_code != 2, result.output
 
+
 class TestRunArgContract:
     """
     SF CLI spawn:

@@ -215,7 +215,9 @@ def inspect_function_types(
         Either can be None if not found or on error
 
     Example:
-        >>> request_name, response_name = inspect_function_types("payload/entrypoint.py")
+        >>> request_name, response_name = inspect_function_types(
+        ...     "payload/entrypoint.py"
+        ... )
         >>> print(request_name)  # "SearchIndexChunkingV1Request"
         >>> print(response_name)  # "SearchIndexChunkingV1Response"
     """
