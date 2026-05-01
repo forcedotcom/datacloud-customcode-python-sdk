@@ -240,6 +240,11 @@ ZIP_FILE_NAME = "deployment.zip"
 def prepare_dependency_archive(
     directory: str, docker_network: str, package_type: str
 ) -> None:
+    # The parent directory of 'directory' contains Dockerfile.dependencies,
+    # requirements.txt, and build_native_dependencies.sh
+    # (same location checked by has_nonempty_requirements_file)
+    parent_dir = os.path.dirname(directory)
+
     cmd = f"docker images -q {DOCKER_IMAGE_NAME}"
     image_exists = cmd_output(cmd)
 
@@ -248,7 +253,8 @@ def prepare_dependency_archive(
     if not image_exists:
         logger.info(f"Building docker image with docker network: {docker_network}...")
         cmd = docker_build_cmd(docker_network)
-        cmd_output(cmd, env=docker_env)
+        # Run docker build from parent_dir where Dockerfile.dependencies exists
+        cmd_output(cmd, env=docker_env, cwd=parent_dir)
 
     # ignore_cleanup_errors=True: on Windows, Docker creates files inside the
     # mounted volume whose permissions prevent the host from deleting them.
@@ -258,10 +264,12 @@ def prepare_dependency_archive(
         logger.info(
             f"Building dependencies archive with docker network: {docker_network}"
         )
-        shutil.copy("requirements.txt", temp_dir)
-        shutil.copy("build_native_dependencies.sh", temp_dir)
+        # Copy from parent_dir where files actually exist
+        shutil.copy(os.path.join(parent_dir, "requirements.txt"), temp_dir)
+        shutil.copy(os.path.join(parent_dir, "build_native_dependencies.sh"), temp_dir)
         cmd = docker_run_cmd(docker_network, temp_dir)
-        cmd_output(cmd, env=docker_env)
+        # Run docker run from parent_dir for consistency
+        cmd_output(cmd, env=docker_env, cwd=parent_dir)
         if package_type == "function":
             source_py_files = os.path.join(temp_dir, "py-files")
             if os.path.exists(source_py_files):
