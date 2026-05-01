@@ -255,9 +255,9 @@ jobs:
 
       # ── Function: run ─────────────────────────────────────────────────────────
 
-    - name: 'Install testFunction/requirements.txt'
+    - name: Install testFunction/requirements.txt
       run: |
-        pip install testFunction/requirements.txt
+        pip install -r testFunction/requirements.txt
 
     - name: '[function] run — sf data-code-extension function run --entrypoint testFunction/payload/entrypoint.py  --test-with testFunction/payload/tests/test.json '
       run: |
