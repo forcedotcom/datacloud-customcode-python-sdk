@@ -131,7 +131,7 @@ class TestPrepareDependencyArchive:
 
         # Verify docker run command was called
         mock_docker_run_cmd.assert_called_once_with("default", "/tmp/test_dir")
-        mock_cmd_output.assert_any_call("mock run command", env=ANY, cwd="/test")
+        mock_cmd_output.assert_any_call("mock run command", env=ANY)
 
         # Verify archives directory was created
         mock_makedirs.assert_called_once_with("payload/archives", exist_ok=True)
@@ -219,7 +219,7 @@ class TestPrepareDependencyArchive:
 
         # Verify docker run command was called
         mock_docker_run_cmd.assert_called_once_with("default", "/tmp/test_dir")
-        mock_cmd_output.assert_any_call("mock run command", env=ANY, cwd="/test")
+        mock_cmd_output.assert_any_call("mock run command", env=ANY)
 
         # Verify archives directory was created
         mock_makedirs.assert_called_once_with("payload/archives", exist_ok=True)
@@ -491,7 +491,7 @@ class TestPrepareDependencyArchive:
 
         # Verify docker run command was called
         mock_docker_run_cmd.assert_called_once_with("default", "/tmp/test_dir")
-        mock_cmd_output.assert_any_call("mock run command", env=ANY, cwd="/test")
+        mock_cmd_output.assert_any_call("mock run command", env=ANY)
 
         # Verify payload directory was created
         mock_makedirs.assert_called_once_with("payload", exist_ok=True)

@@ -268,8 +268,8 @@ def prepare_dependency_archive(
         shutil.copy(os.path.join(parent_dir, "requirements.txt"), temp_dir)
         shutil.copy(os.path.join(parent_dir, "build_native_dependencies.sh"), temp_dir)
         cmd = docker_run_cmd(docker_network, temp_dir)
-        # Run docker run from parent_dir for consistency
-        cmd_output(cmd, env=docker_env, cwd=parent_dir)
+        # Docker run doesn't need cwd since temp_dir is absolute and mounted
+        cmd_output(cmd, env=docker_env)
         if package_type == "function":
             source_py_files = os.path.join(temp_dir, "py-files")
             if os.path.exists(source_py_files):
