@@ -57,10 +57,10 @@ def function(
             )
             chunks.append(chunk_output)
 
-            print(f"  ✂️  Chunk {chunk_id}: {len(chunk_text)} chars")
+            print(f"Chunk {chunk_id}: {len(chunk_text)} chars")
             chunk_id += 1
 
-    print(f"✅ Generated {len(chunks)} chunks total")
+    print(f"Generated {len(chunks)} chunks total")
 
     return SearchIndexChunkingV1Response(
         output=chunks,
