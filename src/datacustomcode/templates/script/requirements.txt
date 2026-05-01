@@ -1,1 +1,2 @@
 # Packages required for the custom code
+langchain-text-splitters>=0.3.0

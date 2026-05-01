@@ -59,6 +59,7 @@ class TestPrepareDependencyArchive:
     @patch("datacustomcode.deploy.shutil.copy")
     @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
     @patch("datacustomcode.deploy.os.path.join")
+    @patch("datacustomcode.deploy.os.path.dirname")
     @patch("datacustomcode.deploy.os.makedirs")
     @patch("datacustomcode.deploy.docker_build_cmd")
     @patch("datacustomcode.deploy.docker_run_cmd")
@@ -67,6 +68,7 @@ class TestPrepareDependencyArchive:
         mock_docker_run_cmd,
         mock_docker_build_cmd,
         mock_makedirs,
+        mock_dirname,
         mock_join,
         mock_temp_dir,
         mock_copy,
@@ -82,8 +84,34 @@ class TestPrepareDependencyArchive:
         # Mock cmd_output to return image ID (indicating image exists)
         mock_cmd_output.return_value = "abc123"
 
-        # Mock os.path.join for archive path
-        mock_join.return_value = "/tmp/test_dir/native_dependencies.tar.gz"
+        # Mock os.path.dirname to handle different calls
+        def dirname_side_effect(path):
+            if path == "/test/dir":
+                return "/test"
+            elif path == "payload/py-files":
+                return "payload"
+            else:
+                # For other paths, do simple string manipulation
+                return path.rsplit("/", 1)[0] if "/" in path else ""
+
+        mock_dirname.side_effect = dirname_side_effect
+
+        # Mock os.path.join to handle different calls
+        def join_side_effect(*args):
+            if args == ("/test", "requirements.txt"):
+                return "/test/requirements.txt"
+            elif args == ("/test", "build_native_dependencies.sh"):
+                return "/test/build_native_dependencies.sh"
+            elif args == ("/tmp/test_dir", "native_dependencies.tar.gz"):
+                return "/tmp/test_dir/native_dependencies.tar.gz"
+            elif args == ("payload", "archives", "native_dependencies.tar.gz"):
+                return "payload/archives/native_dependencies.tar.gz"
+            elif args == ("payload", "archives"):
+                return "payload/archives"
+            else:
+                return "/".join(args)
+
+        mock_join.side_effect = join_side_effect
 
         # Mock the docker command functions
         mock_docker_build_cmd.return_value = "mock build command"
@@ -97,13 +125,13 @@ class TestPrepareDependencyArchive:
         # Verify docker build command was not called (since image already exists)
         mock_docker_build_cmd.assert_not_called()
 
-        # Verify files were copied to temp directory
-        mock_copy.assert_any_call("requirements.txt", "/tmp/test_dir")
-        mock_copy.assert_any_call("build_native_dependencies.sh", "/tmp/test_dir")
+        # Verify files were copied to temp directory from parent directory
+        mock_copy.assert_any_call("/test/requirements.txt", "/tmp/test_dir")
+        mock_copy.assert_any_call("/test/build_native_dependencies.sh", "/tmp/test_dir")
 
         # Verify docker run command was called
         mock_docker_run_cmd.assert_called_once_with("default", "/tmp/test_dir")
-        mock_cmd_output.assert_any_call("mock run command", env=ANY)
+        mock_cmd_output.assert_any_call("mock run command", env=ANY, cwd="/test")
 
         # Verify archives directory was created
         mock_makedirs.assert_called_once_with("payload/archives", exist_ok=True)
@@ -118,6 +146,7 @@ class TestPrepareDependencyArchive:
     @patch("datacustomcode.deploy.shutil.copy")
     @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
     @patch("datacustomcode.deploy.os.path.join")
+    @patch("datacustomcode.deploy.os.path.dirname")
     @patch("datacustomcode.deploy.os.makedirs")
     @patch("datacustomcode.deploy.docker_build_cmd")
     @patch("datacustomcode.deploy.docker_run_cmd")
@@ -126,6 +155,7 @@ class TestPrepareDependencyArchive:
         mock_docker_run_cmd,
         mock_docker_build_cmd,
         mock_makedirs,
+        mock_dirname,
         mock_join,
         mock_temp_dir,
         mock_copy,
@@ -142,8 +172,33 @@ class TestPrepareDependencyArchive:
         # and then return some value for subsequent calls
         mock_cmd_output.side_effect = [None, None, None, None]
 
-        # Mock os.path.join for archive path
-        mock_join.return_value = "/tmp/test_dir/native_dependencies.tar.gz"
+        # Mock os.path.dirname to handle different calls
+        def dirname_side_effect(path):
+            if path == "/test/dir":
+                return "/test"
+            elif path == "payload/py-files":
+                return "payload"
+            else:
+                return path.rsplit("/", 1)[0] if "/" in path else ""
+
+        mock_dirname.side_effect = dirname_side_effect
+
+        # Mock os.path.join to handle different calls
+        def join_side_effect(*args):
+            if args == ("/test", "requirements.txt"):
+                return "/test/requirements.txt"
+            elif args == ("/test", "build_native_dependencies.sh"):
+                return "/test/build_native_dependencies.sh"
+            elif args == ("/tmp/test_dir", "native_dependencies.tar.gz"):
+                return "/tmp/test_dir/native_dependencies.tar.gz"
+            elif args == ("payload", "archives", "native_dependencies.tar.gz"):
+                return "payload/archives/native_dependencies.tar.gz"
+            elif args == ("payload", "archives"):
+                return "payload/archives"
+            else:
+                return "/".join(args)
+
+        mock_join.side_effect = join_side_effect
 
         # Mock the docker command functions
         mock_docker_build_cmd.return_value = "mock build command"
@@ -156,15 +211,15 @@ class TestPrepareDependencyArchive:
 
         # Verify docker build command was called
         mock_docker_build_cmd.assert_called_once_with("default")
-        mock_cmd_output.assert_any_call("mock build command", env=ANY)
+        mock_cmd_output.assert_any_call("mock build command", env=ANY, cwd="/test")
 
-        # Verify files were copied to temp directory
-        mock_copy.assert_any_call("requirements.txt", "/tmp/test_dir")
-        mock_copy.assert_any_call("build_native_dependencies.sh", "/tmp/test_dir")
+        # Verify files were copied to temp directory from parent directory
+        mock_copy.assert_any_call("/test/requirements.txt", "/tmp/test_dir")
+        mock_copy.assert_any_call("/test/build_native_dependencies.sh", "/tmp/test_dir")
 
         # Verify docker run command was called
         mock_docker_run_cmd.assert_called_once_with("default", "/tmp/test_dir")
-        mock_cmd_output.assert_any_call("mock run command", env=ANY)
+        mock_cmd_output.assert_any_call("mock run command", env=ANY, cwd="/test")
 
         # Verify archives directory was created
         mock_makedirs.assert_called_once_with("payload/archives", exist_ok=True)
@@ -222,6 +277,7 @@ class TestPrepareDependencyArchive:
     @patch("datacustomcode.deploy.shutil.copy")
     @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
     @patch("datacustomcode.deploy.os.path.join")
+    @patch("datacustomcode.deploy.os.path.dirname")
     @patch("datacustomcode.deploy.os.makedirs")
     @patch("datacustomcode.deploy.docker_build_cmd")
     @patch("datacustomcode.deploy.docker_run_cmd")
@@ -230,6 +286,7 @@ class TestPrepareDependencyArchive:
         mock_docker_run_cmd,
         mock_docker_build_cmd,
         mock_makedirs,
+        mock_dirname,
         mock_join,
         mock_temp_dir,
         mock_copy,
@@ -252,15 +309,35 @@ class TestPrepareDependencyArchive:
             ),  # Run fails
         ]
 
+        # Mock os.path.dirname to handle different calls
+        def dirname_side_effect(path):
+            if path == "/test/dir":
+                return "/test"
+            else:
+                return path.rsplit("/", 1)[0] if "/" in path else ""
+
+        mock_dirname.side_effect = dirname_side_effect
+
+        # Mock os.path.join to handle different calls
+        def join_side_effect(*args):
+            if args == ("/test", "requirements.txt"):
+                return "/test/requirements.txt"
+            elif args == ("/test", "build_native_dependencies.sh"):
+                return "/test/build_native_dependencies.sh"
+            else:
+                return "/".join(args)
+
+        mock_join.side_effect = join_side_effect
+
         with pytest.raises(CalledProcessError, match="Run failed"):
             prepare_dependency_archive("/test/dir", "default", "script")
 
         # Verify docker images command was called
         mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_IMAGES_CMD)
 
-        # Verify files were copied to temp directory
-        mock_copy.assert_any_call("requirements.txt", "/tmp/test_dir")
-        mock_copy.assert_any_call("build_native_dependencies.sh", "/tmp/test_dir")
+        # Verify files were copied to temp directory from parent directory
+        mock_copy.assert_any_call("/test/requirements.txt", "/tmp/test_dir")
+        mock_copy.assert_any_call("/test/build_native_dependencies.sh", "/tmp/test_dir")
 
         # Verify docker run command was called
         mock_docker_run_cmd.assert_called_once_with("default", "/tmp/test_dir")
@@ -269,6 +346,7 @@ class TestPrepareDependencyArchive:
     @patch("datacustomcode.deploy.shutil.copy")
     @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
     @patch("datacustomcode.deploy.os.path.join")
+    @patch("datacustomcode.deploy.os.path.dirname")
     @patch("datacustomcode.deploy.os.makedirs")
     @patch("datacustomcode.deploy.docker_build_cmd")
     @patch("datacustomcode.deploy.docker_run_cmd")
@@ -277,6 +355,7 @@ class TestPrepareDependencyArchive:
         mock_docker_run_cmd,
         mock_docker_build_cmd,
         mock_makedirs,
+        mock_dirname,
         mock_join,
         mock_temp_dir,
         mock_copy,
@@ -292,6 +371,26 @@ class TestPrepareDependencyArchive:
         # Mock cmd_output to return image ID
         mock_cmd_output.return_value = "abc123"
 
+        # Mock os.path.dirname to handle different calls
+        def dirname_side_effect(path):
+            if path == "/test/dir":
+                return "/test"
+            else:
+                return path.rsplit("/", 1)[0] if "/" in path else ""
+
+        mock_dirname.side_effect = dirname_side_effect
+
+        # Mock os.path.join to handle different calls
+        def join_side_effect(*args):
+            if args == ("/test", "requirements.txt"):
+                return "/test/requirements.txt"
+            elif args == ("/test", "build_native_dependencies.sh"):
+                return "/test/build_native_dependencies.sh"
+            else:
+                return "/".join(args)
+
+        mock_join.side_effect = join_side_effect
+
         # Mock shutil.copy to raise exception
         mock_copy.side_effect = FileNotFoundError("File not found")
 
@@ -301,8 +400,8 @@ class TestPrepareDependencyArchive:
         # Verify docker images command was called
         mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_IMAGES_CMD)
 
-        # Verify files were attempted to be copied
-        mock_copy.assert_any_call("requirements.txt", "/tmp/test_dir")
+        # Verify files were attempted to be copied from parent directory
+        mock_copy.assert_any_call("/test/requirements.txt", "/tmp/test_dir")
 
     @patch("datacustomcode.deploy.cmd_output")
     @patch("datacustomcode.deploy.shutil.copytree")
@@ -311,6 +410,7 @@ class TestPrepareDependencyArchive:
     @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
     @patch("datacustomcode.deploy.os.path.exists")
     @patch("datacustomcode.deploy.os.path.join")
+    @patch("datacustomcode.deploy.os.path.dirname")
     @patch("datacustomcode.deploy.os.makedirs")
     @patch("datacustomcode.deploy.docker_build_cmd")
     @patch("datacustomcode.deploy.docker_run_cmd")
@@ -319,6 +419,7 @@ class TestPrepareDependencyArchive:
         mock_docker_run_cmd,
         mock_docker_build_cmd,
         mock_makedirs,
+        mock_dirname,
         mock_join,
         mock_exists,
         mock_temp_dir,
@@ -337,10 +438,27 @@ class TestPrepareDependencyArchive:
         # Mock cmd_output to return image ID (indicating image exists)
         mock_cmd_output.return_value = "abc123"
 
-        # Mock os.path.join for py-files paths
+        # Mock os.path.dirname to handle different calls
+        def dirname_side_effect(path):
+            if path == "/test/dir":
+                return "/test"
+            elif path == "payload/py-files":
+                return "payload"
+            else:
+                return path.rsplit("/", 1)[0] if "/" in path else ""
+
+        mock_dirname.side_effect = dirname_side_effect
+
+        # Mock os.path.join for all paths
         def join_side_effect(*args):
-            if args == ("/tmp/test_dir", "py-files"):
+            if args == ("/test", "requirements.txt"):
+                return "/test/requirements.txt"
+            elif args == ("/test", "build_native_dependencies.sh"):
+                return "/test/build_native_dependencies.sh"
+            elif args == ("/tmp/test_dir", "py-files"):
                 return "/tmp/test_dir/py-files"
+            elif args == ("payload", "py-files"):
+                return "payload/py-files"
             return "/".join(args)
 
         mock_join.side_effect = join_side_effect
@@ -367,13 +485,13 @@ class TestPrepareDependencyArchive:
         # Verify docker build command was not called (since image already exists)
         mock_docker_build_cmd.assert_not_called()
 
-        # Verify files were copied to temp directory
-        mock_copy.assert_any_call("requirements.txt", "/tmp/test_dir")
-        mock_copy.assert_any_call("build_native_dependencies.sh", "/tmp/test_dir")
+        # Verify files were copied to temp directory from parent directory
+        mock_copy.assert_any_call("/test/requirements.txt", "/tmp/test_dir")
+        mock_copy.assert_any_call("/test/build_native_dependencies.sh", "/tmp/test_dir")
 
         # Verify docker run command was called
         mock_docker_run_cmd.assert_called_once_with("default", "/tmp/test_dir")
-        mock_cmd_output.assert_any_call("mock run command", env=ANY)
+        mock_cmd_output.assert_any_call("mock run command", env=ANY, cwd="/test")
 
         # Verify payload directory was created
         mock_makedirs.assert_called_once_with("payload", exist_ok=True)
@@ -391,6 +509,7 @@ class TestPrepareDependencyArchive:
     @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
     @patch("datacustomcode.deploy.os.path.exists")
     @patch("datacustomcode.deploy.os.path.join")
+    @patch("datacustomcode.deploy.os.path.dirname")
     @patch("datacustomcode.deploy.os.makedirs")
     @patch("datacustomcode.deploy.docker_build_cmd")
     @patch("datacustomcode.deploy.docker_run_cmd")
@@ -399,6 +518,7 @@ class TestPrepareDependencyArchive:
         mock_docker_run_cmd,
         mock_docker_build_cmd,
         mock_makedirs,
+        mock_dirname,
         mock_join,
         mock_exists,
         mock_temp_dir,
@@ -418,9 +538,22 @@ class TestPrepareDependencyArchive:
         # Mock cmd_output to return image ID (indicating image exists)
         mock_cmd_output.return_value = "abc123"
 
-        # Mock os.path.join for py-files path
+        # Mock os.path.dirname to handle different calls
+        def dirname_side_effect(path):
+            if path == "/test/dir":
+                return "/test"
+            else:
+                return path.rsplit("/", 1)[0] if "/" in path else ""
+
+        mock_dirname.side_effect = dirname_side_effect
+
+        # Mock os.path.join for all paths
         def join_side_effect(*args):
-            if args == ("/tmp/test_dir", "py-files"):
+            if args == ("/test", "requirements.txt"):
+                return "/test/requirements.txt"
+            elif args == ("/test", "build_native_dependencies.sh"):
+                return "/test/build_native_dependencies.sh"
+            elif args == ("/tmp/test_dir", "py-files"):
                 return "/tmp/test_dir/py-files"
             return "/".join(args)
 
