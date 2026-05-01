@@ -275,8 +275,11 @@ def _generate_model_sample_data(model_type):
 
     sample_data = {}
     for field_name, field_info in model_type.model_fields.items():
+        # Use examples if available
+        if field_info.examples and len(field_info.examples) > 0:
+            sample_data[field_name] = field_info.examples[0]
         # Check if field has a real default value
-        if field_info.default is not PydanticUndefined:
+        elif field_info.default is not PydanticUndefined:
             sample_data[field_name] = field_info.default
         else:
             # Required field or field without default - generate sample
