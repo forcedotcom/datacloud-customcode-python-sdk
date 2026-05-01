@@ -368,6 +368,8 @@ def update_config(file_path: str) -> dict[str, Any]:
     base_directory = find_base_directory(file_path)
     package_type = get_package_type(base_directory)
 
+    existing_config["entryPoint"] = os.path.basename(file_path)
+
     if package_type == "script":
         existing_config["dataspace"] = get_dataspace(existing_config)
         output = scan_file(file_path)
