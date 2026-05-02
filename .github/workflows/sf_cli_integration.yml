@@ -259,11 +259,10 @@ jobs:
       run: |
         sf data-code-extension function run \
           --entrypoint testFunction/payload/entrypoint.py \
-          --test-with testFunction/payload/tests/test.json \
-          -o dev1 || {
-          echo "::error::sf data-code-extension function run FAILED. Check mock server output above; the --entrypoint flag or SF CLI org auth contract may have changed."
-          exit 1
-        }
+          --test-with testFunction/payload/tests/test.json || {
+            echo "::error::sf data-code-extension function run FAILED. Check mock server output above; the --entrypoint flag or SF CLI org auth contract may have changed."
+            exit 1
+          }
 
       # ── Function: deploy ─────────────────────────────────────────────────────
 
@@ -275,7 +274,6 @@ jobs:
           --description "Test function deploy" \
           --package-dir testFunction/payload \
           --cpu-size CPU_2XL \
-          --function-invoke-opt UnstructuredChunking \
           -o dev1 || {
           echo "::error::sf data-code-extension function deploy FAILED. Check mock server output above for which endpoint failed. The deploy command flags or API contract may have changed."
           exit 1
