@@ -33,13 +33,13 @@ from pydantic import (
 class DocumentType(str, Enum):
     """Document type enumeration"""
 
-    TEXT = "Text"
-    TITLE = "Title"
-    TABLE = "Table"
-    IMAGE = "Image"
-    LIST_ITEM = "ListItem"
-    CODE_SNIPPET = "CodeSnippet"
-    PAGE_METADATA = "PageMetadata"
+    TEXT = "text"
+    TITLE = "title"
+    TABLE = "table"
+    IMAGE = "image"
+    LIST_ITEM = "list_item"
+    CODE_SNIPPET = "code_snippet"
+    PAGE_METADATA = "page_metadata"
 
 
 class ChunkType(str, Enum):
@@ -90,7 +90,7 @@ class SearchIndexChunkingV1Metadata(BaseModel):
     """Metadata for input documents"""
 
     type: DocumentType = Field(
-        default=DocumentType.TEXT, description="Document type (Text)", examples=["Text"]
+        default=DocumentType.TEXT, description="Document type (text)", examples=["text"]
     )
     transcript_fields: SearchIndexChunkingV1TranscriptField = Field(
         default_factory=SearchIndexChunkingV1TranscriptField,
