@@ -200,6 +200,10 @@ jobs:
           echo "::error::testFunction/.datacustomcode_proj/sdk_config.json not found after function init."
           exit 1
         }
+        test -f testFunction/payload/tests/test.json || {
+          echo "::error::testFunction/payload/tests/test.json not found after function init."
+          exit 1
+        }
 
       # ── Function: scan ────────────────────────────────────────────────────────
 
@@ -251,14 +255,14 @@ jobs:
 
       # ── Function: run ─────────────────────────────────────────────────────────
 
-    - name: '[function] run — sf data-code-extension function run --entrypoint testFunction/payload/entrypoint.py -o dev1'
+    - name: '[function] run — sf data-code-extension function run --entrypoint testFunction/payload/entrypoint.py  --test-with testFunction/payload/tests/test.json -o dev1'
       run: |
         sf data-code-extension function run \
           --entrypoint testFunction/payload/entrypoint.py \
-          -o dev1 || {
-          echo "::error::sf data-code-extension function run FAILED. Check mock server output above; the --entrypoint flag or SF CLI org auth contract may have changed."
-          exit 1
-        }
+          --test-with testFunction/payload/tests/test.json || {
+            echo "::error::sf data-code-extension function run FAILED. Check mock server output above; the --entrypoint flag or SF CLI org auth contract may have changed."
+            exit 1
+          }
 
       # ── Function: deploy ─────────────────────────────────────────────────────
 
@@ -270,7 +274,6 @@ jobs:
           --description "Test function deploy" \
           --package-dir testFunction/payload \
           --cpu-size CPU_2XL \
-          --function-invoke-opt UnstructuredChunking \
           -o dev1 || {
           echo "::error::sf data-code-extension function deploy FAILED. Check mock server output above for which endpoint failed. The deploy command flags or API contract may have changed."
           exit 1

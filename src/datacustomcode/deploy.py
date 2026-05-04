@@ -35,6 +35,7 @@ from pydantic import BaseModel
 import requests
 
 from datacustomcode.cmd import cmd_output
+from datacustomcode.constants import REQUEST_TYPE_TO_FEATURE
 from datacustomcode.scan import find_base_directory, get_package_type
 
 DATA_CUSTOM_CODE_PATH = "services/data/v63.0/ssot/data-custom-code"
@@ -63,6 +64,40 @@ def _sanitize_api_name(name: str) -> str:
     sanitized = re.sub(r"_+", "_", sanitized)
     sanitized = sanitized.strip("_")
     return sanitized
+
+
+def infer_use_in_feature(entrypoint_path: str) -> Union[str, None]:
+    """Infer the use_in_feature from function signature.
+
+    Checks both the request parameter type and return type annotation.
+    Both must map to the same feature for a valid inference.
+
+    Uses static AST parsing to avoid importing dependencies.
+
+    Args:
+        entrypoint_path: Path to the entrypoint.py file
+
+    Returns:
+        The feature name if both request and response match, None otherwise
+    """
+    from datacustomcode.function_utils import inspect_function_types_static
+
+    request_type_name, response_type_name = inspect_function_types_static(
+        entrypoint_path
+    )
+
+    if not request_type_name or not response_type_name:
+        return None
+
+    # Look up features for both types
+    request_feature = REQUEST_TYPE_TO_FEATURE.get(request_type_name)
+    response_feature = REQUEST_TYPE_TO_FEATURE.get(response_type_name)
+
+    # Both must be present and must match
+    if request_feature and response_feature and request_feature == response_feature:
+        return request_feature
+
+    return None
 
 
 class CodeExtensionMetadata(BaseModel):

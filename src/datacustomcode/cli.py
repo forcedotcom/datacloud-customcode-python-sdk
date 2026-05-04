@@ -27,6 +27,13 @@ from loguru import logger
 
 from datacustomcode import AuthType
 from datacustomcode.auth import configure_oauth_tokens
+from datacustomcode.constants import (
+    CONFIG_FILE,
+    ENTRYPOINT_FILE,
+    PAYLOAD_DIR,
+    TEST_FILE,
+    TESTS_DIR,
+)
 from datacustomcode.scan import find_base_directory, get_package_type
 
 
@@ -72,6 +79,30 @@ def _configure_client_credentials(
         f"Client Credentials saved to profile '{profile}' successfully",
         fg="green",
     )
+
+
+def _generate_function_test_file(entrypoint_path: str) -> Optional[str]:
+    """Generate test.json file for a function.
+
+    Args:
+        entrypoint_path: Path to the function's entrypoint.py
+
+    Returns:
+        Path to generated test.json, or None if generation failed
+    """
+    from datacustomcode.function_utils import generate_test_json
+
+    tests_dir = os.path.join(os.path.dirname(entrypoint_path), TESTS_DIR)
+    os.makedirs(tests_dir, exist_ok=True)
+    test_json_path = os.path.join(tests_dir, TEST_FILE)
+
+    try:
+        generate_test_json(entrypoint_path, test_json_path)
+        logger.debug(f"Generated test JSON at {test_json_path}")
+        return test_json_path
+    except Exception as e:
+        logger.warning(f"Could not generate test.json: {e}")
+        return None
 
 
 @cli.command()
@@ -162,7 +193,6 @@ def zip(path: str, network: str):
 
     Choose based on your workload requirements.""",
 )
-@click.option("--function-invoke-opt")
 @click.option(
     "--sf-cli-org",
     default=None,
@@ -176,13 +206,14 @@ def deploy(
     cpu_size: str,
     profile: str,
     network: str,
-    function_invoke_opt: str,
     sf_cli_org: Optional[str],
 ):
+    from datacustomcode.constants import USE_IN_FEATURE_MAPPING_FOR_CONNECT_API
     from datacustomcode.deploy import (
         COMPUTE_TYPES,
         CodeExtensionMetadata,
         deploy_full,
+        infer_use_in_feature,
     )
     from datacustomcode.token_provider import (
         CredentialsTokenProvider,
@@ -211,15 +242,24 @@ def deploy(
     )
 
     if package_type == "function":
-        if not function_invoke_opt:
+        # Infer use_in_feature from function signature
+        entrypoint_path = os.path.join(path, ENTRYPOINT_FILE)
+        use_in_feature = infer_use_in_feature(entrypoint_path)
+        if use_in_feature:
+            logger.info(f"Inferred use_in_feature: {use_in_feature}")
+        else:
             click.secho(
-                "Error: Function invoke options are required for function package type",
+                "Error: Could not infer function invoke options. "
+                "Please provide --use-in-feature",
                 fg="red",
             )
             raise click.Abort()
-        else:
-            function_invoke_options = function_invoke_opt.split(",")
-            metadata.functionInvokeOptions = function_invoke_options
+
+        # Map user-provided feature names to API names
+        mapped_feature = USE_IN_FEATURE_MAPPING_FOR_CONNECT_API.get(
+            use_in_feature, use_in_feature
+        )
+        metadata.functionInvokeOptions = [mapped_feature]
 
     try:
         if sf_cli_org:
@@ -238,7 +278,12 @@ def deploy(
 @click.option(
     "--code-type", default="script", type=click.Choice(["script", "function"])
 )
-def init(directory: str, code_type: str):
+@click.option(
+    "--use-in-feature",
+    default="SearchIndexChunking",
+    help="Feature where this function will be used (only applicable for function).",
+)
+def init(directory: str, code_type: str, use_in_feature: Optional[str]):
     from datacustomcode.scan import (
         dc_config_json_from_file,
         update_config,
@@ -250,9 +295,9 @@ def init(directory: str, code_type: str):
     if code_type == "script":
         copy_script_template(directory)
     elif code_type == "function":
-        copy_function_template(directory)
-    entrypoint_path = os.path.join(directory, "payload", "entrypoint.py")
-    config_location = os.path.join(os.path.dirname(entrypoint_path), "config.json")
+        copy_function_template(directory, use_in_feature)
+    entrypoint_path = os.path.join(directory, PAYLOAD_DIR, ENTRYPOINT_FILE)
+    config_location = os.path.join(os.path.dirname(entrypoint_path), CONFIG_FILE)
 
     # Write package type to SDK-specific config
     sdk_config = {"type": code_type}
@@ -265,6 +310,7 @@ def init(directory: str, code_type: str):
     updated_config_json = update_config(entrypoint_path)
     with open(config_location, "w") as f:
         json.dump(updated_config_json, f, indent=2)
+
     click.echo(
         "Start developing by updating the code in "
         + click.style(entrypoint_path, fg="blue", bold=True)
@@ -274,6 +320,24 @@ def init(directory: str, code_type: str):
         + click.style(f"datacustomcode scan {entrypoint_path}", fg="blue", bold=True)
         + " to automatically update config.json when you make changes to your code"
     )
+
+    # Generate test.json for functions
+    if code_type == "function":
+        test_json_path = _generate_function_test_file(entrypoint_path)
+        if test_json_path:
+            click.echo(
+                "Generated test file at "
+                + click.style(test_json_path, fg="blue", bold=True)
+            )
+            click.echo(
+                "Test your function locally with "
+                + click.style(
+                    f"datacustomcode run {entrypoint_path} "
+                    f"--test-with {test_json_path}",
+                    fg="blue",
+                    bold=True,
+                )
+            )
 
 
 @cli.command()
@@ -286,7 +350,7 @@ def init(directory: str, code_type: str):
 def scan(filename: str, config: str, dry_run: bool, no_requirements: bool):
     from datacustomcode.scan import update_config, write_requirements_file
 
-    config_location = config or os.path.join(os.path.dirname(filename), "config.json")
+    config_location = config or os.path.join(os.path.dirname(filename), CONFIG_FILE)
     click.echo(
         "Dumping scan results to config file: "
         + click.style(config_location, fg="blue", bold=True)
@@ -313,6 +377,12 @@ def scan(filename: str, config: str, dry_run: bool, no_requirements: bool):
 @click.option("--dependencies", default=[], multiple=True)
 @click.option("--profile", default="default")
 @click.option(
+    "--test-with",
+    default=None,
+    type=click.Path(exists=True),
+    help="Path to test JSON file for function testing",
+)
+@click.option(
     "--sf-cli-org",
     default=None,
     help="SF CLI org alias or username. Fetches credentials via `sf org display`.",
@@ -322,10 +392,16 @@ def run(
     config_file: Union[str, None],
     dependencies: List[str],
     profile: str,
+    test_with: Optional[str],
     sf_cli_org: Optional[str],
 ):
     from datacustomcode.run import run_entrypoint
 
     run_entrypoint(
-        entrypoint, config_file, dependencies, profile, sf_cli_org=sf_cli_org
+        entrypoint,
+        config_file,
+        dependencies,
+        profile,
+        test_file=test_with,
+        sf_cli_org=sf_cli_org,
     )

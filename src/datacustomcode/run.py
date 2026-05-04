@@ -70,6 +70,7 @@ def run_entrypoint(
     config_file: Union[str, None],
     dependencies: List[str],
     profile: str,
+    test_file: Optional[str] = None,
     sf_cli_org: Optional[str] = None,
 ) -> None:
     """Run the entrypoint for script or function with the given config and dependencies.
@@ -79,6 +80,7 @@ def run_entrypoint(
         config_file: The config file to use.
         dependencies: The dependencies to import.
         profile: The credentials profile to use.
+        test_file: Optional test JSON file for function testing.
         sf_cli_org: Optional SF CLI org alias or username. If provided, credentials
             are fetched via `sf org display` instead of from credentials.ini.
     """
@@ -138,7 +140,64 @@ def run_entrypoint(
                     raise exc
             except (ModuleNotFoundError, AttributeError) as inner_exc:
                 raise inner_exc from exc
-    runpy.run_path(entrypoint, init_globals=globals(), run_name="__main__")
+
+    # Handle test file for functions
+    if test_file and package_type == "function":
+        run_function_with_test(entrypoint, test_file)
+    else:
+        runpy.run_path(entrypoint, init_globals=globals(), run_name="__main__")
+
+
+def run_function_with_test(entrypoint: str, test_file: str) -> None:
+    """Run a function with test data from a JSON file.
+
+    Dependencies are already loaded by this point, so we just import
+    the entrypoint module and call the function directly.
+
+    Args:
+        entrypoint: Path to the function entrypoint.py
+        test_file: Path to test JSON file containing request data
+    """
+    from datacustomcode.function_utils import (
+        get_function_callable,
+        get_request_type,
+        load_function_module,
+    )
+
+    # Import the entrypoint module in the current environment
+    # (with all dependencies loaded)
+    module = load_function_module(entrypoint, "entrypoint_module")
+    function_callable = get_function_callable(module)
+    request_type = get_request_type(entrypoint)
+
+    # Load and parse the test JSON
+    with open(test_file, "r") as f:
+        test_data = json.load(f)
+
+    # Use Pydantic to parse and validate the request
+    try:
+        request = request_type(**test_data)
+    except Exception as e:
+        raise ValueError(
+            f"Failed to parse test data as {request_type.__name__}: {e}"
+        ) from e
+
+    # Import Runtime
+    from datacustomcode.function import Runtime
+
+    # Call the function with test data
+    print(f"Running function with test data from {test_file}...")
+    result = function_callable(request, Runtime())
+
+    # Pretty print the result
+    print("\n" + "=" * 80)
+    print("RESULT:")
+    print("=" * 80)
+    if hasattr(result, "model_dump"):
+        print(json.dumps(result.model_dump(), indent=2))
+    else:
+        print(result)
+    print("=" * 80)
 
 
 def add_py_folder(entrypoint: str):
