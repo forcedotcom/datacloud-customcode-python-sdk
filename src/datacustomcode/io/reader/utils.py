@@ -16,32 +16,32 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import pandas.api.types as pd_types
-from pyspark.sql.types import (
-    BooleanType,
-    DoubleType,
-    LongType,
-    StringType,
-    StructField,
-    StructType,
-    TimestampType,
-)
-
 if TYPE_CHECKING:
     import pandas
-    from pyspark.sql.types import AtomicType
-
-PANDAS_TYPE_MAPPING = {
-    "object": StringType(),
-    "int64": LongType(),
-    "float64": DoubleType(),
-    "bool": BooleanType(),
-}
+    from pyspark.sql.types import AtomicType, StructType
 
 
 def _pandas_to_spark_schema(
-    pandas_df: pandas.DataFrame, nullable: bool = True
-) -> StructType:
+    pandas_df: "pandas.DataFrame", nullable: bool = True
+) -> "StructType":
+    import pandas.api.types as pd_types
+    from pyspark.sql.types import (
+        BooleanType,
+        DoubleType,
+        LongType,
+        StringType,
+        StructField,
+        StructType,
+        TimestampType,
+    )
+
+    PANDAS_TYPE_MAPPING = {
+        "object": StringType(),
+        "int64": LongType(),
+        "float64": DoubleType(),
+        "bool": BooleanType(),
+    }
+
     fields = []
     for column, dtype in pandas_df.dtypes.items():
         spark_type: AtomicType

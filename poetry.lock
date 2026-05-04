@@ -3536,7 +3536,10 @@ files = [
 [package.extras]
 cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and python_version < \"3.14\"", "cffi (>=2.0.0b0) ; platform_python_implementation != \"PyPy\" and python_version >= \"3.14\""]
 
+[extras]
+script = []
+
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.12"
-content-hash = "f147a38ecba7556f5b328cff4841ad7087ad41f9a6da1c48e80a3dbef0c773d9"
+content-hash = "9f080426b89262777a5fb963670f79065e6a6e3ae407bd85e47910fd828db0fe"

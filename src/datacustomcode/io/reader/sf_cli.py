@@ -23,7 +23,6 @@ from typing import (
     Union,
 )
 
-import pandas as pd
 import requests
 
 from datacustomcode.io.reader.base import BaseDataCloudReader
@@ -31,6 +30,7 @@ from datacustomcode.io.reader.utils import _pandas_to_spark_schema
 from datacustomcode.token_provider import SFCLITokenProvider
 
 if TYPE_CHECKING:
+    import pandas as pd
     from pyspark.sql import DataFrame as PySparkDataFrame, SparkSession
     from pyspark.sql.types import AtomicType, StructType
 
@@ -52,7 +52,7 @@ class SFCLIDataCloudReader(BaseDataCloudReader):
 
     def __init__(
         self,
-        spark: SparkSession,
+        spark: "SparkSession",
         sf_cli_org: str,
         dataspace: Optional[str] = None,
         default_row_limit: Optional[int] = None,
@@ -82,7 +82,7 @@ class SFCLIDataCloudReader(BaseDataCloudReader):
         logger.debug(f"Fetched token from SF CLI for org '{self.sf_cli_org}'")
         return token_response.access_token, token_response.instance_url
 
-    def _execute_query(self, sql: str) -> pd.DataFrame:
+    def _execute_query(self, sql: str) -> "pd.DataFrame":
         """Execute *sql* against the Data Cloud REST endpoint.
 
         The configured ``default_row_limit`` is automatically appended as a
@@ -97,6 +97,8 @@ class SFCLIDataCloudReader(BaseDataCloudReader):
         Raises:
             RuntimeError: On HTTP errors or unexpected response shapes.
         """
+        import pandas as pd
+
         access_token, instance_url = self._get_token()
 
         url = f"{instance_url}/services/data/{API_VERSION}/ssot/query-sql"
@@ -144,8 +146,8 @@ class SFCLIDataCloudReader(BaseDataCloudReader):
     def read_dlo(
         self,
         name: str,
-        schema: Union[AtomicType, StructType, str, None] = None,
-    ) -> PySparkDataFrame:
+        schema: Union["AtomicType", "StructType", str, None] = None,
+    ) -> "PySparkDataFrame":
         """Read a Data Lake Object (DLO) from Data Cloud.
 
         Args:
@@ -163,8 +165,8 @@ class SFCLIDataCloudReader(BaseDataCloudReader):
     def read_dmo(
         self,
         name: str,
-        schema: Union[AtomicType, StructType, str, None] = None,
-    ) -> PySparkDataFrame:
+        schema: Union["AtomicType", "StructType", str, None] = None,
+    ) -> "PySparkDataFrame":
         """Read a Data Model Object (DMO) from Data Cloud.
 
         Args:

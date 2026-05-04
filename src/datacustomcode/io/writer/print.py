@@ -13,12 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
 
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
-from pyspark.sql import DataFrame as PySparkDataFrame, SparkSession
+if TYPE_CHECKING:
+    from pyspark.sql import DataFrame as PySparkDataFrame, SparkSession
 
-from datacustomcode.io.reader.query_api import QueryAPIDataCloudReader
+    from datacustomcode.io.reader.query_api import QueryAPIDataCloudReader
+
 from datacustomcode.io.writer.base import BaseDataCloudWriter, WriteMode
 
 
@@ -61,6 +64,8 @@ class PrintDataCloudWriter(BaseDataCloudWriter):
             sf_cli_org: Optional SF CLI org alias or username. If provided,
                 credentials are fetched via `sf org display`.
         """
+        from datacustomcode.io.reader.query_api import QueryAPIDataCloudReader
+
         super().__init__(spark)
         if reader is None:
             self.reader = QueryAPIDataCloudReader(
