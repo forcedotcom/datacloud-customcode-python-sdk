@@ -20,6 +20,7 @@ from enum import Enum
 from typing import (
     Dict,
     List,
+    Optional,
     Union,
 )
 
@@ -103,8 +104,8 @@ class SearchIndexChunkingV1Metadata(BaseModel):
         description="Page number in the source document (0-based)",
         examples=[1],
     )
-    text_as_html: str = Field(
-        default="",
+    text_as_html: Optional[str] = Field(
+        default=None,
         description="HTML representation of the document text",
         examples=["<p>Online Remittance Instructions</p>"],
     )
