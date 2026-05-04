@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 class DefaultSparkSessionProvider(BaseSparkSessionProvider):
     CONFIG_NAME = "DefaultSparkSessionProvider"
 
-    def get_session(self, spark_config: SparkConfig) -> "SparkSession":
+    def get_session(self, spark_config: SparkConfig) -> SparkSession:
         from pyspark.sql import SparkSession
 
         builder = SparkSession.builder

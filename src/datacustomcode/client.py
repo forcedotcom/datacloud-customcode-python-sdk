@@ -112,8 +112,8 @@ class Client:
     def __new__(
         cls,
         reader: Optional[BaseDataCloudReader] = None,
-        writer: Optional["BaseDataCloudWriter"] = None,
-        spark_provider: Optional["BaseSparkSessionProvider"] = None,
+        writer: Optional[BaseDataCloudWriter] = None,
+        spark_provider: Optional[BaseSparkSessionProvider] = None,
         code_type: str = "script",
     ) -> Client:
 

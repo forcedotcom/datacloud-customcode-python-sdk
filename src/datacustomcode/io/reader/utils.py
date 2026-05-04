@@ -22,8 +22,8 @@ if TYPE_CHECKING:
 
 
 def _pandas_to_spark_schema(
-    pandas_df: "pandas.DataFrame", nullable: bool = True
-) -> "StructType":
+    pandas_df: pandas.DataFrame, nullable: bool = True
+) -> StructType:
     import pandas.api.types as pd_types
     from pyspark.sql.types import (
         BooleanType,
