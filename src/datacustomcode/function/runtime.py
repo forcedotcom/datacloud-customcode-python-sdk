@@ -21,7 +21,8 @@ from datacustomcode.einstein_predictions.base import EinsteinPredictions
 from datacustomcode.einstein_predictions_config import einstein_predictions_config
 from datacustomcode.file.path.default import DefaultFindFilePath
 from datacustomcode.function.base import BaseRuntime
-from datacustomcode.llm_gateway.default import DefaultLLMGateway
+from datacustomcode.llm_gateway.base import LLMGateway
+from datacustomcode.llm_gateway_config import llm_gateway_config
 
 
 class Runtime(BaseRuntime):
@@ -46,7 +47,7 @@ class Runtime(BaseRuntime):
                 raise RuntimeError(
                     "Runtime can only be instantiated once by the SDK.\n\n"
                     "Do not instantiate it yourself. Accept it as a parameter:\n\n"
-                    "  from datacustomcode.runtime.function.RunTime import Function\n"
+                    "  from datacustomcode.function.runtime import Runtime\n"
                     "  \n"
                     "  def function(request: dict, runtime: Runtime) -> dict:\n"
                     "      response = {...}\n"
@@ -65,13 +66,19 @@ class Runtime(BaseRuntime):
         super().__init__()
 
         # Initialize resources
-        self._llm_gateway = DefaultLLMGateway()
+        self._llm_gateway: Optional[LLMGateway] = None
         self._file = DefaultFindFilePath()
         self._einstein_predictions: Optional[EinsteinPredictions] = None
 
     @property
-    def llm_gateway(self) -> DefaultLLMGateway:
-        """Access LLM operations."""
+    def llm_gateway(self) -> LLMGateway:
+        if self._llm_gateway is None:
+            if llm_gateway_config.llm_gateway_config is None:
+                raise RuntimeError(
+                    "LLM Gateway is not configured. "
+                    "Add 'llm_gateway_config' section to config.yaml"
+                )
+            self._llm_gateway = llm_gateway_config.llm_gateway_config.to_object()
         return self._llm_gateway
 
     @property
