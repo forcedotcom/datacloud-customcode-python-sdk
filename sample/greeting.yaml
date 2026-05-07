@@ -1,0 +1,49 @@
+openapi: 3.0.0
+info:
+  title: Greet Service
+  description: API generated from Python function schema
+  version: 1.0.0
+paths:
+  /greet:
+    post:
+      summary: Generate a personalized greeting message
+      description: Generate a personalized greeting message.
+      operationId: greet
+      x-sfdc:
+        code-extension:
+          feature: BYOC
+          language: python
+          namespace: salesforceOrg
+          package: dataCloudPkg
+          name: greetFn
+          prototype: 'greet(request: dict) -> dict'
+          requestSchema: 'dict(name: str, greeting: Optional[str])'
+          responseSchema: 'dict(message: str)'
+          description: Will perform greet operation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                greeting:
+                  type: string
+              required:
+              - name
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                required:
+                - message
+        '400':
+          description: Invalid input

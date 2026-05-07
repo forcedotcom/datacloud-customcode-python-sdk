@@ -1,0 +1,64 @@
+openapi: 3.0.0
+info:
+  title: Transform Service
+  description: API generated from Python function schema
+  version: 1.0.0
+paths:
+  /transform:
+    post:
+      summary: Transform a list of records by remapping keys
+      description: Transform a list of records by remapping keys.
+      operationId: transform
+      x-sfdc:
+        code-extension:
+          feature: BYOC
+          language: python
+          namespace: salesforceOrg
+          package: dataCloudPkg
+          name: transformFn
+          prototype: 'transform(request: dict) -> dict'
+          requestSchema: 'dict(records: List[Dict[str, str]], key_mapping: Dict[str,
+            str])'
+          responseSchema: 'dict(transformed: List[Dict[str, str]], count: int)'
+          description: Will perform transform operation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                records:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties:
+                      type: string
+                key_mapping:
+                  type: object
+                  additionalProperties:
+                    type: string
+              required:
+              - records
+              - key_mapping
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transformed:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties:
+                        type: string
+                  count:
+                    type: integer
+                required:
+                - transformed
+                - count
+        '400':
+          description: Invalid input

@@ -1,0 +1,63 @@
+openapi: 3.0.0
+info:
+  title: Analyze Service
+  description: API generated from Python function schema
+  version: 1.0.0
+paths:
+  /analyze:
+    post:
+      summary: Analyze data with filters and return grouped results
+      description: Analyze data with filters and return grouped results.
+      operationId: analyze
+      x-sfdc:
+        code-extension:
+          feature: BYOC
+          language: python
+          namespace: salesforceOrg
+          package: dataCloudPkg
+          name: analyzeFn
+          prototype: 'analyze(request: dict) -> dict'
+          requestSchema: 'dict(dataset: str, filters: Optional[Dict[str, List[str]]],
+            limit: Optional[int])'
+          responseSchema: 'dict(rows: List[Dict[str, int]], total: int)'
+          description: Will perform analyze operation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dataset:
+                  type: string
+                filters:
+                  type: object
+                  additionalProperties:
+                    type: array
+                    items:
+                      type: string
+                limit:
+                  type: integer
+              required:
+              - dataset
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties:
+                        type: integer
+                  total:
+                    type: integer
+                required:
+                - rows
+                - total
+        '400':
+          description: Invalid input

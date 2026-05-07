@@ -1,0 +1,50 @@
+openapi: 3.0.0
+info:
+  title: Add Service
+  description: API generated from Python function schema
+  version: 1.0.0
+paths:
+  /add:
+    post:
+      summary: Add two integers
+      description: Add two integers.
+      operationId: add
+      x-sfdc:
+        code-extension:
+          feature: BYOC
+          language: python
+          namespace: salesforceOrg
+          package: dataCloudPkg
+          name: addFn
+          prototype: 'add(request: dict) -> dict'
+          requestSchema: 'dict(a: int, b: int)'
+          responseSchema: 'dict(result: int)'
+          description: Will perform add operation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                a:
+                  type: integer
+                b:
+                  type: integer
+              required:
+              - a
+              - b
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: integer
+                required:
+                - result
+        '400':
+          description: Invalid input
