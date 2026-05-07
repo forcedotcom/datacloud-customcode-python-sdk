@@ -1,0 +1,19 @@
+Analyze this document and break it into logical chunks for search/retrieval.
+
+Rules:
+1. Each chunk should be 150-300 words
+2. Break at semantic/topic boundaries (not mid-sentence)
+3. Each chunk should be self-contained (understandable alone)
+4. Preserve important context in each chunk
+
+Format your response as chunks separated by "---CHUNK---" markers.
+
+Document:
+{text}
+
+Output format:
+<chunk 1 text>
+---CHUNK---
+<chunk 2 text>
+---CHUNK---
+...
