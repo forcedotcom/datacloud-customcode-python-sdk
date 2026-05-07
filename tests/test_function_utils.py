@@ -228,8 +228,9 @@ def test_generate_test_json():
         assert "port" in complex_data["config"]
         assert complex_data["config"]["port"] == 8080
         assert complex_data["config"]["enabled"] is True
+        # metadata now gets sample data generated (not empty dict)
         assert "metadata" in complex_data
-        assert complex_data["metadata"] == {}
+        assert isinstance(complex_data["metadata"], dict)
 
     finally:
         if temp_dir in sys.path:
