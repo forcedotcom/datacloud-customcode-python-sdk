@@ -1,0 +1,51 @@
+{
+    "input": [
+      {
+        "text": "Employee Stock Ownership Plan (ESOP) Guide\n\nWhat is an ESOP?\n\nAn Employee Stock Ownership Plan (ESOP) is a qualified retirement plan that invests primarily in the stock of the sponsoring employer. ESOPs are designed to provide employees with an ownership interest in the company, aligning their interests with those of shareholders. As the company grows and prospers, so does the value of the ESOP shares held by employees.\n\nHow ESOPs Work\n\nWhen you join a company with an ESOP, you become eligible to participate after meeting certain requirements, typically one year of service. The company makes contributions to your ESOP account, usually as a percentage of your compensation. These contributions are made in the form of company stock or cash that is used to purchase company stock. The shares are held in a trust account in your name.\n\nVesting Schedule and Ownership\n\nYour ownership of ESOP shares typically follows a vesting schedule. A common vesting schedule is 20% per year over five years, meaning you become fully vested after five years of service. Once vested, those shares belong to you even if you leave the company. If you leave before becoming fully vested, you forfeit the unvested portion.\n\nDistribution Rules and Tax Implications\n\nWhen you leave the company, retire, or meet other distribution trigger events, you are entitled to receive the value of your vested ESOP shares. Distributions typically begin in the year following your separation from service. You can choose to receive distributions in a lump sum or in installments over several years. The tax treatment depends on how you receive the distribution - rolling over to an IRA defers taxes, while direct distributions are taxed as ordinary income.\n\nSelling Your ESOP Shares\n\nFor privately held companies, the ESOP trust or the company itself typically repurchases your shares at fair market value, determined by an independent appraiser. For publicly traded companies, shares may be sold on the open market. The repurchase obligation ensures you can convert your ownership stake to cash when you leave the company, providing liquidity for what might otherwise be an illiquid investment.",
+        "metadata": {
+          "type": "text",
+          "page_number": 1,
+          "text_as_html": null,
+          "source_dmo_fields": {
+            "FilePath__c": "employee_handbook/esop_guide.pdf",
+            "Size__c": 2847521,
+            "ContentType__c": "pdf",
+            "LastModified__c": "2026-04-15T08:23:11.442000"
+          },
+          "prepend": [
+            {
+              "dmo_name": "udmo_1__dlm",
+              "field_name": "ResolvedFilePath__c",
+              "value": "udlo_1__dll:employee_handbook/esop_guide.pdf"
+            }
+          ]
+        }
+      },
+      {
+        "text": "Data Privacy and Security Policy\n\nIntroduction and Scope\n\nThis policy establishes the framework for protecting confidential and sensitive information within our organization. It applies to all employees, contractors, consultants, and third parties who have access to company systems or data. The policy covers all forms of information, whether stored electronically, on paper, or transmitted verbally. Compliance with this policy is mandatory and violations may result in disciplinary action up to and including termination of employment.\n\nData Classification Standards\n\nAll company data must be classified according to sensitivity level. Public data can be freely shared without risk to the organization. Internal data is intended for employees only and should not be shared externally without approval. Confidential data includes business plans, financial records, and employee information that could cause significant harm if disclosed. Restricted data includes trade secrets, personal identifiable information (PII), and regulated data that must comply with specific legal requirements like GDPR, HIPAA, or CCPA.\n\nAccess Control and Authentication Requirements\n\nAccess to company systems and data is granted on a need-to-know basis following the principle of least privilege. All users must authenticate using strong passwords that meet complexity requirements: minimum 12 characters, including uppercase, lowercase, numbers, and special characters. Multi-factor authentication (MFA) is required for all remote access and privileged accounts. Passwords must be changed every 90 days and cannot reuse the previous 12 passwords. Sharing of credentials is strictly prohibited.\n\nData Handling and Transmission Security\n\nWhen transmitting confidential or restricted data, encryption must be used. Email containing sensitive information should be encrypted using approved tools. File transfers must use secure protocols like SFTP or HTTPS. Physical documents containing sensitive information must be stored in locked cabinets when not in use and shredded when no longer needed. Laptops and mobile devices must use full-disk encryption and automatic screen locking after 5 minutes of inactivity.\n\nIncident Response and Reporting Obligations\n\nAny suspected or actual security incident must be reported immediately to the Information Security team. Incidents include unauthorized access attempts, malware infections, lost or stolen devices, or accidental disclosure of sensitive information. Do not attempt to investigate or remediate security incidents yourself. The Security team will coordinate the response, including containment, investigation, remediation, and required notifications. For data breaches involving PII, regulatory notification requirements may apply within 72 hours of discovery.",
+        "metadata": {
+          "type": "text",
+          "page_number": 1,
+          "source_dmo_fields": {
+            "FilePath__c": "policies/data_privacy_security.pdf",
+            "Size__c": 1923456,
+            "ContentType__c": "pdf",
+            "LastModified__c": "2026-03-01T14:52:33.127000"
+          }
+        }
+      },
+      {
+        "text": "Product Launch Strategy: CloudSync Pro Q2 2026\n\nExecutive Summary\n\nCloudSync Pro represents our entry into the enterprise data synchronization market, targeting organizations with hybrid cloud infrastructures. Our research indicates strong demand for real-time data replication across on-premise and cloud environments. The total addressable market is estimated at $4.2B globally, growing at 23% annually. We aim to capture 3% market share within 18 months, generating $126M in annual recurring revenue. This launch is critical to our strategic objective of expanding beyond SMB customers into enterprise accounts.\n\nTarget Customer Profile and Pain Points\n\nOur primary target is IT Directors and Cloud Architects at mid-to-large enterprises (1000+ employees) operating hybrid infrastructure. These customers struggle with data consistency across distributed systems, experiencing latency issues, sync failures, and compliance challenges. Current solutions require significant custom development and ongoing maintenance. Our research shows customers spend an average of $340K annually on data integration tools and engineering resources. They need a solution that reduces integration complexity while providing real-time synchronization guarantees.\n\nCompetitive Landscape and Differentiation\n\nThe market leaders are DataSync Enterprise (32% share) and ReplicaCloud (28% share), both offering batch-oriented synchronization with 5-15 minute latencies. Our key differentiator is true real-time replication with sub-second latency using change data capture (CDC) technology. Additionally, our pricing model is consumption-based ($0.02 per GB transferred) versus competitors' per-connector licensing ($5K-15K per connector annually). This makes CloudSync Pro 40% more cost-effective for high-volume use cases while eliminating the capacity planning burden.\n\nGo-to-Market Strategy and Channel Plan\n\nWe will launch through a hybrid direct and partner model. Direct sales will target Fortune 2000 accounts through our existing enterprise sales team, augmented with three new cloud specialist hires. Partner channels include cloud marketplaces (AWS, Azure, GCP) and system integrators. We are finalizing partnerships with Deloitte and Accenture to include CloudSync Pro in their cloud migration practices. Marketing will emphasize analyst relations (targeting Gartner Magic Quadrant inclusion), thought leadership content, and targeted account-based marketing campaigns.\n\nRevenue Model and Financial Projections\n\nPricing is based on data volume transferred: $0.02/GB for the first 100TB monthly, $0.015/GB for 100-500TB, and $0.01/GB above 500TB. Average customer is projected at 250TB monthly ($4,375 MRR, $52,500 ARR). We forecast 100 customers by end of Q4 2026, 300 by end of 2027. Year 1 revenue target is $2.1M, scaling to $15.6M in Year 2 and $47M in Year 3. Gross margins are expected at 78% at scale. Initial investment includes $3.2M in product development (already completed), $2.8M in go-to-market expenses, and $1.5M in infrastructure scaling over 18 months.",
+        "metadata": {
+          "type": "text",
+          "page_number": 1,
+          "source_dmo_fields": {
+            "FilePath__c": "product_strategy/cloudsync_launch_plan.pdf",
+            "Size__c": 3156789,
+            "ContentType__c": "pdf",
+            "LastModified__c": "2026-04-28T11:18:47.893000"
+          }
+        }
+      }
+    ]
+}
