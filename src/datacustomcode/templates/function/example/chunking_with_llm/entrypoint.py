@@ -9,39 +9,35 @@ This function demonstrates the new signature-based invocation with Pydantic mode
 - Automatic validation and conversion
 """
 
-from datacustomcode.function.runtime import Runtime
 import logging
+
+from datacustomcode.function.feature_types.chunking import (
+    ChunkType,
+    SearchIndexChunkingV1Output,
+    SearchIndexChunkingV1Request,
+    SearchIndexChunkingV1Response,
+)
+from datacustomcode.function.runtime import Runtime
+from datacustomcode.llm_gateway.types.generate_text_request_builder import (
+    GenerateTextRequestBuilder,
+)
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 
-
-from datacustomcode.function.feature_types.chunking import (
-    SearchIndexChunkingV1Request,
-    SearchIndexChunkingV1Response,
-    SearchIndexChunkingV1Output,
-    ChunkType
-)
-
-from datacustomcode.llm_gateway.types.generate_text_request_builder import GenerateTextRequestBuilder
-
-
-# Load prompt template once at module load time
-PROMPT_TEMPLATE = None
-
 def _load_prompt_template(runtime: Runtime) -> str:
     """Load the chunking prompt template from file."""
-    global PROMPT_TEMPLATE
-    if PROMPT_TEMPLATE is None:
-        prompt_file = runtime.file.find_file_path("chunking_prompt.txt")
-        with open(prompt_file, 'r') as f:
-            PROMPT_TEMPLATE = f.read()
-        logger.info(f"Loaded prompt template from {prompt_file}")
-    return PROMPT_TEMPLATE
+    prompt_file = runtime.file.find_file_path("chunking_prompt.txt")
+    with open(prompt_file, "r") as f:
+        _prompt_template_cache = f.read()
+    logger.info(f"Loaded prompt template from {prompt_file}")
+    return _prompt_template_cache
 
 
-def function(request: SearchIndexChunkingV1Request, runtime: Runtime) -> SearchIndexChunkingV1Response:
+def function(
+    request: SearchIndexChunkingV1Request, runtime: Runtime
+) -> SearchIndexChunkingV1Response:
     """
     Chunk documents for Search Index.
 
@@ -64,21 +60,21 @@ def function(request: SearchIndexChunkingV1Request, runtime: Runtime) -> SearchI
     for doc_idx, doc in enumerate(request.input):
         # Direct field access - no wrappers!
         text = doc.text
-        metadata = doc.metadata
 
         # Use LLM to intelligently chunk the document
         # This creates semantic chunks that preserve context and meaning
         prompt = prompt_template.format(text=text)
 
         builder = GenerateTextRequestBuilder()
-        llm_request = builder.set_model("sfdc_ai__DefaultGPT4Turbo").set_prompt(prompt).build()
+        llm_request = (
+            builder.set_model("sfdc_ai__DefaultGPT4Turbo").set_prompt(prompt).build()
+        )
         response = runtime.llm_gateway.generate_text(llm_request)
 
         if response.is_success:
             # Parse LLM response to extract chunks
             llm_chunks = response.text.split("---CHUNK---")
             llm_chunks = [chunk.strip() for chunk in llm_chunks if chunk.strip()]
-
 
             # Create chunk outputs
             for chunk_text in llm_chunks:
@@ -93,7 +89,9 @@ def function(request: SearchIndexChunkingV1Request, runtime: Runtime) -> SearchI
 
         else:
             # LLM chunking failed - log error and raise exception
-            error_msg = f"LLM chunking failed for document {doc_idx + 1}: {response.error_code}"
+            error_msg = (
+                f"LLM chunking failed for document {doc_idx + 1}: {response.error_code}"
+            )
             logger.error(error_msg)
             raise RuntimeError(error_msg)
 
