@@ -50,16 +50,16 @@ class ChunkType(str, Enum):
 class SearchIndexChunkingV1PrependField(BaseModel):
     """Field to prepend to chunk content"""
 
-    dmo_name: str = Field(
-        default="", description="Data Model Object name", examples=["udmo_1__dlm"]
+    dmo_name: Optional[str] = Field(
+        default=None, description="Data Model Object name", examples=["udmo_1__dlm"]
     )
-    field_name: str = Field(
-        default="",
+    field_name: Optional[str] = Field(
+        default=None,
         description="Field name to prepend",
         examples=["ResolvedFilePath__c"],
     )
-    value: str = Field(
-        default="",
+    value: Optional[str] = Field(
+        default=None,
         description="Field value to prepend",
         examples=["udlo_1__dll:quarterly_report.pdf"],
     )
@@ -67,20 +67,20 @@ class SearchIndexChunkingV1PrependField(BaseModel):
 
 
 class SearchIndexChunkingV1TranscriptField(BaseModel):
-    """Field to prepend to chunk content"""
+    """Transcript timing and speaker metadata for audio/video documents"""
 
-    speaker: str = Field(
-        default="",
+    speaker: Optional[str] = Field(
+        default=None,
         description="Speaker name for audio/video transcripts",
         examples=["Agent"],
     )
-    start_timestamp: str = Field(
-        default="",
+    start_timestamp: Optional[str] = Field(
+        default=None,
         description="Start timestamp in ISO8601 format: YYYY-MM-DDTHH:MM:SS.ffffff",
         examples=["2026-03-25T02:01:24.918000"],
     )
-    end_timestamp: str = Field(
-        default="",
+    end_timestamp: Optional[str] = Field(
+        default=None,
         description="End timestamp in ISO8601 format: YYYY-MM-DDTHH:MM:SS.ffffff",
         examples=["2026-03-25T02:01:30.500000"],
     )
@@ -88,44 +88,76 @@ class SearchIndexChunkingV1TranscriptField(BaseModel):
 
 
 class SearchIndexChunkingV1Metadata(BaseModel):
-    """Metadata for input documents"""
+    """Metadata for input documents."""
 
-    type: DocumentType = Field(
-        default=DocumentType.TEXT, description="Document type (text)", examples=["text"]
-    )
-    transcript_fields: SearchIndexChunkingV1TranscriptField = Field(
-        default_factory=SearchIndexChunkingV1TranscriptField,
+    type: Optional[DocumentType] = Field(
+        default=DocumentType.TEXT,
         description=(
-            "Transcript information. Will only be there in case of audio-video files"
+            "Document type of the chunk input. Currently only 'text' is supported."
         ),
+        examples=["text"],
     )
-    page_number: int = Field(
-        default=0,
-        description="Page number in the source document (0-based)",
+    page_number: Optional[int] = Field(
+        default=None,
+        description=("Page number in the source document (0-based). "),
         examples=[1],
+    )
+    transcript_fields: Optional[SearchIndexChunkingV1TranscriptField] = Field(
+        default=None,
+        description=(
+            "Speaker and timestamp metadata for audio/video transcripts. "
+            "Optional — only present when the source document is a transcript."
+        ),
     )
     text_as_html: Optional[str] = Field(
         default=None,
-        description="HTML representation of the document text",
+        description=("HTML representation of the chunk text, if available. "),
         examples=["<p>Online Remittance Instructions</p>"],
     )
-    source_dmo_fields: Dict[str, Union[str, int]] = Field(
-        default_factory=dict,
+    source_dmo_fields: Optional[Dict[str, Union[str, int, float]]] = Field(
+        default=None,
         description=(
-            "Source Data Model Object fields as key-value pairs "
-            "(values can be string or int)"
+            "Source Data Model Object fields as key-value pairs. "
+            "Values can be string, int, or float."
         ),
         examples=[
             {
                 "FilePath__c": "quarterly_report.pdf",
-                "Size__c": 1377454,
+                "Size__c": 1377454.0,
                 "ContentType__c": "pdf",
                 "LastModified__c": "2026-03-25T02:01:24.918000",
             }
         ],
     )
-    prepend: List[SearchIndexChunkingV1PrependField] = Field(
-        default_factory=list, description="List of fields to prepend to each chunk"
+    prepend: Optional[List[SearchIndexChunkingV1PrependField]] = Field(
+        default=None,
+        description=(
+            "List of DMO fields whose values are prepended to the chunk "
+            "text before indexing"
+        ),
+    )
+    image_base64: Optional[str] = Field(
+        default=None,
+        description=(
+            "Base64-encoded image data associated with this chunk. "
+            "Optional — only applicable for image-type document elements."
+        ),
+    )
+    image_mime_type: Optional[str] = Field(
+        default=None,
+        description=(
+            "MIME type of the associated image (e.g., 'image/png', 'image/jpeg'). "
+            "Optional — should be provided alongside image_base64 when present."
+        ),
+        examples=["image/png", "image/jpeg"],
+    )
+    image_type: Optional[str] = Field(
+        default=None,
+        description=(
+            "Semantic category of the image content"
+            "(e.g., 'diagram', 'screenshot', 'chart'). Optional."
+        ),
+        examples=["diagram", "screenshot"],
     )
     model_config = ConfigDict(extra="ignore")
 
@@ -143,9 +175,12 @@ class SearchIndexChunkingV1DocElement(BaseModel):
             )
         ],
     )
-    metadata: SearchIndexChunkingV1Metadata = Field(
-        default_factory=SearchIndexChunkingV1Metadata,
-        description="Source document metadata",
+    metadata: Optional[SearchIndexChunkingV1Metadata] = Field(
+        default=None,
+        description=(
+            "Source document metadata. Optional — may be absent if no "
+            "metadata is available for the document element."
+        ),
     )
     model_config = ConfigDict(extra="ignore")
 
@@ -159,21 +194,25 @@ class SearchIndexChunkingV1Output(BaseModel):
         examples=["Online Remittance Instructions"],
     )
     seq_no: int = Field(
-        default=0, description="Sequential chunk number (1-based)", ge=1, examples=[1]
-    )
-    chunk_id: str = Field(
-        default="",
-        description="Unique identifier for this chunk (UUID format)",
-        examples=["550e8400-e29b-41d4-a716-446655440000"],
+        default=0,
+        description=(
+            "Sequential order of this chunk within the output "
+            "Represents chunk ordering within the source document (1-based)."
+        ),
+        ge=1,
+        examples=[1],
     )
     chunk_type: ChunkType = Field(
         default=ChunkType.TEXT,
-        description="Type of chunk (e.g., 'text')",
+        description="Type of chunk. Fixed value — always 'text'.",
         examples=["text"],
     )
-    citations: Dict[str, str] = Field(
-        default_factory=dict,
-        description="Citation information as key-value pairs",
+    citations: Optional[Dict[str, str]] = Field(
+        default=None,
+        description=(
+            "Citation metadata associated with this chunk as key-value "
+            "pairs. Optional — defaults to None if no citations are present."
+        ),
         examples=[{"source": "quarterly_report.pdf"}],
     )
     model_config = ConfigDict(extra="ignore")
@@ -194,4 +233,3 @@ class SearchIndexChunkingV1Response(BaseModel):
     output: List[SearchIndexChunkingV1Output] = Field(
         default_factory=list, description="Flat list of chunks from all docs"
     )
-    model_config = ConfigDict(extra="ignore")

@@ -16,6 +16,7 @@
 """Utilities for inspecting and working with function entrypoints."""
 
 import ast
+from enum import Enum
 import importlib.util
 import inspect
 import json
@@ -278,11 +279,17 @@ def _generate_model_sample_data(model_type):
         # Use examples if available
         if field_info.examples and len(field_info.examples) > 0:
             sample_data[field_name] = field_info.examples[0]
-        # Check if field has a real default value
-        elif field_info.default is not PydanticUndefined:
+        # If field has a non-None, non-empty default value, use it
+        elif (
+            field_info.default is not PydanticUndefined
+            and field_info.default is not None
+            and field_info.default != []
+            and field_info.default != {}
+        ):
             sample_data[field_name] = field_info.default
+        # For all other fields (including default_factory, None defaults,
+        # empty defaults), generate sample data
         else:
-            # Required field or field without default - generate sample
             sample_data[field_name] = generate_sample_value(
                 field_info.annotation, field_name
             )
@@ -300,6 +307,17 @@ def generate_sample_value(field_type, field_name: str):
         A sample value appropriate for the field type
     """
     origin = typing.get_origin(field_type)
+
+    # Handle Optional[T] (Union[T, None]) by unwrapping to T
+    if origin is typing.Union:
+        non_none_args = [
+            arg for arg in typing.get_args(field_type) if arg is not type(None)
+        ]
+        return (
+            generate_sample_value(non_none_args[0], field_name)
+            if non_none_args
+            else None
+        )
 
     if origin is list or field_type is list:
         args = typing.get_args(field_type)
@@ -320,6 +338,10 @@ def generate_sample_value(field_type, field_name: str):
         return 1.0
     elif field_type is bool:
         return True
+    # Handle Enum types
+    elif isinstance(field_type, type) and issubclass(field_type, Enum):
+        # Return the first enum value
+        return next(iter(field_type)).value
     elif hasattr(field_type, "model_fields"):
         # Nested Pydantic model - use shared helper
         return _generate_model_sample_data(field_type)

@@ -1,5 +1,4 @@
 import logging
-import uuid
 
 from datacustomcode.function import Runtime
 from datacustomcode.function.feature_types.chunking import (
@@ -124,12 +123,11 @@ def function(
         for chunk_text in text_chunks:
             # Create citations from source_dmo_fields if available
             citations = {}
-            if metadata.source_dmo_fields:
+            if metadata and metadata.source_dmo_fields:
                 for key, value in metadata.source_dmo_fields.items():
                     citations[key] = str(value)
 
             chunk_output = SearchIndexChunkingV1Output(
-                chunk_id=str(uuid.uuid4()),
                 chunk_type=ChunkType.TEXT,
                 text=chunk_text.strip(),
                 seq_no=seq_no,
