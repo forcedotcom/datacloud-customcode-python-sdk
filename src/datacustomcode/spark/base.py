@@ -25,5 +25,5 @@ if TYPE_CHECKING:
 
 
 class BaseSparkSessionProvider(UserExtendableNamedConfigMixin):
-    def get_session(self, spark_config: SparkConfig) -> "SparkSession":
+    def get_session(self, spark_config: SparkConfig) -> SparkSession:
         raise NotImplementedError

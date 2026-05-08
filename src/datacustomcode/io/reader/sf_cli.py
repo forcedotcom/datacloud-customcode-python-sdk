@@ -23,7 +23,6 @@ from typing import (
     Union,
 )
 
-import pandas as pd
 import requests
 
 from datacustomcode.io.reader.base import BaseDataCloudReader
@@ -31,6 +30,7 @@ from datacustomcode.io.reader.utils import _pandas_to_spark_schema
 from datacustomcode.token_provider import SFCLITokenProvider
 
 if TYPE_CHECKING:
+    import pandas as pd
     from pyspark.sql import DataFrame as PySparkDataFrame, SparkSession
     from pyspark.sql.types import AtomicType, StructType
 
@@ -97,6 +97,8 @@ class SFCLIDataCloudReader(BaseDataCloudReader):
         Raises:
             RuntimeError: On HTTP errors or unexpected response shapes.
         """
+        import pandas as pd
+
         access_token, instance_url = self._get_token()
 
         url = f"{instance_url}/services/data/{API_VERSION}/ssot/query-sql"

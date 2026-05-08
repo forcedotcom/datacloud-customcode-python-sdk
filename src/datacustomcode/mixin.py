@@ -72,6 +72,35 @@ class UserExtendableNamedConfigMixin:
         Args:
             config_name: should match a subclass's ``CONFIG_NAME``.
         """
+        # First, check if already registered (from __init_subclass__)
+        if config_name in UserExtendableNamedConfigMixin._registered_config_names:
+            candidate = UserExtendableNamedConfigMixin._registered_config_names[
+                config_name
+            ]
+            # Verify it's actually a subclass of cls (respects hierarchy)
+            if candidate is cls or issubclass(candidate, cls):
+                return candidate
+
+        # If not found, try to trigger lazy import via __getattr__
+        # This handles the case where subclasses use lazy loading
+        try:
+            import datacustomcode
+
+            # Attempt to trigger __getattr__ by accessing the name
+            getattr(datacustomcode, config_name, None)
+        except (ImportError, AttributeError):
+            pass
+
+        # Check again after potential lazy import
+        if config_name in UserExtendableNamedConfigMixin._registered_config_names:
+            candidate = UserExtendableNamedConfigMixin._registered_config_names[
+                config_name
+            ]
+            # Verify it's actually a subclass of cls (respects hierarchy)
+            if candidate is cls or issubclass(candidate, cls):
+                return candidate
+
+        # Fallback to dynamic lookup (for user-added subclasses)
         subclass_config_name_map = {}
         for type_ in _get_all_subclass_descendants(cls):
             if name := getattr(type_, "CONFIG_NAME", ""):

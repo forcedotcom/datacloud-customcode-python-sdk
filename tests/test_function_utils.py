@@ -193,7 +193,10 @@ def test_generate_test_json():
         assert "message" in data
         assert data["count"] == 5
         assert data["version"] == "v1"
-        assert data["tags"] == []
+        # tags now gets sample data generated (not empty list)
+        assert "tags" in data
+        assert isinstance(data["tags"], list)
+        assert len(data["tags"]) > 0
 
         # Test 2: Complex request type with nested models
         entrypoint_complex = os.path.join(temp_dir, "entrypoint_complex.py")
@@ -225,8 +228,9 @@ def test_generate_test_json():
         assert "port" in complex_data["config"]
         assert complex_data["config"]["port"] == 8080
         assert complex_data["config"]["enabled"] is True
+        # metadata now gets sample data generated (not empty dict)
         assert "metadata" in complex_data
-        assert complex_data["metadata"] == {}
+        assert isinstance(complex_data["metadata"], dict)
 
     finally:
         if temp_dir in sys.path:

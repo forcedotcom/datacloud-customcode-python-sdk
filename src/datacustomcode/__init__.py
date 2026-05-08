@@ -13,11 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from datacustomcode.client import Client
-from datacustomcode.credentials import AuthType, Credentials
-from datacustomcode.io.reader.query_api import QueryAPIDataCloudReader
-from datacustomcode.io.writer.print import PrintDataCloudWriter
-
 __all__ = [
     "AuthType",
     "Client",
@@ -25,3 +20,28 @@ __all__ = [
     "PrintDataCloudWriter",
     "QueryAPIDataCloudReader",
 ]
+
+
+def __getattr__(name: str):
+    """Lazy import heavy dependencies."""
+    if name == "Client":
+        from datacustomcode.client import Client
+
+        return Client
+    elif name == "AuthType":
+        from datacustomcode.credentials import AuthType
+
+        return AuthType
+    elif name == "Credentials":
+        from datacustomcode.credentials import Credentials
+
+        return Credentials
+    elif name == "PrintDataCloudWriter":
+        from datacustomcode.io.writer.print import PrintDataCloudWriter
+
+        return PrintDataCloudWriter
+    elif name == "QueryAPIDataCloudReader":
+        from datacustomcode.io.reader.query_api import QueryAPIDataCloudReader
+
+        return QueryAPIDataCloudReader
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
