@@ -1,0 +1,40 @@
+{
+  "input": [
+    {
+      "text": "Luxury 5-bedroom house with 5000 sq ft living area, built in 2023",
+      "metadata": {
+        "type": "text",
+        "source_dmo_fields": {
+          "First_Flr_SF__c": 2600,
+          "Full_Bath__c": 4,
+          "Garage_Cars__c": 4,
+          "Garage_Qual__c": "good",
+          "Gr_Liv_Area__c": 5000,
+          "Lot_Area__c": 3000,
+          "Overall_Cond__c": 10,
+          "Second_Flr_SF__c": 2400,
+          "Total_Bsmt_SF__c": 0,
+          "Year_Built__c": 2023
+        }
+      }
+    },
+    {
+      "text": "Spacious 4-bedroom family home with 3500 sq ft living space, built in 2020",
+      "metadata": {
+        "type": "text",
+        "source_dmo_fields": {
+          "First_Flr_SF__c": 2000,
+          "Full_Bath__c": 3,
+          "Garage_Cars__c": 3,
+          "Garage_Qual__c": "excellent",
+          "Gr_Liv_Area__c": 3500,
+          "Lot_Area__c": 8000,
+          "Overall_Cond__c": 9,
+          "Second_Flr_SF__c": 1500,
+          "Total_Bsmt_SF__c": 1000,
+          "Year_Built__c": 2020
+        }
+      }
+    }
+  ]
+}
