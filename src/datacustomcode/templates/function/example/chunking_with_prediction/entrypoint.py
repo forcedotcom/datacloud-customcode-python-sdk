@@ -15,20 +15,23 @@ Output: Predicted_SalePrice
 """
 
 import logging
-from typing import Any, Dict, Optional
-
-from datacustomcode.function import Runtime
-from datacustomcode.function.feature_types.chunking import (
-    ChunkType,
-    SearchIndexChunkingV1Output,
-    SearchIndexChunkingV1Request,
-    SearchIndexChunkingV1Response,
+from typing import (
+    Any,
+    Dict,
+    Optional,
 )
 
 from datacustomcode.einstein_predictions.types import (
     PredictionColumBuilder,
     PredictionRequestBuilder,
     PredictionType,
+)
+from datacustomcode.function import Runtime
+from datacustomcode.function.feature_types.chunking import (
+    ChunkType,
+    SearchIndexChunkingV1Output,
+    SearchIndexChunkingV1Request,
+    SearchIndexChunkingV1Response,
 )
 
 logger = logging.getLogger(__name__)
@@ -74,7 +77,9 @@ def predict_sale_price(
                 )
             else:
                 # Skip unsupported types
-                logger.warning(f"Skipping field {column_name} with unsupported type {type(value)}")
+                logger.warning(
+                    f"Skipping field {column_name} with unsupported type {type(value)}"
+                )
                 continue
 
             prediction_columns.append(column)
@@ -95,6 +100,10 @@ def predict_sale_price(
             return None
 
         # Parse regression response
+        if prediction_response.data is None:
+            logger.warning("Prediction response data is None")
+            return None
+
         results = prediction_response.data.get("results", [])
         if not results:
             logger.warning("No results in prediction response")
@@ -179,8 +188,6 @@ def function(
           "metadata": {
             "source_dmo_fields": {
               "Year_Built__c": 1990,
-              "address": "123 Main St",
-              "city": "San Francisco"
             }
           }
         }
@@ -195,7 +202,6 @@ def function(
           "seq_no": 1,
           "citations": {
             "Year_Built__c": "1990",
-            "address": "123 Main St",
             "predicted_sale_price": "$350,000.00",
             "predicted_sale_price_raw": "350000.0",
             "prediction_status": "success"
@@ -211,9 +217,6 @@ def function(
     Returns:
         Properties enriched with predicted sale prices
     """
-    logger.info(
-        f"Processing {len(request.input)} properties for price prediction"
-    )
 
     enriched_properties = []
     seq_no = 1
@@ -222,9 +225,6 @@ def function(
         text = doc.text
         metadata = doc.metadata
 
-        logger.info(f"Property {doc_idx + 1}: {text[:100]}...")
-
-        # Get source_dmo_fields
         source_dmo_fields = {}
         if metadata and metadata.source_dmo_fields:
             source_dmo_fields = dict(metadata.source_dmo_fields)
@@ -241,12 +241,6 @@ def function(
         )
         enriched_properties.append(property_output)
 
-        logger.info(
-            f"Property {seq_no}: Predicted price = "
-            f"{citations.get('predicted_sale_price', 'N/A')}"
-        )
         seq_no += 1
-
-    logger.info(f"Total properties enriched: {len(enriched_properties)}")
 
     return SearchIndexChunkingV1Response(output=enriched_properties)
