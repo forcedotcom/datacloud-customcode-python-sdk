@@ -93,7 +93,12 @@ def predict_sale_price(
             .build()
         )
 
+        logger.info(f"Model: {PREDICTION_MODEL_NAME}")
+
         prediction_response = runtime.einstein_predictions.predict(prediction_request)
+
+        logger.info(f"Response status code: {prediction_response.status_code}")
+        logger.info(f"Response data: {prediction_response.data}")
 
         if not prediction_response.is_success:
             logger.error(f"Prediction failed: {prediction_response.data}")
@@ -118,7 +123,7 @@ def predict_sale_price(
             return None
 
         prediction_data = first_result.get("prediction", {})
-        predicted_value = prediction_data.get("value")
+        predicted_value = prediction_data.get("predictedValue")
 
         if predicted_value is None:
             logger.warning("No predicted value in response")
