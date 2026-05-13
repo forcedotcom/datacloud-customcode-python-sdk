@@ -31,8 +31,8 @@ from pydantic import (
 )
 
 
-class DocumentType(str, Enum):
-    """Document type enumeration"""
+class ElementType(str, Enum):
+    """Element type enumeration"""
 
     TEXT = "text"
     TITLE = "title"
@@ -74,15 +74,15 @@ class SearchIndexChunkingV1TranscriptField(BaseModel):
         description="Speaker name for audio/video transcripts",
         examples=["Agent"],
     )
-    start_timestamp: Optional[str] = Field(
+    start_timestamp: Optional[float] = Field(
         default=None,
-        description="Start timestamp in ISO8601 format: YYYY-MM-DDTHH:MM:SS.ffffff",
-        examples=["2026-03-25T02:01:24.918000"],
+        description="Start timestamp of the audio/video clip",
+        examples=["1.0"],
     )
-    end_timestamp: Optional[str] = Field(
+    end_timestamp: Optional[float] = Field(
         default=None,
-        description="End timestamp in ISO8601 format: YYYY-MM-DDTHH:MM:SS.ffffff",
-        examples=["2026-03-25T02:01:30.500000"],
+        description="End timestamp of the audio/video clip",
+        examples=["8.75"],
     )
     model_config = ConfigDict(extra="ignore")
 
@@ -90,16 +90,16 @@ class SearchIndexChunkingV1TranscriptField(BaseModel):
 class SearchIndexChunkingV1Metadata(BaseModel):
     """Metadata for input documents."""
 
-    type: Optional[DocumentType] = Field(
-        default=DocumentType.TEXT,
+    type: Optional[ElementType] = Field(
+        default=ElementType.TEXT,
         description=(
-            "Document type of the chunk input. Currently only 'text' is supported."
+            "Element type of the chunk input. Currently only 'text' is supported."
         ),
         examples=["text"],
     )
     page_number: Optional[int] = Field(
         default=None,
-        description=("Page number in the source document (0-based). "),
+        description=("Page number in the source document."),
         examples=[1],
     )
     transcript_fields: Optional[SearchIndexChunkingV1TranscriptField] = Field(
@@ -111,7 +111,7 @@ class SearchIndexChunkingV1Metadata(BaseModel):
     )
     text_as_html: Optional[str] = Field(
         default=None,
-        description=("HTML representation of the chunk text, if available. "),
+        description=("Table represented as HTML"),
         examples=["<p>Online Remittance Instructions</p>"],
     )
     source_dmo_fields: Optional[Dict[str, Union[str, int, float]]] = Field(
@@ -194,7 +194,7 @@ class SearchIndexChunkingV1Output(BaseModel):
         examples=["Online Remittance Instructions"],
     )
     seq_no: int = Field(
-        default=0,
+        default=1,
         description=(
             "Sequential order of this chunk within the output "
             "Represents chunk ordering within the source document (1-based)."
