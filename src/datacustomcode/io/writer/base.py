@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 class WriteMode(str, Enum):
     APPEND = "append"
     OVERWRITE = "overwrite"
-    OVERWRITE_PARTITIONS = "overwrite_partitions"
+    OVERWRITE_PARTITIONS = "overwrite_partitions"  # Deprecated: raises error if used
     MERGE = "merge"
     MERGE_UPSERT_DELETE = "merge_upsert_delete"
 

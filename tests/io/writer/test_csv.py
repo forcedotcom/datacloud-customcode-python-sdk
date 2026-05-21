@@ -37,9 +37,10 @@ class TestCSVDataCloudWriter:
         test_cases = [
             ("test_dlo", WriteMode.OVERWRITE),
             ("another_dlo", WriteMode.APPEND),
-            ("third_dlo", WriteMode.OVERWRITE_PARTITIONS),
-            ("fourth_dlo", WriteMode.MERGE),
+            ("third_dlo", WriteMode.MERGE),
+            ("fourth_dlo", WriteMode.MERGE_UPSERT_DELETE),
         ]
+        # Note: OVERWRITE_PARTITIONS is deprecated and raises an error if used
 
         for name, write_mode in test_cases:
             # Call the method
@@ -58,9 +59,10 @@ class TestCSVDataCloudWriter:
         test_cases = [
             ("test_dmo", WriteMode.OVERWRITE),
             ("another_dmo", WriteMode.APPEND),
-            ("third_dmo", WriteMode.OVERWRITE_PARTITIONS),
+            ("third_dmo", WriteMode.MERGE),
             ("fourth_dmo", WriteMode.MERGE_UPSERT_DELETE),
         ]
+        # Note: OVERWRITE_PARTITIONS is deprecated and raises an error if used
 
         for name, write_mode in test_cases:
             # Call the method
