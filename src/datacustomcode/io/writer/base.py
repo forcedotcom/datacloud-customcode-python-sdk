@@ -33,7 +33,7 @@ class WriteMode(str, Enum):
 
 
 class MergeRecordType(str, Enum):
-    """Annotation values for the _merge_record_type column required by MERGE_UPSERT_DELETE."""
+    """Values for the _merge_record_type column used by MERGE_UPSERT_DELETE."""
 
     UPSERT = "UPSERT"
     DELETE = "DELETE"
