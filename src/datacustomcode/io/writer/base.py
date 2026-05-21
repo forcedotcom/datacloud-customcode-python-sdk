@@ -32,6 +32,16 @@ class WriteMode(str, Enum):
     MERGE_UPSERT_DELETE = "merge_upsert_delete"
 
 
+class MergeRecordType(str, Enum):
+    """Annotation values for the _merge_record_type column required by MERGE_UPSERT_DELETE."""
+
+    UPSERT = "UPSERT"
+    DELETE = "DELETE"
+
+
+MERGE_RECORD_TYPE_COLUMN = "_merge_record_type"
+
+
 class BaseDataCloudWriter(BaseDataAccessLayer):
     """Base class for Data Cloud writers."""
 
