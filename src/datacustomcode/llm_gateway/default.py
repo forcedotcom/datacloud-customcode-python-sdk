@@ -29,7 +29,7 @@ class DefaultLLMGateway(EinsteinPlatformClient, LLMGateway):
 
     def generate_text(self, request: GenerateTextRequest) -> GenerateTextResponse:
         api_url = (
-            f"{self.EINSTEIN_PLATFORM_MODELS_URL}/{request.model_name}/generations"
+            f"{self._get_einstein_platform_url()}/{request.model_name}/generations"
         )
 
         payload: Dict[str, Any] = {"prompt": request.prompt}

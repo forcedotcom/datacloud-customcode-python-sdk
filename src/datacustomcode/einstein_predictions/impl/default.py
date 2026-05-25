@@ -48,7 +48,7 @@ class DefaultEinsteinPredictions(EinsteinPlatformClient, EinsteinPredictions):
             )
 
         api_url = (
-            f"{self.EINSTEIN_PLATFORM_MODELS_URL}/{request.model_api_name}/{endpoint}"
+            f"{self._get_einstein_platform_url()}/{request.model_api_name}/{endpoint}"
         )
 
         prediction_columns: List[Dict[str, Any]] = []
