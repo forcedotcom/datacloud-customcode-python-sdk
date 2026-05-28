@@ -5,7 +5,30 @@ on:
     types: [published]
 
 jobs:
+  validate-release:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Validate pre-release consistency
+      env:
+        TAG_NAME: ${{ github.event.release.tag_name }}
+        IS_PRERELEASE: ${{ github.event.release.prerelease }}
+      run: |
+        PEP440_PRE=$(echo "$TAG_NAME" | grep -qE '(\.dev|a|b|rc)[0-9]+' && echo "true" || echo "false")
+
+        if [ "$IS_PRERELEASE" = "true" ] && [ "$PEP440_PRE" = "false" ]; then
+          echo "::error::GitHub release is marked as pre-release but tag '$TAG_NAME' is a stable version. Use a PEP 440 pre-release suffix (e.g. .dev1, rc1)."
+          exit 1
+        fi
+
+        if [ "$IS_PRERELEASE" = "false" ] && [ "$PEP440_PRE" = "true" ]; then
+          echo "::error::Tag '$TAG_NAME' has a pre-release suffix but the GitHub release is not marked as pre-release. Check the 'Set as a pre-release' box."
+          exit 1
+        fi
+
+        echo "Release consistency check passed: tag=$TAG_NAME, prerelease=$IS_PRERELEASE"
+
   publish:
+    needs: validate-release
     runs-on: ubuntu-latest
     environment:
       name: pypi

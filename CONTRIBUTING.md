@@ -78,6 +78,17 @@ See the [Prerequisites section in README.md](./README.md#prerequisites) for comp
 
    **Tip**: See the [README.md](./README.md) for additional `datacustomcode` commands (`scan`, `deploy`, `zip`) to test specific code paths and validate your SDK changes thoroughly.
 
+## Versioning and Pre-Releases
+
+This project uses [PEP 440](https://peps.python.org/pep-0440/) version syntax. Versions are derived automatically from git tags via `poetry-dynamic-versioning`.
+
+- **Stable releases** use tags like `v4.1.0` → published as `4.1.0` on PyPI.
+- **Pre-releases** use tags like `v4.1.0.dev1`, `v4.1.0rc1` → published as `4.1.0.dev1`, `4.1.0rc1` on PyPI.
+
+Pre-release versions are **never** resolved by `pip install salesforce-data-customcode` unless the user explicitly passes `--pre`. This ensures customers always get stable releases by default.
+
+A Github Action (`Released Version Check`) runs after every publish to verify that bare `pip install` still resolves to a stable version.
+
 ## Makefile Commands
 
 ```bash
