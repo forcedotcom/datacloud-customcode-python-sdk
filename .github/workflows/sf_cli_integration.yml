@@ -2,6 +2,7 @@ name: SF CLI Integration Test
 
 on:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   sf-cli-integration:
