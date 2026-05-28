@@ -134,7 +134,7 @@ datacustomcode = "datacustomcode.cli:cli"
 [tool.poetry-dynamic-versioning]
 enable = true
 pattern = "^v(?P<base>.+)$"
-style = "semver"
+style = "pep440"
 vcs = "git"
 
 [tool.pytest.ini_options]
