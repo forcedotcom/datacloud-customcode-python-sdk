@@ -2,6 +2,7 @@ name: SF CLI Integration Test
 
 on:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   sf-cli-integration:
@@ -21,11 +22,16 @@ jobs:
       with:
         python-version: '3.11'
 
-    - name: Install Poetry and Python SDK
+    - name: Install Poetry and build SDK wheel
       run: |
         python -m pip install --upgrade pip
         pip install poetry
         make develop
+        poetry build
+
+    - name: Install SDK wheel into Poetry venv
+      run: |
+        "$(poetry env info --path)/bin/pip" install dist/*.whl --force-reinstall --no-deps
 
     - name: Add Poetry venv to PATH
       run: echo "$(poetry env info --path)/bin" >> $GITHUB_PATH
