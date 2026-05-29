@@ -87,8 +87,8 @@ warn_unused_configs = true
 
 [tool.poetry]
 include = [
-  {path = "src/datacustomcode/templates/**/*", format = "sdist"},
-  {path = "src/datacustomcode/config.yaml", format = "sdist"}
+  {path = "src/datacustomcode/templates/**/*"},
+  {path = "src/datacustomcode/config.yaml"}
 ]
 packages = [{include = "datacustomcode", from = "src"}]
 version = "0.0.0"
@@ -133,7 +133,8 @@ datacustomcode = "datacustomcode.cli:cli"
 
 [tool.poetry-dynamic-versioning]
 enable = true
-pattern = "^v(?P<base>.+)$"
+format-jinja = "{% if distance == 0 %}{{ base }}{{ stage or '' }}{% else %}{{ bump_version(base) }}.dev{{ distance }}+{{ commit }}{% endif %}"
+pattern = "^v(?P<base>\\d+\\.\\d+\\.\\d+)(?P<stage>\\.dev\\d+|a\\d+|b\\d+|rc\\d+)?$"
 style = "pep440"
 vcs = "git"
 

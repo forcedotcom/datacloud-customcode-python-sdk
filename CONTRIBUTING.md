@@ -60,23 +60,42 @@ See the [Prerequisites section in README.md](./README.md#prerequisites) for comp
    datacustomcode version
    ```
 
-4. **Initialize a project for development work verification**
+4. **Install the SF CLI and plugin**
 
-   **Note**: To test your changes and develop new features, initialize a sample project:
+   The SF CLI is how you test your SDK changes end-to-end (`init`, `scan`, `zip`, `run`, `deploy`).
+
+   ```bash
+   # Install the Salesforce CLI (requires Node.js)
+   npm install -g @salesforce/cli
+
+   # Install the Data Cloud Code Extension plugin
+   sf plugins install @salesforce/plugin-data-code-extension
+   ```
+
+5. **Build and install your local SDK changes**
+
+   The SF CLI plugin resolves templates from the installed package path. After making changes, build a wheel and install it:
+
+   ```bash
+   poetry build
+   $(poetry env info --path)/bin/pip install dist/*.whl --force-reinstall --no-deps
+   ```
+
+   Re-run these two commands each time you make SDK changes you want to test via the SF CLI.
+
+6. **Test your changes**
 
    ```bash
    # Create a new directory for your test project
    mkdir my-test-project
    cd my-test-project
 
-   # Initialize a new Data Cloud custom code project
-   datacustomcode init .
-
-   # Test your SDK modifications against the sample project with:
-   datacustomcode run ./payload/entrypoint.py
+   # Initialize, scan, zip, run
+   sf data-code-extension script init --package-dir .
+   sf data-code-extension script scan --entrypoint payload/entrypoint.py
+   sf data-code-extension script zip --package-dir .
+   sf data-code-extension script run --entrypoint payload/entrypoint.py -o <your-org-alias>
    ```
-
-   **Tip**: See the [README.md](./README.md) for additional `datacustomcode` commands (`scan`, `deploy`, `zip`) to test specific code paths and validate your SDK changes thoroughly.
 
 ## Versioning and Pre-Releases
 
