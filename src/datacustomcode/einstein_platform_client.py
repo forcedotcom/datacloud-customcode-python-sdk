@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from typing import (
     Any,
     Dict,
@@ -30,10 +31,6 @@ from datacustomcode.token_provider import (
 
 
 class EinsteinPlatformClient:
-    EINSTEIN_PLATFORM_MODELS_URL = (
-        "https://api.salesforce.com/einstein/platform/v1/models"
-    )
-
     def __init__(
         self,
         credentials_profile: Optional[str] = None,
@@ -48,7 +45,33 @@ class EinsteinPlatformClient:
             self._token_provider = CredentialsTokenProvider(profile)
             logger.debug(f"Using credentials token provider with profile: {profile}")
         self.token_response = None
+        self._einstein_url_cache: Optional[str] = None
         super().__init__(**kwargs)
+
+    def _get_einstein_platform_url(self) -> str:
+        if self._einstein_url_cache is not None:
+            return self._einstein_url_cache
+
+        env = os.environ.get("SFDC_EINSTEIN_API_ENV", "prod").lower()
+        if env not in ("dev", "test", "stage", "prod"):
+            logger.warning(
+                f"Unknown SFDC_EINSTEIN_API_ENV value '{env}', defaulting to prod"
+            )
+            env = "prod"
+
+        base_url = self._get_base_url_for_env(env)
+        logger.info(f"Using Einstein Platform API endpoint: {base_url} (env={env})")
+        self._einstein_url_cache = f"{base_url}/einstein/platform/v1/models"
+        return self._einstein_url_cache
+
+    def _get_base_url_for_env(self, env: str) -> str:
+        env_map = {
+            "dev": "https://dev.api.salesforce.com",
+            "test": "https://test.api.salesforce.com",
+            "stage": "https://stage.api.salesforce.com",
+            "prod": "https://api.salesforce.com",
+        }
+        return env_map.get(env, "https://api.salesforce.com")
 
     def _get_headers(self):
         if self.token_response is None:

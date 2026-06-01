@@ -229,12 +229,18 @@ Instead of using `datacustomcode configure`, you can also set credentials via en
 | `SFDC_REFRESH_TOKEN` | OAuth refresh token |
 | `SFDC_ACCESS_TOKEN` | (Optional) OAuth core/access token |
 
+**Einstein Platform API Environment (Optional):**
+| Variable | Description |
+|----------|-------------|
+| `SFDC_EINSTEIN_API_ENV` | Einstein Platform API environment: `dev`, `test`, `stage`, or `prod`. If not set, automatically inferred from login URL. Set this explicitly if auto-detection fails. |
+
 Example usage:
 ```bash
 export SFDC_LOGIN_URL="https://login.salesforce.com"
 export SFDC_CLIENT_ID="your_client_id"
 export SFDC_CLIENT_SECRET="your_client_secret"
 export SFDC_REFRESH_TOKEN="your_refresh_token"
+export SFDC_EINSTEIN_API_ENV="test"  # optional
 
 datacustomcode run ./payload/entrypoint.py
 ```
