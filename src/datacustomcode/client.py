@@ -66,10 +66,10 @@ def llm_gateway_generate_text_col(
     Example:
 
         >>> df.withColumn(
-        ...     "response",
+        ...     "Greeting__c",
         ...     llm_gateway_generate_text_col(
         ...         "In one sentence, greet {name} from {city}.",
-        ...         {"name": col("name"), "city": col("city")},
+        ...         {"name": col("Name__c"), "city": col("HomeCity__c")},
         ...         model_id="sfdc_ai__DefaultGPT4Omni",
         ...         max_tokens=100,
         ...     ),

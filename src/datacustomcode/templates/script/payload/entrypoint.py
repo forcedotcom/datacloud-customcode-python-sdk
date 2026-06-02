@@ -24,7 +24,7 @@ def main():
 
         >>> from datacustomcode.client import llm_gateway_generate_text_col
             df_generated = df.withColumn(
-            ...     "greeting__c",
+            ...     "Greeting__c",
             ...     llm_gateway_generate_text_col(
             ...         "In one sentence, greet {name} from {city}.",
             ...         {"name": col("Name__c"), "city": col("HomeCity__c")},
