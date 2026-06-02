@@ -15,8 +15,12 @@
 
 from datacustomcode.llm_gateway.base import LLMGateway
 from datacustomcode.llm_gateway.default import DefaultLLMGateway
+from datacustomcode.llm_gateway.spark_base import SparkLLMGateway
+from datacustomcode.llm_gateway.spark_default import DefaultSparkLLMGateway
 
 __all__ = [
     "DefaultLLMGateway",
+    "DefaultSparkLLMGateway",
     "LLMGateway",
+    "SparkLLMGateway",
 ]

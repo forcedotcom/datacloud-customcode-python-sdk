@@ -17,8 +17,11 @@ __all__ = [
     "AuthType",
     "Client",
     "Credentials",
+    "DefaultSparkLLMGateway",
     "PrintDataCloudWriter",
     "QueryAPIDataCloudReader",
+    "SparkLLMGateway",
+    "llm_gateway_generate_text_col",
 ]
 
 
@@ -44,4 +47,16 @@ def __getattr__(name: str):
         from datacustomcode.io.reader.query_api import QueryAPIDataCloudReader
 
         return QueryAPIDataCloudReader
+    elif name == "SparkLLMGateway":
+        from datacustomcode.llm_gateway import SparkLLMGateway
+
+        return SparkLLMGateway
+    elif name == "DefaultSparkLLMGateway":
+        from datacustomcode.llm_gateway import DefaultSparkLLMGateway
+
+        return DefaultSparkLLMGateway
+    elif name == "llm_gateway_generate_text_col":
+        from datacustomcode.client import llm_gateway_generate_text_col
+
+        return llm_gateway_generate_text_col
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

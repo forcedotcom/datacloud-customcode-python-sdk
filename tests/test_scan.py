@@ -47,8 +47,7 @@ def create_sdk_config(base_directory: str, package_type: str = "script") -> str:
 class TestClientMethodVisitor:
     def test_variable_tracking(self):
         """Test that the visitor can track variable assignments."""
-        content = textwrap.dedent(
-            """
+        content = textwrap.dedent("""
             from datacustomcode.client import Client
 
             client = Client()
@@ -56,8 +55,7 @@ class TestClientMethodVisitor:
             dmo_name = "my_dmo"
             client.read_dlo(dlo_name)
             # Don't mix with DMO reads in the same test
-        """
-        )
+        """)
         temp_path = create_test_script(content)
         try:
             result = scan_file(temp_path)
@@ -68,15 +66,13 @@ class TestClientMethodVisitor:
 
     def test_string_literals(self):
         """Test that the visitor can track string literals in method calls."""
-        content = textwrap.dedent(
-            """
+        content = textwrap.dedent("""
             from datacustomcode.client import Client
 
             client = Client()
             client.read_dlo("direct_dlo_1")
             client.read_dlo("direct_dlo_2")
-        """
-        )
+        """)
         temp_path = create_test_script(content)
         try:
             result = scan_file(temp_path)
@@ -87,15 +83,13 @@ class TestClientMethodVisitor:
 
     def test_cannot_mix_dlo_dmo_reads(self):
         """Test that mixing DLO and DMO reads in the same file raises an error."""
-        content = textwrap.dedent(
-            """
+        content = textwrap.dedent("""
             from datacustomcode.client import Client
 
             client = Client()
             client.read_dlo("direct_dlo")
             client.read_dmo("direct_dmo")
-        """
-        )
+        """)
         temp_path = create_test_script(content)
         try:
             # This should raise a validation error due to mixing DLO and DMO reads
@@ -108,8 +102,7 @@ class TestClientMethodVisitor:
 
     def test_read_both_dlo_dmo_throws_error(self):
         """Test that reading from both DLO and DMO throws an error."""
-        content = textwrap.dedent(
-            """
+        content = textwrap.dedent("""
             from datacustomcode.client import Client
 
             client = Client()
@@ -120,8 +113,7 @@ class TestClientMethodVisitor:
             # This operation should never happen as validation should fail
             result = df1.join(df2, "key")
             client.write_to_dlo("output", result, "overwrite")
-        """
-        )
+        """)
         temp_path = create_test_script(content)
         try:
             with pytest.raises(
@@ -135,8 +127,7 @@ class TestClientMethodVisitor:
 class TestScanFile:
     def test_valid_dlo_to_dlo(self):
         """Test scanning a file with valid DLO to DLO operations."""
-        content = textwrap.dedent(
-            """
+        content = textwrap.dedent("""
             from datacustomcode.client import Client
 
             client = Client()
@@ -149,8 +140,7 @@ class TestScanFile:
 
             # Write to DLO
             client.write_to_dlo("output_dlo", df, "overwrite")
-        """
-        )
+        """)
         temp_path = create_test_script(content)
         try:
             result = scan_file(temp_path)
@@ -163,8 +153,7 @@ class TestScanFile:
 
     def test_valid_dmo_to_dmo(self):
         """Test scanning a file with valid DMO to DMO operations."""
-        content = textwrap.dedent(
-            """
+        content = textwrap.dedent("""
             from datacustomcode.client import Client
 
             client = Client()
@@ -177,8 +166,7 @@ class TestScanFile:
 
             # Write to DMO
             client.write_to_dmo("output_dmo", df, "overwrite")
-        """
-        )
+        """)
         temp_path = create_test_script(content)
         try:
             result = scan_file(temp_path)
@@ -191,8 +179,7 @@ class TestScanFile:
 
     def test_multiple_reads(self):
         """Test scanning a file with multiple read operations."""
-        content = textwrap.dedent(
-            """
+        content = textwrap.dedent("""
             from datacustomcode.client import Client
 
             client = Client()
@@ -206,8 +193,7 @@ class TestScanFile:
 
             # Write to DLO
             client.write_to_dlo("output_dlo", result_df, "overwrite")
-        """
-        )
+        """)
         temp_path = create_test_script(content)
         try:
             result = scan_file(temp_path)
@@ -221,8 +207,7 @@ class TestScanFile:
 
     def test_invalid_mix_dlo_dmo(self):
         """Test scanning a file with invalid mix of DLO and DMO operations."""
-        content = textwrap.dedent(
-            """
+        content = textwrap.dedent("""
             from datacustomcode.client import Client
 
             client = Client()
@@ -232,8 +217,7 @@ class TestScanFile:
 
             # Write to DMO - invalid operation
             client.write_to_dmo("output_dmo", df, "overwrite")
-        """
-        )
+        """)
         temp_path = create_test_script(content)
         try:
             with pytest.raises(
@@ -245,8 +229,7 @@ class TestScanFile:
 
     def test_read_dmo_write_dlo_throws_error(self):
         """Test that reading from DMO and writing to DLO throws an error."""
-        content = textwrap.dedent(
-            """
+        content = textwrap.dedent("""
             from datacustomcode.client import Client
 
             client = Client()
@@ -256,8 +239,7 @@ class TestScanFile:
 
             # Write to DLO - invalid operation
             client.write_to_dlo("output_dlo", df, "overwrite")
-        """
-        )
+        """)
         temp_path = create_test_script(content)
         try:
             with pytest.raises(
@@ -269,8 +251,7 @@ class TestScanFile:
 
     def test_multiple_writes(self):
         """Test scanning a file with multiple write operations."""
-        content = textwrap.dedent(
-            """
+        content = textwrap.dedent("""
             from datacustomcode.client import Client
 
             client = Client()
@@ -285,8 +266,7 @@ class TestScanFile:
             # Write to multiple DLOs
             client.write_to_dlo("output_filtered", df_filtered, "overwrite")
             client.write_to_dlo("output_aggregated", df_aggregated, "overwrite")
-        """
-        )
+        """)
         temp_path = create_test_script(content)
         try:
             result = scan_file(temp_path)
@@ -304,8 +284,7 @@ class TestScanFile:
 class TestDcConfigJson:
     def test_dlo_to_dlo_config(self):
         """Test generating config JSON for DLO to DLO operations."""
-        content = textwrap.dedent(
-            """
+        content = textwrap.dedent("""
             from datacustomcode.client import Client
 
             client = Client()
@@ -315,8 +294,7 @@ class TestDcConfigJson:
 
             # Write to DLO
             client.write_to_dlo("output_dlo", df, "overwrite")
-        """
-        )
+        """)
         temp_path = create_test_script(content)
         file_dir = os.path.dirname(temp_path)
         # Create SDK config in the same directory as the script
@@ -341,8 +319,7 @@ class TestDcConfigJson:
 
     def test_dmo_to_dmo_config(self):
         """Test generating config JSON for DMO to DMO operations."""
-        content = textwrap.dedent(
-            """
+        content = textwrap.dedent("""
             from datacustomcode.client import Client
 
             client = Client()
@@ -352,8 +329,7 @@ class TestDcConfigJson:
 
             # Write to DMO
             client.write_to_dmo("output_dmo", df, "overwrite")
-        """
-        )
+        """)
         temp_path = create_test_script(content)
         file_dir = os.path.dirname(temp_path)
         # Create SDK config in the same directory as the script
@@ -376,15 +352,13 @@ class TestDcConfigJson:
         """Test that existing dataspace value is preserved when config.json exists."""
         import json
 
-        content = textwrap.dedent(
-            """
+        content = textwrap.dedent("""
             from datacustomcode.client import Client
 
             client = Client()
             df = client.read_dlo("input_dlo")
             client.write_to_dlo("output_dlo", df, "overwrite")
-        """
-        )
+        """)
         temp_path = create_test_script(content)
         file_dir = os.path.dirname(temp_path)
         config_path = os.path.join(file_dir, "config.json")
@@ -424,15 +398,13 @@ class TestDcConfigJson:
         """Test that empty dataspace value uses default and logs warning."""
         import json
 
-        content = textwrap.dedent(
-            """
+        content = textwrap.dedent("""
             from datacustomcode.client import Client
 
             client = Client()
             df = client.read_dlo("input_dlo")
             client.write_to_dlo("output_dlo", df, "overwrite")
-        """
-        )
+        """)
         temp_path = create_test_script(content)
         file_dir = os.path.dirname(temp_path)
         config_path = os.path.join(file_dir, "config.json")
@@ -470,15 +442,13 @@ class TestDcConfigJson:
 
     def test_uses_default_dataspace_when_no_config(self):
         """Test missing config.json uses default dataspace."""
-        content = textwrap.dedent(
-            """
+        content = textwrap.dedent("""
             from datacustomcode.client import Client
 
             client = Client()
             df = client.read_dlo("input_dlo")
             client.write_to_dlo("output_dlo", df, "overwrite")
-        """
-        )
+        """)
         temp_path = create_test_script(content)
 
         try:
@@ -492,15 +462,13 @@ class TestDcConfigJson:
         """Test that config.json missing dataspace field raises ValueError."""
         import json
 
-        content = textwrap.dedent(
-            """
+        content = textwrap.dedent("""
             from datacustomcode.client import Client
 
             client = Client()
             df = client.read_dlo("input_dlo")
             client.write_to_dlo("output_dlo", df, "overwrite")
-        """
-        )
+        """)
         temp_path = create_test_script(content)
         file_dir = os.path.dirname(temp_path)
         config_path = os.path.join(file_dir, "config.json")
@@ -539,15 +507,13 @@ class TestDcConfigJson:
     def test_raises_error_on_invalid_json(self):
         """Test that invalid JSON in config.json raises an error."""
 
-        content = textwrap.dedent(
-            """
+        content = textwrap.dedent("""
             from datacustomcode.client import Client
 
             client = Client()
             df = client.read_dlo("input_dlo")
             client.write_to_dlo("output_dlo", df, "overwrite")
-        """
-        )
+        """)
         temp_path = create_test_script(content)
         file_dir = os.path.dirname(temp_path)
         config_path = os.path.join(file_dir, "config.json")
@@ -570,15 +536,13 @@ class TestDcConfigJson:
         Test that update_config() updates the entryPoint field
         when scanning a renamed file.
         """
-        content = textwrap.dedent(
-            """
+        content = textwrap.dedent("""
             from datacustomcode.client import Client
 
             client = Client()
             df = client.read_dlo("input_dlo")
             client.write_to_dlo("output_dlo", df, "overwrite")
-        """
-        )
+        """)
 
         temp_path = create_test_script(content)
         file_dir = os.path.dirname(temp_path)
@@ -616,15 +580,13 @@ class TestDcConfigJson:
 
     def test_update_entrypoint_with_absolute_path(self):
         """Test that entryPoint uses basename even when file_path is absolute."""
-        content = textwrap.dedent(
-            """
+        content = textwrap.dedent("""
             from datacustomcode.client import Client
 
             client = Client()
             df = client.read_dlo("input_dlo")
             client.write_to_dlo("output_dlo", df, "overwrite")
-        """
-        )
+        """)
 
         temp_path = create_test_script(content)
         assert os.path.isabs(temp_path), "Test requires absolute path"
@@ -659,14 +621,12 @@ class TestDcConfigJson:
 
     def test_update_entrypoint_preserves_function_type(self):
         """Test that entryPoint update works for 'function' package type."""
-        content = textwrap.dedent(
-            """
+        content = textwrap.dedent("""
             from datacustomcode.client import Client
 
             def my_function(event, context):
                 return {"statusCode": 200}
-        """
-        )
+        """)
 
         temp_path = create_test_script(content)
         file_dir = os.path.dirname(temp_path)
@@ -722,8 +682,7 @@ class TestDataAccessLayerCalls:
 
 def test_real_world_example():
     """Test scanning a more complex, real-world example script."""
-    content = textwrap.dedent(
-        """
+    content = textwrap.dedent("""
         from datacustomcode.client import Client
         from pyspark.sql.functions import col, expr
 
@@ -756,8 +715,7 @@ def test_real_world_example():
 
         if __name__ == "__main__":
             process_customer_data()
-    """
-    )
+    """)
     temp_path = create_test_script(content)
     try:
         result = scan_file(temp_path)
@@ -777,16 +735,14 @@ def test_real_world_example():
 class TestRequirementsFile:
     def test_scan_file_for_imports(self):
         """Test scanning a file for external package imports."""
-        content = textwrap.dedent(
-            """
+        content = textwrap.dedent("""
             import pandas as pd
             import numpy as np
             from sklearn.linear_model import LinearRegression
             import os  # Standard library
             import sys  # Standard library
             from datacustomcode.client import Client  # Internal package
-            """
-        )
+            """)
         temp_path = create_test_script(content)
         try:
             imports = scan_file_for_imports(temp_path)
@@ -806,12 +762,10 @@ class TestRequirementsFile:
         script_dir = os.path.join(temp_dir, "script_dir")
         os.makedirs(script_dir)
 
-        content = textwrap.dedent(
-            """
+        content = textwrap.dedent("""
             import pandas as pd
             import numpy as np
-            """
-        )
+            """)
         temp_path = os.path.join(script_dir, "test_script.py")
         with open(temp_path, "w") as f:
             f.write(content)
@@ -850,14 +804,12 @@ class TestRequirementsFile:
             f.write("pandas\nnumpy\n")
 
         # Create a new Python file with additional imports
-        content = textwrap.dedent(
-            """
+        content = textwrap.dedent("""
             import pandas as pd
             import numpy as np
             import scipy
             import matplotlib
-            """
-        )
+            """)
         temp_path = os.path.join(script_dir, "test_script.py")
         with open(temp_path, "w") as f:
             f.write(content)
@@ -890,15 +842,13 @@ class TestRequirementsFile:
 
     def test_standard_library_exclusion(self):
         """Test that standard library imports are excluded."""
-        content = textwrap.dedent(
-            """
+        content = textwrap.dedent("""
             import os
             import sys
             import json
             import datetime
             import pandas as pd
-            """
-        )
+            """)
         temp_path = create_test_script(content)
         try:
             imports = scan_file_for_imports(temp_path)
@@ -912,13 +862,11 @@ class TestRequirementsFile:
 
     def test_excluded_packages(self):
         """Test that excluded packages are not included in requirements."""
-        content = textwrap.dedent(
-            """
+        content = textwrap.dedent("""
             import datacustomcode
             import pyspark
             import pandas as pd
-            """
-        )
+            """)
         temp_path = create_test_script(content)
         try:
             imports = scan_file_for_imports(temp_path)

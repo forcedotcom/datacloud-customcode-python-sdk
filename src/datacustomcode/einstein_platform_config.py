@@ -38,4 +38,4 @@ class CredentialsObjectConfig(BaseObjectConfig):
             options["sf_cli_org"] = self.sf_cli_org
 
         type_ = self.type_to_create.subclass_from_config_name(self.type_config_name)
-        return cast(type_, type_(**options))
+        return cast("type_", type_(**options))

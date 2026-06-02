@@ -29,8 +29,7 @@ from datacustomcode import function_utils
 def sample_entrypoint():
     """Create a temporary entrypoint file with a function."""
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as temp_file:
-        entrypoint_content = textwrap.dedent(
-            """
+        entrypoint_content = textwrap.dedent("""
             from typing import List
             from pydantic import BaseModel
 
@@ -46,8 +45,7 @@ def sample_entrypoint():
 
             def function(request: SampleRequest) -> SampleResponse:
                 return SampleResponse(result=f"Processed {request.message}")
-            """
-        )
+            """)
         temp_file.write(entrypoint_content)
         temp_file_path = temp_file.name
 
@@ -61,12 +59,10 @@ def sample_entrypoint():
 def entrypoint_no_annotations():
     """Create an entrypoint with no type annotations."""
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as temp_file:
-        entrypoint_content = textwrap.dedent(
-            """
+        entrypoint_content = textwrap.dedent("""
             def function(request):
                 return {"result": "no annotations"}
-            """
-        )
+            """)
         temp_file.write(entrypoint_content)
         temp_file_path = temp_file.name
 
@@ -146,8 +142,7 @@ def test_generate_test_json():
         output_simple = os.path.join(temp_dir, "test_simple.json")
 
         with open(models_file, "w") as f:
-            models_content = textwrap.dedent(
-                """
+            models_content = textwrap.dedent("""
                 from pydantic import BaseModel
                 from typing import List
 
@@ -167,19 +162,16 @@ def test_generate_test_json():
                     max_items: int = 100
                     config: NestedConfig
                     metadata: dict = {}
-                """
-            )
+                """)
             f.write(models_content)
 
         with open(entrypoint_simple, "w") as f:
-            entrypoint_content = textwrap.dedent(
-                """
+            entrypoint_content = textwrap.dedent("""
                 from test_models import SimpleRequest
 
                 def function(request: SimpleRequest):
                     return {"result": "ok"}
-                """
-            )
+                """)
             f.write(entrypoint_content)
 
         sys.path.insert(0, temp_dir)
@@ -203,14 +195,12 @@ def test_generate_test_json():
         output_complex = os.path.join(temp_dir, "test_complex.json")
 
         with open(entrypoint_complex, "w") as f:
-            entrypoint_content = textwrap.dedent(
-                """
+            entrypoint_content = textwrap.dedent("""
                 from test_models import ComplexRequest
 
                 def function(request: ComplexRequest):
                     return {"result": "ok"}
-                """
-            )
+                """)
             f.write(entrypoint_content)
 
         function_utils.generate_test_json(entrypoint_complex, output_complex)

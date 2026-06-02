@@ -9,6 +9,16 @@ This function demonstrates the new signature-based invocation with Pydantic mode
 - Automatic validation and conversion
 """
 
+"""
+    You can use your AI models configured in Salesforce to generate texts.
+
+    For testing locally before deploying your code to Data Cloud (datacustomcode run),
+    first configure an external client app before using LLM functionality, then configure
+    the SDK with your client app credentials.
+    
+    https://developer.salesforce.com/docs/ai/agentforce/guide/agent-api-get-started.html#create-a-salesforce-app
+"""
+
 import logging
 
 from datacustomcode.function.feature_types.chunking import (

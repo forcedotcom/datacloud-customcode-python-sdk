@@ -34,6 +34,8 @@ class DefaultLLMGateway(EinsteinPlatformClient, LLMGateway):
 
         payload: Dict[str, Any] = {"prompt": request.prompt}
 
+        if request.max_tokens is not None:
+            payload["max_tokens"] = request.max_tokens
         if request.localization:
             payload["localization"] = request.localization
         if request.tags:

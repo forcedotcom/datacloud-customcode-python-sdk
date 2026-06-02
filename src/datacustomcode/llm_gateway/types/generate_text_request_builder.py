@@ -26,6 +26,7 @@ class GenerateTextRequestBuilder:
     def __init__(self) -> None:
         self._prompt = ""
         self._model_name = ""
+        self._max_tokens: Optional[int] = None
         self._localization: Optional[Dict[str, Any]] = None
         self._tags: Optional[Dict[str, Any]] = None
 
@@ -35,6 +36,10 @@ class GenerateTextRequestBuilder:
 
     def set_model(self, model_name: str) -> "GenerateTextRequestBuilder":
         self._model_name = model_name
+        return self
+
+    def set_max_tokens(self, max_tokens: int) -> "GenerateTextRequestBuilder":
+        self._max_tokens = max_tokens
         return self
 
     def set_localization(
@@ -75,6 +80,7 @@ class GenerateTextRequestBuilder:
         request = GenerateTextRequest(
             prompt=self._prompt,
             model_name=self._model_name,
+            max_tokens=self._max_tokens,
             localization=self._localization,
             tags=self._tags,
         )

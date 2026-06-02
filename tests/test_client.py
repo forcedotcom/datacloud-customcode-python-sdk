@@ -9,6 +9,7 @@ from datacustomcode.client import (
     Client,
     DataCloudAccessLayerException,
     DataCloudObjectType,
+    llm_gateway_generate_text_col,
 )
 from datacustomcode.config import (
     AccessLayerObjectConfig,
@@ -251,6 +252,92 @@ class TestClient:
         )
 
         assert "source_dmo" in client._data_layer_history[DataCloudObjectType.DMO]
+
+
+class TestClientLlmGatewayGenerateText:
+
+    @patch("datacustomcode.client._build_spark_llm_gateway")
+    def test_forwards_args_to_spark_llm_gateway(self, mock_build_gateway, reset_client):
+        mock_spark_gateway = MagicMock()
+        mock_spark_gateway.llm_gateway_generate_text.return_value = "reply"
+        mock_build_gateway.return_value = mock_spark_gateway
+
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        client = Client(reader=reader, writer=writer)
+
+        result = client.llm_gateway_generate_text(
+            "ping", model_id="test-model", max_tokens=42
+        )
+
+        assert result == "reply"
+        mock_spark_gateway.llm_gateway_generate_text.assert_called_once_with(
+            "ping", model_id="test-model", max_tokens=42
+        )
+
+    @patch("datacustomcode.client._build_spark_llm_gateway")
+    def test_gateway_is_built_lazily_and_cached(self, mock_build_gateway, reset_client):
+        mock_spark_gateway = MagicMock()
+        mock_spark_gateway.llm_gateway_generate_text.return_value = "ok"
+        mock_build_gateway.return_value = mock_spark_gateway
+
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        client = Client(reader=reader, writer=writer)
+
+        mock_build_gateway.assert_not_called()
+
+        client.llm_gateway_generate_text("a")
+        client.llm_gateway_generate_text("b")
+
+        mock_build_gateway.assert_called_once_with()
+        assert mock_spark_gateway.llm_gateway_generate_text.call_count == 2
+
+    @patch("datacustomcode.client._build_spark_llm_gateway")
+    def test_uses_injected_spark_llm_gateway_without_config_lookup(
+        self, mock_build_gateway, reset_client
+    ):
+        injected = MagicMock()
+        injected.llm_gateway_generate_text.return_value = "from-injected"
+
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        client = Client(reader=reader, writer=writer, spark_llm_gateway=injected)
+
+        result = client.llm_gateway_generate_text("hello")
+
+        assert result == "from-injected"
+        injected.llm_gateway_generate_text.assert_called_once_with(
+            "hello", model_id=None, max_tokens=None
+        )
+        mock_build_gateway.assert_not_called()
+
+
+class TestLLMGatewayGenerateTextCol:
+    """The module-level ``llm_gateway_generate_text_col`` is a thin wrapper
+    that resolves the client-owned :class:`SparkLLMGateway` and delegates.
+    """
+
+    @patch("datacustomcode.client._build_spark_llm_gateway")
+    def test_delegates_to_spark_llm_gateway(self, mock_build_gateway):
+        mock_spark_gateway = MagicMock()
+        sentinel_col = MagicMock(name="col")
+        mock_spark_gateway.llm_gateway_generate_text_col.return_value = sentinel_col
+        mock_build_gateway.return_value = mock_spark_gateway
+
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        Client(reader=reader, writer=writer)
+
+        values = {"name": MagicMock()}
+        result = llm_gateway_generate_text_col(
+            "Greet {name}", values, model_id="m", max_tokens=7
+        )
+
+        assert result is sentinel_col
+        mock_spark_gateway.llm_gateway_generate_text_col.assert_called_once_with(
+            "Greet {name}", values, model_id="m", max_tokens=7
+        )
 
 
 # Add tests for DefaultSparkSessionProvider

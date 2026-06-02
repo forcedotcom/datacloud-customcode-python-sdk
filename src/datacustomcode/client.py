@@ -18,22 +18,78 @@ from enum import Enum
 from typing import (
     TYPE_CHECKING,
     ClassVar,
+    Dict,
     Optional,
+    Union,
 )
 
 from datacustomcode.config import config
 from datacustomcode.file.path.default import DefaultFindFilePath
 from datacustomcode.io.reader.base import BaseDataCloudReader
+from datacustomcode.llm_gateway_config import spark_llm_gateway_config
 from datacustomcode.spark.default import DefaultSparkSessionProvider
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from pyspark.sql import DataFrame as PySparkDataFrame
+    from pyspark.sql import Column, DataFrame as PySparkDataFrame
 
     from datacustomcode.io.reader.base import BaseDataCloudReader
     from datacustomcode.io.writer.base import BaseDataCloudWriter, WriteMode
+    from datacustomcode.llm_gateway.spark_base import SparkLLMGateway
     from datacustomcode.spark.base import BaseSparkSessionProvider
+
+
+def _build_spark_llm_gateway() -> "SparkLLMGateway":
+    """Instantiate the SDK-configured :class:`SparkLLMGateway`.
+
+    Raises:
+        RuntimeError: If no ``spark_llm_gateway_config`` has been loaded.
+    """
+    cfg = spark_llm_gateway_config.spark_llm_gateway_config
+    if cfg is None:
+        raise RuntimeError(
+            "spark_llm_gateway_config is not configured. Add a "
+            "'spark_llm_gateway_config' section to config.yaml."
+        )
+    return cfg.to_object()
+
+
+def llm_gateway_generate_text_col(
+    template: str,
+    values: Union[Dict[str, "Column"], "Column"],
+    model_id: Optional[str] = None,
+    max_tokens: Optional[int] = None,
+) -> "Column":
+    """Build a Spark Column that runs the LLM Gateway per row.
+
+    Example:
+
+        >>> df.withColumn(
+        ...     "response",
+        ...     llm_gateway_generate_text_col(
+        ...         "In one sentence, greet {name} from {city}.",
+        ...         {"name": col("name"), "city": col("city")},
+        ...         model_id="sfdc_ai__DefaultGPT4Omni",
+        ...         max_tokens=100,
+        ...     ),
+        ... )
+
+    Args:
+        template: The prompt template, with ``{field}`` placeholders matching
+            keys in ``values``. Substitution uses ``str.format``.
+        values: Either a mapping from placeholder name to Spark ``Column``, or
+            a single ``Column`` whose value is already a struct.
+        model_id: LLM model id. Defaults to ``sfdc_ai__DefaultGPT4Omni``.
+        max_tokens: Maximum tokens to generate. Defaults to 200.
+
+    Returns:
+        A Spark ``Column`` that, when evaluated, produces the generated text.
+    """
+    gateway = Client()._get_spark_llm_gateway()
+    return gateway.llm_gateway_generate_text_col(
+        template, values, model_id=model_id, max_tokens=max_tokens
+    )
 
 
 class DataCloudObjectType(Enum):
@@ -94,18 +150,23 @@ class Client:
         finder: Find a file path
         reader: A custom reader to use for reading Data Cloud objects.
         writer: A custom writer to use for writing Data Cloud objects.
+        spark_llm_gateway: Optional custom :class:`SparkLLMGateway`. When
+            omitted, the gateway is lazily resolved from
+            ``spark_llm_gateway_config``.
 
     Example:
     >>> client = Client()
     >>> file_path = client.find_file_path("data.csv")
     >>> dlo = client.read_dlo("my_dlo")
     >>> client.write_to_dmo("my_dmo", dlo)
+    >>> answer = client.llm_gateway_generate_text("Generate a greeting message")
     """
 
     _instance: ClassVar[Optional[Client]] = None
     _reader: BaseDataCloudReader
     _writer: BaseDataCloudWriter
     _file: DefaultFindFilePath
+    _spark_llm_gateway: Optional[SparkLLMGateway]
     _data_layer_history: dict[DataCloudObjectType, set[str]]
     _code_type: str
 
@@ -114,11 +175,13 @@ class Client:
         reader: Optional[BaseDataCloudReader] = None,
         writer: Optional[BaseDataCloudWriter] = None,
         spark_provider: Optional[BaseSparkSessionProvider] = None,
+        spark_llm_gateway: Optional[SparkLLMGateway] = None,
         code_type: str = "script",
     ) -> Client:
 
         if cls._instance is None:
             cls._instance = super().__new__(cls)
+            cls._instance._spark_llm_gateway = spark_llm_gateway
             # Initialize Readers and Writers from config
             # and/or provided reader and writer
             if reader is None or writer is None:
@@ -224,6 +287,44 @@ class Client:
         """Return a file path"""
 
         return self._file.find_file_path(file_name)  # type: ignore[no-any-return]
+
+    def llm_gateway_generate_text(
+        self,
+        prompt: str,
+        model_id: Optional[str] = None,
+        max_tokens: Optional[int] = None,
+    ) -> str:
+        """Issue a one-shot LLM Gateway call. This is the scalar counterpart to
+        :func:`llm_gateway_generate_text_col`: it runs **once**  — not per row.
+        Use the column helper method instead when you want to fan a prompt out across
+        every row of a DataFrame.
+
+        Example:
+
+            >>> response = Client().llm_gateway_generate_text(
+            ...     "Generate a greeting message"
+            ... )
+
+        Args:
+            prompt: The literal prompt to send. Plain text — no
+                ``{field}`` substitution is performed on this string.
+            model_id: LLM model id to target. Defaults to
+                ``sfdc_ai__DefaultGPT4Omni`` when ``None``.
+            max_tokens: Hard upper bound on the number of tokens the model
+                may generate. Defaults to 200 when ``None``.
+
+        Returns:
+            The generated text as a plain Python ``str``; empty when the
+            gateway response carries no generated text.
+        """
+        return self._get_spark_llm_gateway().llm_gateway_generate_text(
+            prompt, model_id=model_id, max_tokens=max_tokens
+        )
+
+    def _get_spark_llm_gateway(self) -> SparkLLMGateway:
+        if self._spark_llm_gateway is None:
+            self._spark_llm_gateway = _build_spark_llm_gateway()
+        return self._spark_llm_gateway
 
     def _validate_data_layer_history_does_not_contain(
         self, data_cloud_object_type: DataCloudObjectType
