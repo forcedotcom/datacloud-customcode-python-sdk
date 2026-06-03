@@ -103,8 +103,13 @@ class TestGetToken:
         )
         mock_run.assert_any_call(
             [
-                "sf", "org", "auth", "show-access-token",
-                "--target-org", "dev1", "--json",
+                "sf",
+                "org",
+                "auth",
+                "show-access-token",
+                "--target-org",
+                "dev1",
+                "--json",
             ],
             capture_output=True,
             text=True,
