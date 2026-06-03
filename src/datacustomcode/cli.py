@@ -198,6 +198,11 @@ def zip(path: str, network: str):
     default=None,
     help="SF CLI org alias or username. Fetches credentials via `sf org display`.",
 )
+@click.option(
+    "--use-in-feature",
+    default="SearchIndexChunking",
+    help="Feature where this function will be used.",
+)
 def deploy(
     path: str,
     name: str,
@@ -207,6 +212,7 @@ def deploy(
     profile: str,
     network: str,
     sf_cli_org: Optional[str],
+    use_in_feature: Optional[str],
 ):
     from datacustomcode.constants import USE_IN_FEATURE_MAPPING_FOR_CONNECT_API
     from datacustomcode.deploy import (
@@ -242,20 +248,17 @@ def deploy(
     )
 
     if package_type == "function":
-        # Infer use_in_feature from function signature
+        # Try to infer use_in_feature from function signature; fall back to
+        # the explicit flag value (defaults to SearchIndexChunking)
         entrypoint_path = os.path.join(path, ENTRYPOINT_FILE)
-        use_in_feature = infer_use_in_feature(entrypoint_path)
-        if use_in_feature:
+        inferred = infer_use_in_feature(entrypoint_path)
+        if inferred:
+            use_in_feature = inferred
             logger.info(f"Inferred use_in_feature: {use_in_feature}")
         else:
-            click.secho(
-                "Error: Could not infer function invoke options. "
-                "Please provide --use-in-feature",
-                fg="red",
-            )
-            raise click.Abort()
+            logger.info(f"Using use_in_feature: {use_in_feature}")
 
-        # Map user-provided feature names to API names
+        # Map feature names to Connect API names
         mapped_feature = USE_IN_FEATURE_MAPPING_FOR_CONNECT_API.get(
             use_in_feature, use_in_feature
         )
