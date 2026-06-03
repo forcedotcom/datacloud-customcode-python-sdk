@@ -28,7 +28,7 @@ from datacustomcode.einstein_predictions.base import EinsteinPredictions
 _E = TypeVar("_E", bound=EinsteinPredictions)
 
 
-class EinsteinPredictionsObjectConfig(CredentialsObjectConfig, Generic[_E]):
+class EinsteinPredictionsObjectConfig(CredentialsObjectConfig[_E], Generic[_E]):
     type_to_create: ClassVar[Type[EinsteinPredictions]] = EinsteinPredictions  # type: ignore[type-abstract]
 
 

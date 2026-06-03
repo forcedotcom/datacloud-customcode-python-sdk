@@ -84,12 +84,14 @@ def function(request: dict, runtime: Runtime) -> dict:
     current_seq_no = 1  # Start sequence number from 1
 
     """
-    You can use your AI models configured in Salesforce to generate texts or predict an outcome.
+    You can use your AI models configured in Salesforce to generate texts
+    or predict an outcome.
 
-    For testing locally before deploying your code to Data Cloud (datacustomcode run),
-    first configure an external client app before using LLM functionality, then configure
-    the SDK with your client app credentials.
-    
+    For testing locally before deploying your code to Data Cloud
+    (``datacustomcode run``), first configure an external client app before
+    using LLM functionality, then configure the SDK with your client app
+    credentials.
+
     https://developer.salesforce.com/docs/ai/agentforce/guide/agent-api-get-started.html#create-a-salesforce-app
 
     Example:

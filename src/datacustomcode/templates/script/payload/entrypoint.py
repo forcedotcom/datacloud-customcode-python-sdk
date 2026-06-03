@@ -13,21 +13,22 @@ def main():
     df_upper1 = df.withColumn("description__c", upper(col("description__c")))
 
     """
-    You can use your AI models configured in Salesforce to generate column values.
-    For testing locally before deploying your code to Data Cloud (datacustomcode run),
-    first configure an external client app before using LLM functionality, then configure
-    the SDK with your client app credentials.
-    
+    You can use your AI models configured in Salesforce to generate column
+    values. For testing locally before deploying your code to Data Cloud
+    (``datacustomcode run``), first configure an external client app before
+    using LLM functionality, then configure the SDK with your client app
+    credentials.
+
     https://developer.salesforce.com/docs/ai/agentforce/guide/agent-api-get-started.html#create-a-salesforce-app
 
     Example:
 
         >>> from datacustomcode.client import llm_gateway_generate_text_col
             df_generated = df.withColumn(
-            ...     "Greeting__c",
+            ...     "greeting__c",
             ...     llm_gateway_generate_text_col(
             ...         "In one sentence, greet {name} from {city}.",
-            ...         {"name": col("Name__c"), "city": col("HomeCity__c")},
+            ...         {"name": col("name__c"), "city": col("homecity__c")},
             ...         model_id="sfdc_ai__DefaultGPT4Omni",
             ...         max_tokens=100,
             ...     ),
@@ -38,7 +39,9 @@ def main():
 
     Example:
 
-        >>> generated_text = client.llm_gateway_generate_text(prompt, model_id, max_tokens)
+        >>> generated_text = client.llm_gateway_generate_text(
+        ...     prompt, model_id, max_tokens
+        ... )
     """
 
     # Drop specific columns related to relationships

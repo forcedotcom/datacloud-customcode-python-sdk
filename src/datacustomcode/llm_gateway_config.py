@@ -19,7 +19,6 @@ from typing import (
     Type,
     TypeVar,
     Union,
-    cast,
 )
 
 from datacustomcode.common_config import (
@@ -35,7 +34,7 @@ _E = TypeVar("_E", bound=LLMGateway)
 _S = TypeVar("_S", bound=SparkLLMGateway)
 
 
-class LLMGatewayObjectConfig(CredentialsObjectConfig, Generic[_E]):
+class LLMGatewayObjectConfig(CredentialsObjectConfig[_E], Generic[_E]):
     type_to_create: ClassVar[Type[LLMGateway]] = LLMGateway  # type: ignore[type-abstract]
 
 
@@ -64,7 +63,7 @@ class SparkLLMGatewayObjectConfig(BaseObjectConfig, Generic[_S]):
 
     def to_object(self) -> SparkLLMGateway:
         type_ = self.type_to_create.subclass_from_config_name(self.type_config_name)
-        return cast("SparkLLMGateway", type_(**self.options))
+        return type_(**self.options)
 
 
 class SparkLLMGatewayConfig(BaseConfig):

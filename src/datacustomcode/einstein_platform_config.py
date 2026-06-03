@@ -15,20 +15,23 @@
 
 from typing import (
     ClassVar,
+    Generic,
     Optional,
     Type,
-    cast,
+    TypeVar,
 )
 
 from datacustomcode.common_config import BaseObjectConfig
 
+_T = TypeVar("_T")
 
-class CredentialsObjectConfig(BaseObjectConfig):
+
+class CredentialsObjectConfig(BaseObjectConfig, Generic[_T]):
     type_to_create: ClassVar[Type]
     credentials_profile: Optional[str] = None
     sf_cli_org: Optional[str] = None
 
-    def to_object(self):
+    def to_object(self) -> _T:
         """Create an object instance, automatically including credentials in options"""
 
         options = self.options.copy()
@@ -38,4 +41,5 @@ class CredentialsObjectConfig(BaseObjectConfig):
             options["sf_cli_org"] = self.sf_cli_org
 
         type_ = self.type_to_create.subclass_from_config_name(self.type_config_name)
-        return cast("type_", type_(**options))
+        instance: _T = type_(**options)
+        return instance

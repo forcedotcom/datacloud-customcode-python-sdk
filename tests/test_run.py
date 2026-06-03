@@ -48,7 +48,8 @@ def test_config_file():
 def test_entrypoint_file():
     """Create a temporary test entrypoint script with config.json."""
     with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as temp:
-        entrypoint_content = textwrap.dedent("""
+        entrypoint_content = textwrap.dedent(
+            """
             # Test entrypoint
             import os
             import sys
@@ -71,7 +72,8 @@ def test_entrypoint_file():
                     if config.writer_config else None
                 )
                 f.write(f"Writer type: {writer_type}\\n")
-        """)
+        """
+        )
         temp.write(entrypoint_content.encode("utf-8"))
         temp_name = temp.name
 
@@ -163,14 +165,16 @@ def test_run_entrypoint_with_dependencies():
 
         # Create a temp entrypoint that uses the dependency
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as temp:
-            entrypoint_content = textwrap.dedent("""
+            entrypoint_content = textwrap.dedent(
+                """
                 # Test entrypoint with dependency
                 import test_dependency
 
                 # Store dependency value in a file to check later
                 with open("dependency_output.txt", "w") as f:
                     f.write(f"Dependency value: {test_dependency.TEST_CONSTANT}\\n")
-            """)
+            """
+            )
             temp.write(entrypoint_content.encode("utf-8"))
             entrypoint_file = temp.name
 
@@ -239,7 +243,8 @@ class TestDataspaceScenarios:
     def test_run_entrypoint_with_default_dataspace(self):
         """Test that run_entrypoint sets dataspace='default' correctly."""
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as temp:
-            entrypoint_content = textwrap.dedent("""
+            entrypoint_content = textwrap.dedent(
+                """
                 # Test entrypoint
                 from datacustomcode.config import config
                 with open("dataspace_output.txt", "w") as f:
@@ -255,7 +260,8 @@ class TestDataspaceScenarios:
                     )
                     f.write(f"Reader dataspace: {rds}\\n")
                     f.write(f"Writer dataspace: {wds}\\n")
-            """)
+            """
+            )
             temp.write(entrypoint_content.encode("utf-8"))
             entrypoint_file = temp.name
 
@@ -290,7 +296,8 @@ class TestDataspaceScenarios:
         """Test that run_entrypoint sets custom dataspace correctly."""
         custom_dataspace = "dataspace-1"
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as temp:
-            entrypoint_content = textwrap.dedent("""
+            entrypoint_content = textwrap.dedent(
+                """
                 # Test entrypoint
                 from datacustomcode.config import config
                 with open("dataspace_output.txt", "w") as f:
@@ -306,7 +313,8 @@ class TestDataspaceScenarios:
                     )
                     f.write(f"Reader dataspace: {rds}\\n")
                     f.write(f"Writer dataspace: {wds}\\n")
-            """)
+            """
+            )
             temp.write(entrypoint_content.encode("utf-8"))
             entrypoint_file = temp.name
 

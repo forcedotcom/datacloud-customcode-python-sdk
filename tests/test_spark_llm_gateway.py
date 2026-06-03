@@ -9,9 +9,7 @@ from datacustomcode.llm_gateway.spark_default import (
     _build_underlying_gateway,
     _invoke_llm_gateway,
 )
-from datacustomcode.llm_gateway.types.generate_text_response import (
-    GenerateTextResponse,
-)
+from datacustomcode.llm_gateway.types.generate_text_response import GenerateTextResponse
 
 
 def _success_response(text: str = "ok") -> GenerateTextResponse:
