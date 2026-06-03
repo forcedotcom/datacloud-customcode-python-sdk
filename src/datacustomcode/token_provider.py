@@ -138,7 +138,7 @@ class SFCLITokenProvider(TokenProvider):
                     f"SF CLI error for org '{self.sf_cli_org}': "
                     f"{data.get('message', 'unknown error')}"
                 )
-            return data
+            return dict(data)
 
         # Get instanceUrl from sf org display
         display_data = _run_sf_command(
@@ -156,8 +156,13 @@ class SFCLITokenProvider(TokenProvider):
         # redact the token in sf org display)
         token_data = _run_sf_command(
             [
-                "sf", "org", "auth", "show-access-token",
-                "--target-org", self.sf_cli_org, "--json",
+                "sf",
+                "org",
+                "auth",
+                "show-access-token",
+                "--target-org",
+                self.sf_cli_org,
+                "--json",
             ],
             "sf org auth show-access-token",
         )
