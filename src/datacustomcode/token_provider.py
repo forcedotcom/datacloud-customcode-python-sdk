@@ -101,48 +101,70 @@ class SFCLITokenProvider(TokenProvider):
 
         from datacustomcode.deploy import AccessTokenResponse
 
-        try:
-            result = subprocess.run(
-                ["sf", "org", "display", "--target-org", self.sf_cli_org, "--json"],
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=30,
+        def _run_sf_command(args: list[str], description: str) -> dict:
+            try:
+                result = subprocess.run(
+                    args,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                    timeout=30,
+                )
+            except FileNotFoundError as exc:
+                raise RuntimeError(
+                    "The 'sf' command was not found. "
+                    "Install Salesforce CLI: "
+                    "https://developer.salesforce.com/tools/salesforcecli"
+                ) from exc
+            except subprocess.TimeoutExpired as exc:
+                raise RuntimeError(
+                    f"'{description}' timed out for org '{self.sf_cli_org}'"
+                ) from exc
+            except subprocess.CalledProcessError as exc:
+                raise RuntimeError(
+                    f"'{description}' failed for org '{self.sf_cli_org}': "
+                    f"{exc.stderr}"
+                ) from exc
+
+            try:
+                data = json.loads(result.stdout)
+            except json.JSONDecodeError as exc:
+                raise RuntimeError(
+                    f"Failed to parse JSON from '{description}': {result.stdout}"
+                ) from exc
+
+            if data.get("status") != 0:
+                raise RuntimeError(
+                    f"SF CLI error for org '{self.sf_cli_org}': "
+                    f"{data.get('message', 'unknown error')}"
+                )
+            return data
+
+        # Get instanceUrl from sf org display
+        display_data = _run_sf_command(
+            ["sf", "org", "display", "--target-org", self.sf_cli_org, "--json"],
+            "sf org display",
+        )
+        instance_url = display_data.get("result", {}).get("instanceUrl")
+        if not instance_url:
+            raise RuntimeError(
+                f"'sf org display' did not return an instance URL "
+                f"for org '{self.sf_cli_org}'"
             )
-        except FileNotFoundError as exc:
-            raise RuntimeError(
-                "The 'sf' command was not found. "
-                "Install Salesforce CLI: https://developer.salesforce.com/tools/salesforcecli"
-            ) from exc
-        except subprocess.TimeoutExpired as exc:
-            raise RuntimeError(
-                f"'sf org display' timed out for org '{self.sf_cli_org}'"
-            ) from exc
-        except subprocess.CalledProcessError as exc:
-            raise RuntimeError(
-                f"'sf org display' failed for org '{self.sf_cli_org}': {exc.stderr}"
-            ) from exc
 
-        try:
-            data = json.loads(result.stdout)
-        except json.JSONDecodeError as exc:
+        # Get access token via show-access-token (newer SF CLI versions
+        # redact the token in sf org display)
+        token_data = _run_sf_command(
+            [
+                "sf", "org", "auth", "show-access-token",
+                "--target-org", self.sf_cli_org, "--json",
+            ],
+            "sf org auth show-access-token",
+        )
+        access_token = token_data.get("result", {}).get("accessToken")
+        if not access_token:
             raise RuntimeError(
-                f"Failed to parse JSON from 'sf org display': {result.stdout}"
-            ) from exc
-
-        if data.get("status") != 0:
-            raise RuntimeError(
-                f"SF CLI error for org '{self.sf_cli_org}': "
-                f"{data.get('message', 'unknown error')}"
-            )
-
-        result_data = data.get("result", {})
-        access_token = result_data.get("accessToken")
-        instance_url = result_data.get("instanceUrl")
-
-        if not access_token or not instance_url:
-            raise RuntimeError(
-                f"'sf org display' did not return an access token or instance URL "
+                f"'sf org auth show-access-token' did not return an access token "
                 f"for org '{self.sf_cli_org}'"
             )
 

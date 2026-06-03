@@ -160,24 +160,42 @@ class TestSFCLITokenProvider:
 
         provider = SFCLITokenProvider("test_org")
 
-        cli_output = json.dumps(
+        display_output = json.dumps(
+            {
+                "status": 0,
+                "result": {
+                    "accessToken": "[REDACTED]",
+                    "instanceUrl": "https://cli.salesforce.com",
+                },
+            }
+        )
+        token_output = json.dumps(
             {
                 "status": 0,
                 "result": {
                     "accessToken": "cli_access_token",
-                    "instanceUrl": "https://cli.salesforce.com",
                 },
             }
         )
 
         with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(stdout=cli_output)
+            mock_run.side_effect = [
+                MagicMock(stdout=display_output),
+                MagicMock(stdout=token_output),
+            ]
 
             result = provider.get_token()
 
             assert isinstance(result, AccessTokenResponse)
             assert result.access_token == "cli_access_token"
             assert result.instance_url == "https://cli.salesforce.com"
+
+            # Verify both commands were called
+            assert mock_run.call_count == 2
+            display_call = mock_run.call_args_list[0]
+            token_call = mock_run.call_args_list[1]
+            assert "org" in display_call[0][0] and "display" in display_call[0][0]
+            assert "show-access-token" in token_call[0][0]
 
     def test_sf_command_not_found(self):
         """Test that FileNotFoundError is wrapped in RuntimeError."""
