@@ -258,6 +258,7 @@ def deploy(
         else:
             logger.info(f"Using use_in_feature: {use_in_feature}")
 
+        assert use_in_feature is not None
         # Map feature names to Connect API names
         mapped_feature = USE_IN_FEATURE_MAPPING_FOR_CONNECT_API.get(
             use_in_feature, use_in_feature
