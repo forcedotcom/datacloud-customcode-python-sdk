@@ -1,5 +1,26 @@
 # Changelog
 
+## 6.0.0
+
+### Breaking Changes
+
+- **`WriteMode.OVERWRITE_PARTITIONS` is deprecated and now raises an error if used.**
+
+  `WriteMode.OVERWRITE_PARTITIONS` remains in the enum for backward compatibility but will raise a `ValueError` at runtime.
+
+  **Migration:** Use `WriteMode.OVERWRITE` to replace all records, or `WriteMode.MERGE` for targeted updates by primary key:
+
+  ```python
+  # Before
+  client.write_to_dlo("MyTable__dll", df, write_mode=WriteMode.OVERWRITE_PARTITIONS)
+
+  # After (full replacement)
+  client.write_to_dlo("MyTable__dll", df, write_mode=WriteMode.OVERWRITE)
+
+  # After (update specific rows by primary key)
+  client.write_to_dlo("MyTable__dll", df, write_mode=WriteMode.MERGE)
+  ```
+
 ## 3.0.0
 
 ### Breaking Changes

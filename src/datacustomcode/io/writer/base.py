@@ -27,9 +27,19 @@ if TYPE_CHECKING:
 class WriteMode(str, Enum):
     APPEND = "append"
     OVERWRITE = "overwrite"
-    OVERWRITE_PARTITIONS = "overwrite_partitions"
+    OVERWRITE_PARTITIONS = "overwrite_partitions"  # Deprecated: raises error if used
     MERGE = "merge"
     MERGE_UPSERT_DELETE = "merge_upsert_delete"
+
+
+class MergeRecordType(str, Enum):
+    """Values for the _merge_record_type column used by MERGE_UPSERT_DELETE."""
+
+    UPSERT = "UPSERT"
+    DELETE = "DELETE"
+
+
+MERGE_RECORD_TYPE_COLUMN = "_merge_record_type"
 
 
 class BaseDataCloudWriter(BaseDataAccessLayer):
