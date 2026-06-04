@@ -238,7 +238,7 @@ def test_run_entrypoint_with_dependencies():
 
 
 def test_add_py_folder_enables_local_imports():
-    """Test that add_py_folder adds entrypoint directory to sys.path for local imports."""
+    """Test that add_py_folder adds entrypoint directory to sys.path."""
     from datacustomcode.run import add_py_folder
 
     # Create a temporary directory structure
