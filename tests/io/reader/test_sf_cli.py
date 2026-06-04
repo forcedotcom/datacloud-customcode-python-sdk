@@ -79,18 +79,38 @@ class TestGetToken:
         return result
 
     def test_returns_token_and_instance_url(self, reader):
+        display_result = self._run_result(
+            _sf_display_output("redacted", "https://org.salesforce.com")
+        )
+        token_result = self._run_result(
+            json.dumps({"status": 0, "result": {"accessToken": "mytoken"}})
+        )
         with patch(
             "subprocess.run",
-            return_value=self._run_result(
-                _sf_display_output("mytoken", "https://org.salesforce.com")
-            ),
+            side_effect=[display_result, token_result],
         ) as mock_run:
             token, url = reader._get_token()
 
         assert token == "mytoken"
         assert url == "https://org.salesforce.com"
-        mock_run.assert_called_once_with(
+        assert mock_run.call_count == 2
+        mock_run.assert_any_call(
             ["sf", "org", "display", "--target-org", "dev1", "--json"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=30,
+        )
+        mock_run.assert_any_call(
+            [
+                "sf",
+                "org",
+                "auth",
+                "show-access-token",
+                "--target-org",
+                "dev1",
+                "--json",
+            ],
             capture_output=True,
             text=True,
             check=True,
@@ -148,21 +168,21 @@ class TestGetToken:
                 reader._get_token()
 
     def test_missing_access_token_raises_runtime_error(self, reader):
-        payload = json.dumps(
+        display_result = MagicMock()
+        display_result.stdout = json.dumps(
             {"status": 0, "result": {"instanceUrl": "https://x.salesforce.com"}}
         )
-        result = MagicMock()
-        result.stdout = payload
-        with patch("subprocess.run", return_value=result):
-            with pytest.raises(RuntimeError, match="access token or instance URL"):
+        token_result = MagicMock()
+        token_result.stdout = json.dumps({"status": 0, "result": {}})
+        with patch("subprocess.run", side_effect=[display_result, token_result]):
+            with pytest.raises(RuntimeError, match="did not return an access token"):
                 reader._get_token()
 
     def test_missing_instance_url_raises_runtime_error(self, reader):
-        payload = json.dumps({"status": 0, "result": {"accessToken": "tok"}})
-        result = MagicMock()
-        result.stdout = payload
-        with patch("subprocess.run", return_value=result):
-            with pytest.raises(RuntimeError, match="access token or instance URL"):
+        display_result = MagicMock()
+        display_result.stdout = json.dumps({"status": 0, "result": {}})
+        with patch("subprocess.run", return_value=display_result):
+            with pytest.raises(RuntimeError, match="did not return an instance URL"):
                 reader._get_token()
 
 
