@@ -198,6 +198,7 @@ def zip(path: str, network: str):
     default=None,
     help="SF CLI org alias or username. Fetches credentials via `sf org display`.",
 )
+@click.option("--use-in-feature", default=None, hidden=True, deprecated=True)
 def deploy(
     path: str,
     name: str,
@@ -207,6 +208,7 @@ def deploy(
     profile: str,
     network: str,
     sf_cli_org: Optional[str],
+    use_in_feature: Optional[str],
 ):
     from datacustomcode.constants import USE_IN_FEATURE_MAPPING_FOR_CONNECT_API
     from datacustomcode.deploy import (
