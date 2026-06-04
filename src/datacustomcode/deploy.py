@@ -31,7 +31,7 @@ from typing import (
 
 from loguru import logger
 import pydantic
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 import requests
 
 from datacustomcode.cmd import cmd_output
@@ -376,13 +376,37 @@ class FunctionConfig(BaseConfig):
     pass
 
 
-class Permissions(BaseModel):
-    read: Union[DloPermission]
-    write: Union[DloPermission]
-
-
 class DloPermission(BaseModel):
     dlo: list[str]
+
+
+class DmoPermission(BaseModel):
+    dmo: list[str]
+
+
+class Permissions(BaseModel):
+    read: Union[DloPermission, DmoPermission]
+    write: Union[DloPermission, DmoPermission]
+
+    @model_validator(mode="after")
+    def _no_mixed_layers(self) -> "Permissions":
+        read_is_dlo = isinstance(self.read, DloPermission)
+        write_is_dlo = isinstance(self.write, DloPermission)
+        if read_is_dlo != write_is_dlo:
+            raise ValueError(
+                "permissions.read and permissions.write must both reference "
+                "DLOs or both reference DMOs (got "
+                f"read={type(self.read).__name__}, "
+                f"write={type(self.write).__name__})"
+            )
+        return self
+
+
+def _permission_entries(perm: Union[DloPermission, DmoPermission]) -> list[str]:
+    """Return the list of object names regardless of layer (DLO or DMO)."""
+    if isinstance(perm, DloPermission):
+        return perm.dlo
+    return perm.dmo
 
 
 def get_config(directory: str) -> BaseConfig:
@@ -404,10 +428,17 @@ def get_config(directory: str) -> BaseConfig:
     except json.JSONDecodeError as err:
         raise ValueError(f"config.json at {config_path} is not valid JSON") from err
     except pydantic.ValidationError as err:
-        missing_fields = [str(err["loc"][0]) for err in err.errors()]
+        errors = err.errors()
+        missing = [e for e in errors if e.get("type") == "missing"]
+        if missing and len(missing) == len(errors):
+            missing_fields = [str(e["loc"][0]) for e in missing]
+            raise ValueError(
+                f"config.json at {config_path} is missing required "
+                f"fields: {', '.join(missing_fields)}"
+            ) from err
+        messages = [str(e.get("msg", "")) for e in errors]
         raise ValueError(
-            f"config.json at {config_path} is missing required "
-            f"fields: {', '.join(missing_fields)}"
+            f"config.json at {config_path} is invalid: {'; '.join(messages)}"
         ) from err
 
 
@@ -421,17 +452,21 @@ def create_data_transform(
     script_name = metadata.name
     request_hydrated = DATA_TRANSFORM_REQUEST_TEMPLATE.copy()
 
-    # Add nodes for each write DLO
-    for i, dlo in enumerate(data_transform_config.permissions.write.dlo, 1):
+    # Add nodes for each write entry (DLO or DMO)
+    for i, name in enumerate(
+        _permission_entries(data_transform_config.permissions.write), 1
+    ):
         request_hydrated["nodes"][f"node{i}"] = {
-            "relation_name": dlo,
+            "relation_name": name,
             "config": {"materialized": "table"},
             "compiled_code": "",
         }
 
-    # Add sources for each read DLO
-    for i, dlo in enumerate(data_transform_config.permissions.read.dlo, 1):
-        request_hydrated["sources"][f"source{i}"] = {"relation_name": dlo}
+    # Add sources for each read entry (DLO or DMO)
+    for i, name in enumerate(
+        _permission_entries(data_transform_config.permissions.read), 1
+    ):
+        request_hydrated["sources"][f"source{i}"] = {"relation_name": name}
 
     request_hydrated["macros"]["macro.byoc"]["arguments"][0]["name"] = script_name
 

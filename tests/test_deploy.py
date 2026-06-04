@@ -13,6 +13,7 @@ import requests
 
 from datacustomcode.deploy import (
     DloPermission,
+    DmoPermission,
     Permissions,
     get_config,
 )
@@ -934,6 +935,56 @@ class TestDataTransformConfig:
         ):
             get_config("/test/dir/payload")
 
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data=(
+            '{"sdkVersion": "1.0.0", "entryPoint": "entrypoint.py", '
+            '"dataspace": "test_dataspace", '
+            '"permissions": {"read": {"dmo": ["input_dmo__dlm"]}, '
+            '"write": {"dmo": ["output_dmo__dlm"]}}}'
+        ),
+    )
+    def test_get_config_dmo_permissions(self, mock_file):
+        """DMO-only config.json parses into DmoPermission on both sides."""
+        result = get_config("/test/dir")
+        assert isinstance(result, DataTransformConfig)
+        assert isinstance(result.permissions.read, DmoPermission)
+        assert isinstance(result.permissions.write, DmoPermission)
+        assert result.permissions.read.dmo == ["input_dmo__dlm"]
+        assert result.permissions.write.dmo == ["output_dmo__dlm"]
+
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data=(
+            '{"sdkVersion": "1.0.0", "entryPoint": "entrypoint.py", '
+            '"dataspace": "test_dataspace", '
+            '"permissions": {"read": {"dlo": ["input_dlo"]}, '
+            '"write": {"dmo": ["output_dmo__dlm"]}}}'
+        ),
+    )
+    def test_get_config_mixed_dlo_dmo_raises(self, mock_file):
+        """A config that mixes DLO read with DMO write is rejected."""
+        with pytest.raises(ValueError) as excinfo:
+            get_config("/test/dir")
+        msg = str(excinfo.value)
+        assert "read" in msg and "write" in msg
+
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data=(
+            '{"sdkVersion": "1.0.0", "entryPoint": "entrypoint.py", '
+            '"dataspace": "test_dataspace", '
+            '"permissions": {"read": {}, "write": {"dlo": ["output_dlo"]}}}'
+        ),
+    )
+    def test_get_config_empty_permission_raises(self, mock_file):
+        """A permission block with neither dlo nor dmo is rejected."""
+        with pytest.raises(ValueError):
+            get_config("/test/dir")
+
 
 class TestCreateDataTransform:
     @patch("datacustomcode.deploy.get_config")
@@ -972,17 +1023,107 @@ class TestCreateDataTransform:
         request_body = mock_make_api_call.call_args[1]["json"]
         assert request_body["definition"]["type"] == "DCSQL"
         assert request_body["dataSpaceName"] == "test_dataspace"
-        assert "nodes" in request_body["definition"]["manifest"]
-        assert "sources" in request_body["definition"]["manifest"]
-        assert "macros" in request_body["definition"]["manifest"]
-        assert (
-            request_body["definition"]["manifest"]["macros"]["macro.byoc"]["arguments"][
-                0
-            ]["name"]
-            == "test_job"
-        )
+        manifest = request_body["definition"]["manifest"]
+        assert manifest["nodes"] == {
+            "node1": {
+                "relation_name": "output_dlo",
+                "config": {"materialized": "table"},
+                "compiled_code": "",
+            }
+        }
+        assert manifest["sources"] == {"source1": {"relation_name": "input_dlo"}}
+        assert manifest["macros"]["macro.byoc"]["arguments"][0]["name"] == "test_job"
 
         assert result == {"id": "transform_id"}
+
+    @patch("datacustomcode.deploy.get_config")
+    @patch("datacustomcode.deploy._make_api_call")
+    def test_create_data_transform_dmo(self, mock_make_api_call, mock_get_config):
+        """DMO permissions emit nodes/sources with DMO relation names."""
+        access_token = AccessTokenResponse(
+            access_token="test_token", instance_url="https://instance.example.com"
+        )
+        metadata = CodeExtensionMetadata(
+            name="dmo_job",
+            version="1.0.0",
+            description="DMO job",
+            computeType="CPU_M",
+            codeType="script",
+        )
+
+        data_transform_config = DataTransformConfig(
+            sdkVersion="1.0.0",
+            entryPoint="entrypoint.py",
+            dataspace="test_dataspace",
+            permissions=Permissions(
+                read=DmoPermission(dmo=["input_dmo__dlm"]),
+                write=DmoPermission(dmo=["output_dmo__dlm"]),
+            ),
+        )
+        mock_make_api_call.return_value = {"id": "transform_id"}
+
+        create_data_transform(
+            "/test/dir", access_token, metadata, data_transform_config
+        )
+
+        request_body = mock_make_api_call.call_args[1]["json"]
+        manifest = request_body["definition"]["manifest"]
+        assert manifest["nodes"] == {
+            "node1": {
+                "relation_name": "output_dmo__dlm",
+                "config": {"materialized": "table"},
+                "compiled_code": "",
+            }
+        }
+        assert manifest["sources"] == {"source1": {"relation_name": "input_dmo__dlm"}}
+        assert manifest["macros"]["macro.byoc"]["arguments"][0]["name"] == "dmo_job"
+        assert request_body["dataSpaceName"] == "test_dataspace"
+
+    @patch("datacustomcode.deploy.get_config")
+    @patch("datacustomcode.deploy._make_api_call")
+    def test_create_data_transform_multiple_dmos(
+        self, mock_make_api_call, mock_get_config
+    ):
+        """Multiple read DMOs become multiple sources; one write DMO is one node."""
+        access_token = AccessTokenResponse(
+            access_token="test_token", instance_url="https://instance.example.com"
+        )
+        metadata = CodeExtensionMetadata(
+            name="dmo_multi",
+            version="1.0.0",
+            description="DMO multi",
+            computeType="CPU_M",
+            codeType="script",
+        )
+
+        data_transform_config = DataTransformConfig(
+            sdkVersion="1.0.0",
+            entryPoint="entrypoint.py",
+            dataspace="test_dataspace",
+            permissions=Permissions(
+                read=DmoPermission(dmo=["in1__dlm", "in2__dlm"]),
+                write=DmoPermission(dmo=["out__dlm"]),
+            ),
+        )
+        mock_make_api_call.return_value = {"id": "transform_id"}
+
+        create_data_transform(
+            "/test/dir", access_token, metadata, data_transform_config
+        )
+
+        request_body = mock_make_api_call.call_args[1]["json"]
+        manifest = request_body["definition"]["manifest"]
+        assert manifest["sources"] == {
+            "source1": {"relation_name": "in1__dlm"},
+            "source2": {"relation_name": "in2__dlm"},
+        }
+        assert manifest["nodes"] == {
+            "node1": {
+                "relation_name": "out__dlm",
+                "config": {"materialized": "table"},
+                "compiled_code": "",
+            }
+        }
 
 
 class TestDeployFull:
