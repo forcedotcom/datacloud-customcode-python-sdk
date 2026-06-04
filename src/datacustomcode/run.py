@@ -207,7 +207,7 @@ def add_py_folder(entrypoint: str):
     1. py-files/ is available for additional dependencies
     2. The entrypoint directory is available for local module imports
     """
-    default_py_folder = "py-files"  # Hardcoded folder name
+    default_py_folder = "py-files"
     cwd = Path.cwd().joinpath(entrypoint)
     entrypoint_dir = cwd.parent
     py_folder = entrypoint_dir.joinpath(default_py_folder)
@@ -216,5 +216,5 @@ def add_py_folder(entrypoint: str):
     if py_folder.exists():
         sys.path.insert(0, str(py_folder))
 
-    # Add entrypoint directory to allow local module imports (e.g., utility.py)
+    # Add entrypoint directory to allow local module imports
     sys.path.insert(0, str(entrypoint_dir))
