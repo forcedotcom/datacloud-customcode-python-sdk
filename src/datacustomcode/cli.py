@@ -198,11 +198,7 @@ def zip(path: str, network: str):
     default=None,
     help="SF CLI org alias or username. Fetches credentials via `sf org display`.",
 )
-@click.option(
-    "--use-in-feature",
-    default="SearchIndexChunking",
-    help="Feature where this function will be used.",
-)
+@click.option("--use-in-feature", default=None, hidden=True, deprecated=True)
 def deploy(
     path: str,
     name: str,
@@ -248,17 +244,20 @@ def deploy(
     )
 
     if package_type == "function":
-        # Try to infer use_in_feature from function signature; fall back to
-        # the explicit flag value (defaults to SearchIndexChunking)
+        # Infer use_in_feature from function signature
         entrypoint_path = os.path.join(path, ENTRYPOINT_FILE)
-        inferred = infer_use_in_feature(entrypoint_path)
-        if inferred:
-            use_in_feature = inferred
+        use_in_feature = infer_use_in_feature(entrypoint_path)
+        if use_in_feature:
             logger.info(f"Inferred use_in_feature: {use_in_feature}")
         else:
-            logger.info(f"Using use_in_feature: {use_in_feature}")
+            click.secho(
+                "Error: Function signature does not match a supported type. "
+                "Use SearchIndexChunkingV1Request and "
+                "SearchIndexChunkingV1Response in function signature.",
+                fg="red",
+            )
+            raise click.Abort()
 
-        assert use_in_feature is not None
         # Map feature names to Connect API names
         mapped_feature = USE_IN_FEATURE_MAPPING_FOR_CONNECT_API.get(
             use_in_feature, use_in_feature

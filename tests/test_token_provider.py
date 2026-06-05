@@ -197,6 +197,40 @@ class TestSFCLITokenProvider:
             assert "org" in display_call[0][0] and "display" in display_call[0][0]
             assert "show-access-token" in token_call[0][0]
 
+    def test_fallback_to_display_token_on_older_cli(self):
+        """Test fallback to sf org display token when show-access-token unavailable."""
+        import json
+        import subprocess
+
+        provider = SFCLITokenProvider("test_org")
+
+        display_output = json.dumps(
+            {
+                "status": 0,
+                "result": {
+                    "accessToken": "display_token",
+                    "instanceUrl": "https://cli.salesforce.com",
+                },
+            }
+        )
+
+        def side_effect(*args, **kwargs):
+            cmd = args[0]
+            if "show-access-token" in cmd:
+                raise subprocess.CalledProcessError(
+                    returncode=2, cmd="sf", stderr="not a sf command"
+                )
+            mock = MagicMock()
+            mock.stdout = display_output
+            return mock
+
+        with patch("subprocess.run", side_effect=side_effect):
+            result = provider.get_token()
+
+            assert isinstance(result, AccessTokenResponse)
+            assert result.access_token == "display_token"
+            assert result.instance_url == "https://cli.salesforce.com"
+
     def test_sf_command_not_found(self):
         """Test that FileNotFoundError is wrapped in RuntimeError."""
         provider = SFCLITokenProvider("test_org")
