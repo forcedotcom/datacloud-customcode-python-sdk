@@ -12,6 +12,8 @@ import pytest
 import requests
 
 from datacustomcode.deploy import (
+    DataObject,
+    DataObjectField,
     DloPermission,
     DmoPermission,
     Permissions,
@@ -985,6 +987,37 @@ class TestDataTransformConfig:
         with pytest.raises(ValueError):
             get_config("/test/dir")
 
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data=(
+            '{"sdkVersion": "0.1.14", "entryPoint": "entrypoint.py", '
+            '"dataspace": "default", '
+            '"permissions": {"read": {"dmo": ["ssot__Account__dlm"]}, '
+            '"write": {"dmo": ["Account_DMO_Test__dlm"]}}, '
+            '"dataObjects": [{'
+            '"name": "Account_DMO_Test__dlm", '
+            '"label": "Account DMO Test", '
+            '"type": "dataModelObject", '
+            '"category": "profile", '
+            '"fields": [{"name": "Id__c", "label": "Account Id", '
+            '"dataType": "text", "isPrimaryKey": true, '
+            '"keyQualifierFieldName": "KQ_Id1__c"}]'
+            "}]}"
+        ),
+    )
+    def test_get_config_dmo_with_data_objects(self, mock_file):
+        """config.json parses the optional dataObjects schema for DMO writes."""
+        result = get_config("/test/dir")
+        assert isinstance(result, DataTransformConfig)
+        assert result.dataObjects is not None
+        assert len(result.dataObjects) == 1
+        obj = result.dataObjects[0]
+        assert obj.name == "Account_DMO_Test__dlm"
+        assert obj.category == "profile"
+        assert obj.fields[0].dataType == "text"
+        assert obj.fields[0].keyQualifierFieldName == "KQ_Id1__c"
+
 
 class TestCreateDataTransform:
     @patch("datacustomcode.deploy.get_config")
@@ -1059,6 +1092,23 @@ class TestCreateDataTransform:
                 read=DmoPermission(dmo=["input_dmo__dlm"]),
                 write=DmoPermission(dmo=["output_dmo__dlm"]),
             ),
+            dataObjects=[
+                DataObject(
+                    name="output_dmo__dlm",
+                    label="Output DMO",
+                    type="dataModelObject",
+                    category="profile",
+                    fields=[
+                        DataObjectField(
+                            name="Id__c",
+                            label="Id",
+                            dataType="text",
+                            isPrimaryKey=True,
+                            keyQualifierFieldName="KQ_Id1__c",
+                        )
+                    ],
+                )
+            ],
         )
         mock_make_api_call.return_value = {"id": "transform_id"}
 
@@ -1104,6 +1154,23 @@ class TestCreateDataTransform:
                 read=DmoPermission(dmo=["in1__dlm", "in2__dlm"]),
                 write=DmoPermission(dmo=["out__dlm"]),
             ),
+            dataObjects=[
+                DataObject(
+                    name="out__dlm",
+                    label="Out",
+                    type="dataModelObject",
+                    category="profile",
+                    fields=[
+                        DataObjectField(
+                            name="Id__c",
+                            label="Id",
+                            dataType="text",
+                            isPrimaryKey=True,
+                            keyQualifierFieldName="KQ_Id1__c",
+                        )
+                    ],
+                )
+            ],
         )
         mock_make_api_call.return_value = {"id": "transform_id"}
 
@@ -1124,6 +1191,167 @@ class TestCreateDataTransform:
                 "compiled_code": "",
             }
         }
+
+    @patch("datacustomcode.deploy.get_config")
+    @patch("datacustomcode.deploy._make_api_call")
+    def test_create_data_transform_dmo_emits_output_data_objects(
+        self, mock_make_api_call, mock_get_config
+    ):
+        """DMO transforms include outputDataObjects with transformed field names."""
+        access_token = AccessTokenResponse(
+            access_token="test_token", instance_url="https://instance.example.com"
+        )
+        metadata = CodeExtensionMetadata(
+            name="test_package",
+            version="1.0.0",
+            description="DMO with schema",
+            computeType="CPU_M",
+            codeType="script",
+        )
+
+        data_transform_config = DataTransformConfig(
+            sdkVersion="0.1.14",
+            entryPoint="entrypoint.py",
+            dataspace="default",
+            permissions=Permissions(
+                read=DmoPermission(dmo=["ssot__Account__dlm"]),
+                write=DmoPermission(dmo=["Account_DMO_Test__dlm"]),
+            ),
+            dataObjects=[
+                DataObject(
+                    name="Account_DMO_Test__dlm",
+                    label="Account DMO Test",
+                    type="dataModelObject",
+                    category="profile",
+                    fields=[
+                        DataObjectField(
+                            name="Id__c",
+                            label="Account Id",
+                            dataType="text",
+                            isPrimaryKey=True,
+                            keyQualifierFieldName="KQ_Id1__c",
+                        ),
+                        DataObjectField(
+                            name="KQ_Id1__c",
+                            label="Key Qualifier Account Id",
+                            dataType="text",
+                            isPrimaryKey=False,
+                            keyQualifierFieldName=None,
+                        ),
+                        DataObjectField(
+                            name="Description__c",
+                            label="Account Description",
+                            dataType="text",
+                            isPrimaryKey=False,
+                            keyQualifierFieldName=None,
+                        ),
+                    ],
+                )
+            ],
+        )
+        mock_make_api_call.return_value = {"id": "transform_id"}
+
+        create_data_transform(
+            "/test/dir", access_token, metadata, data_transform_config
+        )
+
+        request_body = mock_make_api_call.call_args[1]["json"]
+        assert request_body["definition"]["outputDataObjects"] == [
+            {
+                "category": "profile",
+                "fields": [
+                    {
+                        "isPrimaryKey": True,
+                        "keyQualifierField": "KQ_Id1__c",
+                        "label": "Account Id",
+                        "name": "Id__c",
+                        "type": "text",
+                    },
+                    {
+                        "isPrimaryKey": False,
+                        "label": "Key Qualifier Account Id",
+                        "name": "KQ_Id1__c",
+                        "type": "text",
+                    },
+                    {
+                        "isPrimaryKey": False,
+                        "label": "Account Description",
+                        "name": "Description__c",
+                        "type": "text",
+                    },
+                ],
+                "label": "Account DMO Test",
+                "name": "Account_DMO_Test__dlm",
+                "type": "dataModelObject",
+            }
+        ]
+
+    @patch("datacustomcode.deploy.get_config")
+    @patch("datacustomcode.deploy._make_api_call")
+    def test_create_data_transform_dlo_omits_output_data_objects(
+        self, mock_make_api_call, mock_get_config
+    ):
+        """DLO transforms must not include outputDataObjects in the payload."""
+        access_token = AccessTokenResponse(
+            access_token="test_token", instance_url="https://instance.example.com"
+        )
+        metadata = CodeExtensionMetadata(
+            name="dlo_job",
+            version="1.0.0",
+            description="DLO job",
+            computeType="CPU_M",
+            codeType="script",
+        )
+
+        data_transform_config = DataTransformConfig(
+            sdkVersion="1.0.0",
+            entryPoint="entrypoint.py",
+            dataspace="test_dataspace",
+            permissions=Permissions(
+                read=DloPermission(dlo=["input_dlo"]),
+                write=DloPermission(dlo=["output_dlo"]),
+            ),
+        )
+        mock_make_api_call.return_value = {"id": "transform_id"}
+
+        create_data_transform(
+            "/test/dir", access_token, metadata, data_transform_config
+        )
+
+        request_body = mock_make_api_call.call_args[1]["json"]
+        assert "outputDataObjects" not in request_body["definition"]
+
+    @patch("datacustomcode.deploy.get_config")
+    @patch("datacustomcode.deploy._make_api_call")
+    def test_create_data_transform_dmo_missing_data_objects_raises(
+        self, mock_make_api_call, mock_get_config
+    ):
+        """DMO transforms without dataObjects raise a clear error."""
+        access_token = AccessTokenResponse(
+            access_token="test_token", instance_url="https://instance.example.com"
+        )
+        metadata = CodeExtensionMetadata(
+            name="dmo_no_schema",
+            version="1.0.0",
+            description="DMO no schema",
+            computeType="CPU_M",
+            codeType="script",
+        )
+
+        data_transform_config = DataTransformConfig(
+            sdkVersion="1.0.0",
+            entryPoint="entrypoint.py",
+            dataspace="test_dataspace",
+            permissions=Permissions(
+                read=DmoPermission(dmo=["input_dmo__dlm"]),
+                write=DmoPermission(dmo=["output_dmo__dlm"]),
+            ),
+        )
+
+        with pytest.raises(ValueError, match="dataObjects"):
+            create_data_transform(
+                "/test/dir", access_token, metadata, data_transform_config
+            )
 
 
 class TestDeployFull:

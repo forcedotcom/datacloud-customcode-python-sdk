@@ -26,6 +26,7 @@ from typing import (
     Callable,
     Dict,
     List,
+    Optional,
     Union,
 )
 
@@ -366,10 +367,27 @@ class BaseConfig(BaseModel):
     entryPoint: str
 
 
+class DataObjectField(BaseModel):
+    name: str
+    label: str
+    dataType: str
+    isPrimaryKey: bool = False
+    keyQualifierFieldName: Optional[str] = None
+
+
+class DataObject(BaseModel):
+    name: str
+    label: str
+    type: str
+    category: str
+    fields: list[DataObjectField]
+
+
 class DataTransformConfig(BaseConfig):
     sdkVersion: str
     dataspace: str
     permissions: Permissions
+    dataObjects: Optional[list[DataObject]] = None
 
 
 class FunctionConfig(BaseConfig):
@@ -407,6 +425,28 @@ def _permission_entries(perm: Union[DloPermission, DmoPermission]) -> list[str]:
     if isinstance(perm, DloPermission):
         return perm.dlo
     return perm.dmo
+
+
+def _data_object_to_output(obj: DataObject) -> dict[str, Any]:
+    """Convert a config.json DataObject into an outputDataObjects entry."""
+    fields: list[dict[str, Any]] = []
+    for field in obj.fields:
+        entry: dict[str, Any] = {
+            "isPrimaryKey": field.isPrimaryKey,
+            "label": field.label,
+            "name": field.name,
+            "type": field.dataType,
+        }
+        if field.keyQualifierFieldName is not None:
+            entry["keyQualifierField"] = field.keyQualifierFieldName
+        fields.append(entry)
+    return {
+        "category": obj.category,
+        "fields": fields,
+        "label": obj.label,
+        "name": obj.name,
+        "type": obj.type,
+    }
 
 
 def get_config(directory: str) -> BaseConfig:
@@ -470,12 +510,27 @@ def create_data_transform(
 
     request_hydrated["macros"]["macro.byoc"]["arguments"][0]["name"] = script_name
 
+    definition: dict[str, Any] = {
+        "type": "DCSQL",
+        "manifest": request_hydrated,
+        "version": "56.0",
+    }
+
+    # outputDataObjects is only set for DMO-backed transforms. The server requires
+    # the schema of any DMO created/updated by the transform; DLO transforms use
+    # an existing materialized table and must not include this field.
+    if isinstance(data_transform_config.permissions.write, DmoPermission):
+        if not data_transform_config.dataObjects:
+            raise ValueError(
+                "DMO transforms require 'dataObjects' in config.json describing "
+                "the schema of each output DMO."
+            )
+        definition["outputDataObjects"] = [
+            _data_object_to_output(obj) for obj in data_transform_config.dataObjects
+        ]
+
     body = {
-        "definition": {
-            "type": "DCSQL",
-            "manifest": request_hydrated,
-            "version": "56.0",
-        },
+        "definition": definition,
         "label": f"{metadata.name}",
         "name": f"{metadata.name}",
         "type": "BATCH",
