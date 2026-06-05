@@ -140,37 +140,44 @@ class SFCLITokenProvider(TokenProvider):
                 )
             return dict(data)
 
-        # Get instanceUrl from sf org display
+        # Get org info from sf org display
         display_data = _run_sf_command(
             ["sf", "org", "display", "--target-org", self.sf_cli_org, "--json"],
             "sf org display",
         )
-        instance_url = display_data.get("result", {}).get("instanceUrl")
+        result_data = display_data.get("result", {})
+        instance_url = result_data.get("instanceUrl")
         if not instance_url:
             raise RuntimeError(
                 f"'sf org display' did not return an instance URL "
                 f"for org '{self.sf_cli_org}'"
             )
 
-        # Get access token via show-access-token (newer SF CLI versions
-        # redact the token in sf org display)
-        token_data = _run_sf_command(
-            [
-                "sf",
-                "org",
-                "auth",
-                "show-access-token",
-                "--target-org",
-                self.sf_cli_org,
-                "--json",
-            ],
-            "sf org auth show-access-token",
-        )
-        access_token = token_data.get("result", {}).get("accessToken")
+        # Try show-access-token first (SF CLI >= 2.136.6); fall back to the
+        # token from sf org display (older CLIs don't redact it).
+        access_token = None
+        try:
+            token_data = _run_sf_command(
+                [
+                    "sf",
+                    "org",
+                    "auth",
+                    "show-access-token",
+                    "--target-org",
+                    self.sf_cli_org,
+                    "--json",
+                ],
+                "sf org auth show-access-token",
+            )
+            access_token = token_data.get("result", {}).get("accessToken")
+        except RuntimeError:
+            # Command not available on older SF CLI versions
+            access_token = result_data.get("accessToken")
+
         if not access_token:
             raise RuntimeError(
-                f"'sf org auth show-access-token' did not return an access token "
-                f"for org '{self.sf_cli_org}'"
+                f"Could not obtain an access token for org '{self.sf_cli_org}'. "
+                f"Upgrade SF CLI to 2.136.6+ or ensure the org is authenticated."
             )
 
         return AccessTokenResponse(access_token=access_token, instance_url=instance_url)

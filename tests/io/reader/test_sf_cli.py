@@ -175,7 +175,7 @@ class TestGetToken:
         token_result = MagicMock()
         token_result.stdout = json.dumps({"status": 0, "result": {}})
         with patch("subprocess.run", side_effect=[display_result, token_result]):
-            with pytest.raises(RuntimeError, match="did not return an access token"):
+            with pytest.raises(RuntimeError, match="Could not obtain an access token"):
                 reader._get_token()
 
     def test_missing_instance_url_raises_runtime_error(self, reader):
