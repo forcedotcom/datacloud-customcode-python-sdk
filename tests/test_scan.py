@@ -937,24 +937,28 @@ class TestRequirementsFile:
             # Create a local module file
             utility_path = os.path.join(temp_dir, "utility.py")
             with open(utility_path, "w") as f:
-                f.write(textwrap.dedent(
-                    """
+                f.write(
+                    textwrap.dedent(
+                        """
                     def helper_function():
                         return "helper"
                     """
-                ))
+                    )
+                )
 
             # Create another local module
             helpers_path = os.path.join(temp_dir, "helpers.py")
             with open(helpers_path, "w") as f:
-                f.write(textwrap.dedent(
-                    """
+                f.write(
+                    textwrap.dedent(
+                        """
                     def another_helper():
                         return "another"
                     """
-                ))
+                    )
+                )
 
-            # Create the main script that imports both local modules and external packages
+            # script imports both local modules and external packages
             main_content = textwrap.dedent(
                 """
                 from utility import helper_function
