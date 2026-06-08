@@ -258,24 +258,20 @@ class ImportVisitor(ast.NodeVisitor):
 
 
 def scan_file_for_imports(file_path: str) -> Set[str]:
-    """Scan a Python file for external package imports.
-
-    Excludes local modules (Python files in the same directory).
-    """
+    """Scan a Python file for external package imports."""
     with open(file_path, "r") as f:
         code = f.read()
         tree = ast.parse(code)
         visitor = ImportVisitor()
         visitor.visit(tree)
 
-        # Filter out local modules (files in the same directory)
+        # Filter out local modules
         file_dir = os.path.dirname(file_path)
         filtered_imports = set()
         for package in visitor.imports:
-            # Check if this is a local module (a .py file exists in the same directory)
+            # Check if a .py file exists in the same directory
             local_module_path = os.path.join(file_dir, f"{package}.py")
             if not os.path.exists(local_module_path):
-                # Not a local module, keep it in the imports
                 filtered_imports.add(package)
 
         return filtered_imports
