@@ -6,8 +6,11 @@ import pytest
 
 from datacustomcode.llm_gateway import DefaultSparkLLMGateway, LLMGatewayCallError
 from datacustomcode.llm_gateway.spark_default import (
+    _STATUS_ERROR,
+    _STATUS_SUCCESS,
     _build_underlying_gateway,
     _invoke_llm_gateway,
+    _invoke_llm_gateway_as_struct,
 )
 from datacustomcode.llm_gateway.types.generate_text_response import GenerateTextResponse
 
@@ -134,7 +137,12 @@ class TestDefaultSparkLLMGatewayGenerateTextCol:
         row.asDict.return_value = {"name": "Ada", "city": "London"}
         out = udf_fn(row)
 
-        assert out == "row-out"
+        assert out == {
+            "status": _STATUS_SUCCESS,
+            "response": "row-out",
+            "error_code": None,
+            "error_message": None,
+        }
         sent = mock_inner.generate_text.call_args.args[0]
         assert sent.prompt == "Greet Ada from London."
         assert sent.model_name == "test-model"
@@ -158,7 +166,7 @@ class TestDefaultSparkLLMGatewayGenerateTextCol:
 
     @patch("pyspark.sql.functions.udf")
     @patch("pyspark.sql.functions.struct")
-    def test_udf_returns_empty_for_null_row(self, mock_struct, mock_udf):
+    def test_udf_returns_error_struct_for_null_row(self, mock_struct, mock_udf):
         mock_struct.return_value = MagicMock()
         mock_udf.return_value = MagicMock()
         mock_inner = MagicMock()
@@ -167,8 +175,36 @@ class TestDefaultSparkLLMGatewayGenerateTextCol:
         gateway.llm_gateway_generate_text_col("template", {"placeholder": MagicMock()})
 
         udf_fn = mock_udf.call_args.args[0]
-        assert udf_fn(None) == ""
+        out = udf_fn(None)
+        assert out["status"] == _STATUS_ERROR
+        assert out["response"] is None
+        assert "null" in out["error_message"].lower()
         mock_inner.generate_text.assert_not_called()
+
+    @patch("pyspark.sql.functions.udf")
+    @patch("pyspark.sql.functions.struct")
+    def test_udf_returns_error_struct_on_http_error(self, mock_struct, mock_udf):
+        """Per-row HTTP errors are returned as ``status="ERROR"`` structs so
+        one bad row does not abort the Spark job."""
+        mock_struct.return_value = MagicMock()
+        mock_udf.return_value = MagicMock()
+        mock_inner = MagicMock()
+        mock_inner.generate_text.return_value = _error_response(
+            status_code=503, error_code="UNAVAILABLE"
+        )
+        gateway = DefaultSparkLLMGateway(llm_gateway=mock_inner)
+
+        gateway.llm_gateway_generate_text_col("Greet {name}", {"name": MagicMock()})
+
+        udf_fn = mock_udf.call_args.args[0]
+        row = MagicMock()
+        row.asDict.return_value = {"name": "Ada"}
+        out = udf_fn(row)
+
+        assert out["status"] == _STATUS_ERROR
+        assert out["response"] is None
+        assert out["error_code"] == "UNAVAILABLE"
+        assert out["error_message"] is not None
 
 
 class TestInvokeLLMGateway:
@@ -205,6 +241,46 @@ class TestInvokeLLMGateway:
         assert excinfo.value.error_code == "UNAVAILABLE"
         assert "503" in str(excinfo.value)
         assert "UNAVAILABLE" in str(excinfo.value)
+
+
+class TestInvokeLLMGatewayAsStruct:
+    """Non-raising variant of ``_invoke_llm_gateway`` used by the per-row UDF.
+    Both SUCCESS and ERROR cases land in the same struct shape so callers can
+    select fields uniformly."""
+
+    def test_success_returns_success_struct(self):
+        mock_inner = MagicMock()
+        mock_inner.generate_text.return_value = _success_response("howdy")
+
+        out = _invoke_llm_gateway_as_struct(mock_inner, "prompt", "model")
+
+        assert out == {
+            "status": _STATUS_SUCCESS,
+            "response": "howdy",
+            "error_code": None,
+            "error_message": None,
+        }
+
+    def test_error_returns_error_struct_without_raising(self):
+        mock_inner = MagicMock()
+        mock_inner.generate_text.return_value = _error_response(
+            status_code=503, error_code="UNAVAILABLE"
+        )
+
+        out = _invoke_llm_gateway_as_struct(mock_inner, "prompt", "model")
+
+        assert out["status"] == _STATUS_ERROR
+        assert out["response"] is None
+        assert out["error_code"] == "UNAVAILABLE"
+        assert out["error_message"] is not None
+
+    def test_uses_default_model_when_none(self):
+        mock_inner = MagicMock()
+        mock_inner.generate_text.return_value = _success_response("ok")
+
+        _invoke_llm_gateway_as_struct(mock_inner, "prompt", None)
+        sent = mock_inner.generate_text.call_args.args[0]
+        assert sent.model_name == "sfdc_ai__DefaultGPT4Omni"
 
 
 class TestDefaultSparkLLMGatewayGenerateTextErrorHandling:

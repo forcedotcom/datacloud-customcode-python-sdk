@@ -28,9 +28,15 @@ if TYPE_CHECKING:
     from pyspark.sql import Column
 
     from datacustomcode.llm_gateway.base import LLMGateway
+    from datacustomcode.llm_gateway.types.generate_text_response import (
+        GenerateTextResponse,
+    )
 
 
 _DEFAULT_LLM_MODEL_ID = "sfdc_ai__DefaultGPT4Omni"
+
+_STATUS_SUCCESS = "SUCCESS"
+_STATUS_ERROR = "ERROR"
 
 
 class DefaultSparkLLMGateway(SparkLLMGateway):
@@ -60,9 +66,17 @@ class DefaultSparkLLMGateway(SparkLLMGateway):
         values: Union[Dict[str, "Column"], "Column"],
         model_id: Optional[str] = None,
     ) -> "Column":
-
+        """Build a per-row UDF that returns a struct ``{status, response,
+        error_code, error_message}`` so per-row failures do not abort the
+        Spark job. Callers select the field they want, e.g.
+        ``llm_gateway_generate_text_col(...)["response"]``.
+        """
         from pyspark.sql.functions import struct, udf
-        from pyspark.sql.types import StringType
+        from pyspark.sql.types import (
+            StringType,
+            StructField,
+            StructType,
+        )
 
         if isinstance(values, dict):
             values_col = struct(*[v.alias(k) for k, v in values.items()])
@@ -70,19 +84,32 @@ class DefaultSparkLLMGateway(SparkLLMGateway):
             values_col = values
 
         gateway = self._llm_gateway
+        result_schema = StructType(
+            [
+                StructField("status", StringType(), True),
+                StructField("response", StringType(), True),
+                StructField("error_code", StringType(), True),
+                StructField("error_message", StringType(), True),
+            ]
+        )
 
-        def _generate(values_row: Any) -> str:
+        def _generate(values_row: Any) -> Dict[str, Optional[str]]:
             if values_row is None:
-                return ""
+                return {
+                    "status": _STATUS_ERROR,
+                    "response": None,
+                    "error_code": None,
+                    "error_message": "values column was null for this row",
+                }
             subs = (
                 values_row.asDict()
                 if hasattr(values_row, "asDict")
                 else dict(values_row)
             )
             prompt = template.format(**subs)
-            return _invoke_llm_gateway(gateway, prompt, model_id)
+            return _invoke_llm_gateway_as_struct(gateway, prompt, model_id)
 
-        return udf(_generate, StringType())(values_col)
+        return udf(_generate, result_schema)(values_col)
 
 
 def _build_underlying_gateway() -> "LLMGateway":
@@ -97,22 +124,33 @@ def _build_underlying_gateway() -> "LLMGateway":
     return cfg.to_object()
 
 
+def _call_llm_gateway(
+    gateway: "LLMGateway",
+    prompt: str,
+    model_id: Optional[str],
+) -> "GenerateTextResponse":
+    """Build the request and dispatch it to the underlying gateway."""
+    from datacustomcode.llm_gateway.types.generate_text_request_builder import (
+        GenerateTextRequestBuilder,
+    )
+
+    request = (
+        GenerateTextRequestBuilder()
+        .set_prompt(prompt)
+        .set_model(model_id or _DEFAULT_LLM_MODEL_ID)
+        .build()
+    )
+    return gateway.generate_text(request)
+
+
 def _invoke_llm_gateway(
     gateway: "LLMGateway",
     prompt: str,
     model_id: Optional[str],
 ) -> str:
     from datacustomcode.llm_gateway.errors import LLMGatewayCallError
-    from datacustomcode.llm_gateway.types.generate_text_request_builder import (
-        GenerateTextRequestBuilder,
-    )
 
-    builder = (
-        GenerateTextRequestBuilder()
-        .set_prompt(prompt)
-        .set_model(model_id or _DEFAULT_LLM_MODEL_ID)
-    )
-    response = gateway.generate_text(builder.build())
+    response = _call_llm_gateway(gateway, prompt, model_id)
     if response.is_error:
         raise LLMGatewayCallError(
             f"LLM Gateway call failed: status_code={response.status_code}, "
@@ -123,3 +161,24 @@ def _invoke_llm_gateway(
             error_message=str(response.data) if response.data else None,
         )
     return response.text
+
+
+def _invoke_llm_gateway_as_struct(
+    gateway: "LLMGateway",
+    prompt: str,
+    model_id: Optional[str],
+) -> Dict[str, Optional[str]]:
+    response = _call_llm_gateway(gateway, prompt, model_id)
+    if response.is_error:
+        return {
+            "status": _STATUS_ERROR,
+            "response": None,
+            "error_code": response.error_code or None,
+            "error_message": str(response.data) if response.data else None,
+        }
+    return {
+        "status": _STATUS_SUCCESS,
+        "response": response.text,
+        "error_code": None,
+        "error_message": None,
+    }

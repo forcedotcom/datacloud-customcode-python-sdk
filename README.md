@@ -316,13 +316,16 @@ from datacustomcode.client import Client, llm_gateway_generate_text_col
 def main():
   client = Client()
   df = client.read_dlo("Input__dll")
+  # llm_gateway_generate_text_col returns a struct
+  # {status, response, error_code, error_message} per row, so per-row
+  # failures don't abort the Spark job. Pick the field you want with [].
   df_generated = df.withColumn(
     "greeting__c",
     llm_gateway_generate_text_col(
         "In one sentence, greet {name} from {city}.",
         {"name": col("name__c"), "city": col("homecity__c")},
         model_id="sfdc_ai__DefaultGPT4Omni", # An AI model in your org
-    ),
+    )["response"],
   )
 
   dlo_name = "Output_dll"

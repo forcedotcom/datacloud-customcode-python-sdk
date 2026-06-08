@@ -62,15 +62,23 @@ def llm_gateway_generate_text_col(
 ) -> "Column":
     """Build a Spark Column that runs the LLM Gateway per row.
 
+    The returned Column yields a struct ``{status, response, error_code,
+    error_message}`` for each row. Use ``[...]`` (or ``getField``) to pick the
+    field you want, e.g. ``llm_gateway_generate_text_col(...)["response"]``.
+    Per-row failures populate ``status`` / ``error_code`` / ``error_message``
+    so a single bad row does not abort the whole Spark job.
+
     Example:
 
-        >>> df.withColumn(
-        ...     "greeting__c",
-        ...     llm_gateway_generate_text_col(
-        ...         "In one sentence, greet {name} from {city}.",
-        ...         {"name": col("name__c"), "city": col("homecity__c")},
-        ...         model_id="sfdc_ai__DefaultGPT4Omni",
-        ...     ),
+        >>> result = llm_gateway_generate_text_col(
+        ...     "In one sentence, greet {name} from {city}.",
+        ...     {"name": col("name__c"), "city": col("homecity__c")},
+        ...     model_id="sfdc_ai__DefaultGPT4Omni",
+        ... )
+        >>> df.withColumn("greeting__c", result["response"])
+        >>> # …or keep the struct around and inspect failures:
+        >>> df.withColumn("llm", result).select(
+        ...     "llm.status", "llm.response", "llm.error_message"
         ... )
 
     Args:
@@ -81,7 +89,11 @@ def llm_gateway_generate_text_col(
         model_id: LLM model id. Defaults to ``sfdc_ai__DefaultGPT4Omni``.
 
     Returns:
-        A Spark ``Column`` that, when evaluated, produces the generated text.
+        A Spark ``Column`` of ``StructType`` with fields ``status``,
+        ``response``, ``error_code``, and ``error_message`` (all nullable
+        strings). On success, ``status == "SUCCESS"`` and ``response`` holds
+        the generated text; on failure, ``status == "ERROR"`` and the
+        ``error_*`` fields carry diagnostic detail.
     """
     gateway = Client()._get_spark_llm_gateway()
     return gateway.llm_gateway_generate_text_col(template, values, model_id=model_id)

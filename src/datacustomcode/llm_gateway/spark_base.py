@@ -50,4 +50,13 @@ class SparkLLMGateway(ABC, UserExtendableNamedConfigMixin):
         values: Union[Dict[str, "Column"], "Column"],
         model_id: Optional[str] = None,
     ) -> "Column":
-        """Build a Spark ``Column`` that invokes the LLM Gateway per row."""
+        """Build a Spark ``Column`` that invokes the LLM Gateway per row and
+        yields a struct ``{status, response, error_code, error_message}``.
+
+        Select an individual field, e.g.
+        ``llm_gateway_generate_text_col(...)["response"]``. Returning a struct
+        means a single failing row doesn't abort the Spark job.
+        Failing row leaves the rest of the DataFrame intact — callers can
+        inspect ``status`` / ``error_code`` per row instead of having the
+        Spark job abort.
+        """
