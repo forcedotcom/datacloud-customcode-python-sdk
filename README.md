@@ -305,6 +305,55 @@ Options:
 - `--function-invoke-opt TEXT`: Currently we support only `UnstructuredChunking` for functions.
 
 
+## Testing LLM Gateway
+
+You can use AI models configured in Salesforce to generate responses while transforming your data. Below is a sample code example:
+
+```
+from datacustomcode.client import Client, llm_gateway_generate_text_col
+
+
+def main():
+  client = Client()
+  df = client.read_dlo("Input__dll")
+  # llm_gateway_generate_text_col returns a struct
+  # {status, response, error_code, error_message} per row, so per-row
+  # failures don't abort the Spark job. Pick the field you want with [].
+  df_generated = df.withColumn(
+    "greeting__c",
+    llm_gateway_generate_text_col(
+        "In one sentence, greet {name} from {city}.",
+        {"name": col("name__c"), "city": col("homecity__c")},
+        model_id="sfdc_ai__DefaultGPT4Omni", # An AI model in your org
+    )["response"],
+  )
+
+  dlo_name = "Output_dll"
+  client.write_to_dlo(dlo_name, df_upper1, write_mode=WriteMode.APPEND)
+
+  greeting = client.llm_gateway_generate_text("In one sentence, generate a greeting message", "sfdc_ai__DefaultGPT52")
+
+if __name__ == "__main__":
+  main()
+```
+
+In order to test this code on your local machine before deploying it to Data Cloud, you must first set up an External Client App that allows access to the Agent API. Follow this guide to create the ECA https://developer.salesforce.com/docs/ai/agentforce/guide/agent-api-get-started.html#create-a-salesforce-app. You must use `http://localhost:1717/OauthRedirect` as the callback URL.
+
+Once the ECA is set up, log in to your org using this ECA
+```
+sf org login web \
+  --alias myorg \
+  --instance-url https://{MY_DOMAIN_URL} \
+  --client-id {CONSUMER_KEY} \
+  --scopes "sfap_api api"
+```
+
+then you can test your code using `myorg` alias
+```
+datacustomcode run ./payload/entrypoint.py --sf-cli-org myorg
+```
+
+
 ## Docker usage
 
 The SDK provides Docker-based development options that allow you to test your code in an environment that closely resembles Data Cloud's execution environment.

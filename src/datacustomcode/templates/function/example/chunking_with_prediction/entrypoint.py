@@ -12,6 +12,9 @@ Model: YH_Regression_Python_Predicted_SalePrice_CM_12l_ATC937af934
 Type: Regression
 Input: Year_Built__c (numeric)
 Output: Predicted_SalePrice
+
+You can use your AI models configured in Salesforce to make predictions.
+See README.md for how to test locally before deploying to Data Cloud.
 """
 
 import logging

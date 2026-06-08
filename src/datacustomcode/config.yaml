@@ -28,3 +28,6 @@ llm_gateway_config:
   type_config_name: DefaultLLMGateway
   options:
     credentials_profile: default
+
+spark_llm_gateway_config:
+  type_config_name: DefaultSparkLLMGateway

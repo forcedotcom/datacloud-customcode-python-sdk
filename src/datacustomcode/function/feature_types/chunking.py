@@ -16,6 +16,7 @@
 """
 Pydantic models for Search Index Chunking V1
 """
+
 from enum import Enum
 from typing import (
     Dict,

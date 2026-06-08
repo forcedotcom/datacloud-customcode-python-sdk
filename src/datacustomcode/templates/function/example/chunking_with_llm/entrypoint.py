@@ -7,6 +7,9 @@ This function demonstrates the new signature-based invocation with Pydantic mode
 - Requires Runtime parameter (for agentic capabilities)
 - Type-safe with direct field access (no wrappers)
 - Automatic validation and conversion
+
+You can use your AI models configured in Salesforce to generate texts.
+See README.md for how to test locally before deploying to Data Cloud.
 """
 
 import logging

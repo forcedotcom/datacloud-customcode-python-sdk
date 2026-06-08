@@ -65,13 +65,9 @@ def make_einstein_prediction(runtime: Runtime) -> None:
     )
 
 
-def generate_text(runtime: Runtime):
+def generate_text(runtime: Runtime, prompt: str, model: str = "sfdc_ai__DefaultGPT52"):
     builder = GenerateTextRequestBuilder()
-    llm_request = (
-        builder.set_prompt("Generate 2 dog names")
-        .set_model("sfdc_ai__DefaultGPT52")
-        .build()
-    )
+    llm_request = builder.set_prompt(prompt).set_model(model).build()
     llm_response = runtime.llm_gateway.generate_text(llm_request)
     logger.info(
         f"LLM Gateway generate text results - success: [{llm_response.is_success}] "
@@ -88,13 +84,16 @@ def function(request: dict, runtime: Runtime) -> dict:
     current_seq_no = 1  # Start sequence number from 1
 
     """
-    You can use your AI models configured in Salesforce
-    to generate texts or predict an outcome.
-    First configure an external client app before using these AI APIs
-    https://developer.salesforce.com/docs/ai/agentforce/guide/agent-api-get-started.html#create-a-salesforce-app"
+    You can use your AI models configured in Salesforce to generate texts
+    or predict an outcome. See README.md for how to test locally before
+    deploying to Data Cloud.
+
+    Example:
+
+        >>> generated_text = generate_text(runtime, "Generate a greeting message")
+        ... prediction = make_einstein_prediction(runtime)
+
     """
-    # generate_text(runtime)
-    # make_einstein_prediction(runtime)
 
     for item in items:
         # Item is DocElement as dict
