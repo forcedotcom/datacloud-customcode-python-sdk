@@ -31,7 +31,6 @@ if TYPE_CHECKING:
 
 
 _DEFAULT_LLM_MODEL_ID = "sfdc_ai__DefaultGPT4Omni"
-_DEFAULT_LLM_MAX_TOKENS = 200
 
 
 class DefaultSparkLLMGateway(SparkLLMGateway):
@@ -52,16 +51,14 @@ class DefaultSparkLLMGateway(SparkLLMGateway):
         self,
         prompt: str,
         model_id: Optional[str] = None,
-        max_tokens: Optional[int] = None,
     ) -> str:
-        return _invoke_llm_gateway(self._llm_gateway, prompt, model_id, max_tokens)
+        return _invoke_llm_gateway(self._llm_gateway, prompt, model_id)
 
     def llm_gateway_generate_text_col(
         self,
         template: str,
         values: Union[Dict[str, "Column"], "Column"],
         model_id: Optional[str] = None,
-        max_tokens: Optional[int] = None,
     ) -> "Column":
 
         from pyspark.sql.functions import struct, udf
@@ -83,7 +80,7 @@ class DefaultSparkLLMGateway(SparkLLMGateway):
                 else dict(values_row)
             )
             prompt = template.format(**subs)
-            return _invoke_llm_gateway(gateway, prompt, model_id, max_tokens)
+            return _invoke_llm_gateway(gateway, prompt, model_id)
 
         return udf(_generate, StringType())(values_col)
 
@@ -104,8 +101,8 @@ def _invoke_llm_gateway(
     gateway: "LLMGateway",
     prompt: str,
     model_id: Optional[str],
-    max_tokens: Optional[int],
 ) -> str:
+    from datacustomcode.llm_gateway.errors import LLMGatewayCallError
     from datacustomcode.llm_gateway.types.generate_text_request_builder import (
         GenerateTextRequestBuilder,
     )
@@ -114,6 +111,15 @@ def _invoke_llm_gateway(
         GenerateTextRequestBuilder()
         .set_prompt(prompt)
         .set_model(model_id or _DEFAULT_LLM_MODEL_ID)
-        .set_max_tokens(max_tokens or _DEFAULT_LLM_MAX_TOKENS)
     )
-    return gateway.generate_text(builder.build()).text
+    response = gateway.generate_text(builder.build())
+    if response.is_error:
+        raise LLMGatewayCallError(
+            f"LLM Gateway call failed: status_code={response.status_code}, "
+            f"error_code={response.error_code!r}, "
+            f"message={response.data!r}",
+            status=response.status_code,
+            error_code=response.error_code or None,
+            error_message=str(response.data) if response.data else None,
+        )
+    return response.text

@@ -40,13 +40,6 @@ class GenerateTextRequest(BaseModel):
     )
     model_name: str = Field(..., min_length=1, description="Name of the model to use")
     prompt: str = Field(..., description="Input prompt")
-    max_tokens: Optional[int] = Field(
-        default=None,
-        ge=1,
-        description=(
-            "Maximum number of tokens to generate. If None, server default applies."
-        ),
-    )
     localization: Optional[Dict[str, Any]] = Field(
         default=None, description="Localization settings"
     )

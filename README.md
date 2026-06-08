@@ -322,7 +322,6 @@ def main():
         "In one sentence, greet {name} from {city}.",
         {"name": col("name__c"), "city": col("homecity__c")},
         model_id="sfdc_ai__DefaultGPT4Omni", # An AI model in your org
-        max_tokens=100,
     ),
   )
 

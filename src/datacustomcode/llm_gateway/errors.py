@@ -12,17 +12,25 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Exceptions raised by LLM Gateway implementations."""
 
-from datacustomcode.llm_gateway.base import LLMGateway
-from datacustomcode.llm_gateway.default import DefaultLLMGateway
-from datacustomcode.llm_gateway.errors import LLMGatewayCallError
-from datacustomcode.llm_gateway.spark_base import SparkLLMGateway
-from datacustomcode.llm_gateway.spark_default import DefaultSparkLLMGateway
+from __future__ import annotations
 
-__all__ = [
-    "DefaultLLMGateway",
-    "DefaultSparkLLMGateway",
-    "LLMGateway",
-    "LLMGatewayCallError",
-    "SparkLLMGateway",
-]
+from typing import Optional
+
+
+class LLMGatewayCallError(RuntimeError):
+    """Raised when an LLM Gateway call returns an error."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        status: Optional[object] = None,
+        error_code: Optional[str] = None,
+        error_message: Optional[str] = None,
+    ) -> None:
+        super().__init__(message)
+        self.status = status
+        self.error_code = error_code
+        self.error_message = error_message

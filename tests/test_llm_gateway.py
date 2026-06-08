@@ -53,22 +53,6 @@ class TestGenerateTextRequest:
         request = GenerateTextRequest(modelName="gpt-4", prompt="Hello")
         assert request.model_name == "gpt-4"
 
-    def test_max_tokens_defaults_to_none(self):
-        """max_tokens is optional and defaults to None (server default applies)."""
-        request = GenerateTextRequest(model_name="gpt-4", prompt="Hello")
-        assert request.max_tokens is None
-
-    def test_max_tokens_accepts_int(self):
-        """max_tokens accepts a positive int."""
-        request = GenerateTextRequest(model_name="gpt-4", prompt="Hello", max_tokens=50)
-        assert request.max_tokens == 50
-
-    def test_max_tokens_must_be_positive(self):
-        """max_tokens is constrained to >= 1."""
-        with pytest.raises(ValidationError) as exc_info:
-            GenerateTextRequest(model_name="gpt-4", prompt="Hello", max_tokens=0)
-        assert "max_tokens" in str(exc_info.value) or "maxTokens" in str(exc_info.value)
-
 
 class TestGenerateTextRequestBuilder:
     """Test GenerateTextRequestBuilder."""
@@ -115,20 +99,6 @@ class TestGenerateTextRequestBuilder:
         tags = {"user": "test", "session": "123"}
         request = builder.set_prompt("Hello").set_model("gpt-4").set_tags(tags).build()
         assert request.tags == tags
-
-    def test_builder_with_max_tokens(self):
-        """set_max_tokens propagates to the built request."""
-        builder = GenerateTextRequestBuilder()
-        request = (
-            builder.set_prompt("Hello").set_model("gpt-4").set_max_tokens(123).build()
-        )
-        assert request.max_tokens == 123
-
-    def test_builder_default_max_tokens_is_none(self):
-        """Omitting set_max_tokens leaves max_tokens as None on the request."""
-        builder = GenerateTextRequestBuilder()
-        request = builder.set_prompt("Hello").set_model("gpt-4").build()
-        assert request.max_tokens is None
 
     def test_builder_validates_on_build(self):
         """Test builder validates request on build."""

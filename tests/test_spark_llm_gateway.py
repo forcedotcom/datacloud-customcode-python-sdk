@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from datacustomcode.llm_gateway import DefaultSparkLLMGateway
+from datacustomcode.llm_gateway import DefaultSparkLLMGateway, LLMGatewayCallError
 from datacustomcode.llm_gateway.spark_default import (
     _build_underlying_gateway,
     _invoke_llm_gateway,
@@ -16,6 +16,12 @@ def _success_response(text: str = "ok") -> GenerateTextResponse:
     return GenerateTextResponse(
         status_code=200, data={"generation": {"generatedText": text}}
     )
+
+
+def _error_response(
+    status_code: int = 500, error_code: str = "INTERNAL_ERROR"
+) -> GenerateTextResponse:
+    return GenerateTextResponse(status_code=status_code, data={"errorCode": error_code})
 
 
 class TestDefaultSparkLLMGatewayConstruction:
@@ -61,22 +67,19 @@ class TestBuildUnderlyingGateway:
 
 class TestDefaultSparkLLMGatewayGenerateText:
 
-    def test_forwards_prompt_model_and_max_tokens(self):
+    def test_forwards_prompt_and_model(self):
         mock_inner = MagicMock()
         mock_inner.generate_text.return_value = _success_response("hello back")
         gateway = DefaultSparkLLMGateway(llm_gateway=mock_inner)
 
-        result = gateway.llm_gateway_generate_text(
-            "hello", model_id="m1", max_tokens=42
-        )
+        result = gateway.llm_gateway_generate_text("hello", model_id="m1")
 
         assert result == "hello back"
         sent = mock_inner.generate_text.call_args.args[0]
         assert sent.prompt == "hello"
         assert sent.model_name == "m1"
-        assert sent.max_tokens == 42
 
-    def test_applies_defaults_when_model_and_tokens_omitted(self):
+    def test_applies_default_model_when_omitted(self):
         mock_inner = MagicMock()
         mock_inner.generate_text.return_value = _success_response("ok")
         gateway = DefaultSparkLLMGateway(llm_gateway=mock_inner)
@@ -85,7 +88,6 @@ class TestDefaultSparkLLMGatewayGenerateText:
 
         sent = mock_inner.generate_text.call_args.args[0]
         assert sent.model_name == "sfdc_ai__DefaultGPT4Omni"
-        assert sent.max_tokens == 200
 
 
 class TestDefaultSparkLLMGatewayGenerateTextCol:
@@ -118,7 +120,6 @@ class TestDefaultSparkLLMGatewayGenerateTextCol:
             "Greet {name} from {city}.",
             {"name": name_col, "city": city_col},
             model_id="test-model",
-            max_tokens=5,
         )
 
         name_col.alias.assert_called_once_with("name")
@@ -137,7 +138,6 @@ class TestDefaultSparkLLMGatewayGenerateTextCol:
         sent = mock_inner.generate_text.call_args.args[0]
         assert sent.prompt == "Greet Ada from London."
         assert sent.model_name == "test-model"
-        assert sent.max_tokens == 5
 
     @patch("pyspark.sql.functions.udf")
     @patch("pyspark.sql.functions.struct")
@@ -177,17 +177,48 @@ class TestInvokeLLMGateway:
         mock_inner = MagicMock()
         mock_inner.generate_text.return_value = _success_response("done")
 
-        assert _invoke_llm_gateway(mock_inner, "prompt", "model", 7) == "done"
+        assert _invoke_llm_gateway(mock_inner, "prompt", "model") == "done"
         sent = mock_inner.generate_text.call_args.args[0]
         assert sent.prompt == "prompt"
         assert sent.model_name == "model"
-        assert sent.max_tokens == 7
 
-    def test_uses_defaults_when_model_and_tokens_none(self):
+    def test_uses_default_model_when_none(self):
         mock_inner = MagicMock()
         mock_inner.generate_text.return_value = _success_response("ok")
 
-        _invoke_llm_gateway(mock_inner, "prompt", None, None)
+        _invoke_llm_gateway(mock_inner, "prompt", None)
         sent = mock_inner.generate_text.call_args.args[0]
         assert sent.model_name == "sfdc_ai__DefaultGPT4Omni"
-        assert sent.max_tokens == 200
+
+    def test_raises_llm_gateway_call_error_on_error_response(self):
+        """``is_error`` responses surface as ``LLMGatewayCallError`` with the
+        status code and error code attached for programmatic inspection."""
+        mock_inner = MagicMock()
+        mock_inner.generate_text.return_value = _error_response(
+            status_code=503, error_code="UNAVAILABLE"
+        )
+
+        with pytest.raises(LLMGatewayCallError) as excinfo:
+            _invoke_llm_gateway(mock_inner, "prompt", "model")
+
+        assert excinfo.value.status == 503
+        assert excinfo.value.error_code == "UNAVAILABLE"
+        assert "503" in str(excinfo.value)
+        assert "UNAVAILABLE" in str(excinfo.value)
+
+
+class TestDefaultSparkLLMGatewayGenerateTextErrorHandling:
+    """The scalar generate_text path raises when the underlying gateway errors."""
+
+    def test_raises_on_error_response(self):
+        mock_inner = MagicMock()
+        mock_inner.generate_text.return_value = _error_response(
+            status_code=429, error_code="RATE_LIMITED"
+        )
+        gateway = DefaultSparkLLMGateway(llm_gateway=mock_inner)
+
+        with pytest.raises(LLMGatewayCallError) as excinfo:
+            gateway.llm_gateway_generate_text("hello")
+
+        assert excinfo.value.status == 429
+        assert excinfo.value.error_code == "RATE_LIMITED"

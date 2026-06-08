@@ -59,7 +59,6 @@ def llm_gateway_generate_text_col(
     template: str,
     values: Union[Dict[str, "Column"], "Column"],
     model_id: Optional[str] = None,
-    max_tokens: Optional[int] = None,
 ) -> "Column":
     """Build a Spark Column that runs the LLM Gateway per row.
 
@@ -71,7 +70,6 @@ def llm_gateway_generate_text_col(
         ...         "In one sentence, greet {name} from {city}.",
         ...         {"name": col("name__c"), "city": col("homecity__c")},
         ...         model_id="sfdc_ai__DefaultGPT4Omni",
-        ...         max_tokens=100,
         ...     ),
         ... )
 
@@ -81,15 +79,12 @@ def llm_gateway_generate_text_col(
         values: Either a mapping from placeholder name to Spark ``Column``, or
             a single ``Column`` whose value is already a struct.
         model_id: LLM model id. Defaults to ``sfdc_ai__DefaultGPT4Omni``.
-        max_tokens: Maximum tokens to generate. Defaults to 200.
 
     Returns:
         A Spark ``Column`` that, when evaluated, produces the generated text.
     """
     gateway = Client()._get_spark_llm_gateway()
-    return gateway.llm_gateway_generate_text_col(
-        template, values, model_id=model_id, max_tokens=max_tokens
-    )
+    return gateway.llm_gateway_generate_text_col(template, values, model_id=model_id)
 
 
 class DataCloudObjectType(Enum):
@@ -150,9 +145,7 @@ class Client:
         finder: Find a file path
         reader: A custom reader to use for reading Data Cloud objects.
         writer: A custom writer to use for writing Data Cloud objects.
-        spark_llm_gateway: Optional custom :class:`SparkLLMGateway`. When
-            omitted, the gateway is lazily resolved from
-            ``spark_llm_gateway_config``.
+        spark_llm_gateway: Optional custom :class:`SparkLLMGateway`.
 
     Example:
     >>> client = Client()
@@ -292,7 +285,6 @@ class Client:
         self,
         prompt: str,
         model_id: Optional[str] = None,
-        max_tokens: Optional[int] = None,
     ) -> str:
         """Issue a one-shot LLM Gateway call. This is the scalar counterpart to
         :func:`llm_gateway_generate_text_col`: it runs **once**  — not per row.
@@ -310,15 +302,13 @@ class Client:
                 ``{field}`` substitution is performed on this string.
             model_id: LLM model id to target. Defaults to
                 ``sfdc_ai__DefaultGPT4Omni`` when ``None``.
-            max_tokens: Hard upper bound on the number of tokens the model
-                may generate. Defaults to 200 when ``None``.
 
         Returns:
             The generated text as a plain Python ``str``; empty when the
             gateway response carries no generated text.
         """
         return self._get_spark_llm_gateway().llm_gateway_generate_text(
-            prompt, model_id=model_id, max_tokens=max_tokens
+            prompt, model_id=model_id
         )
 
     def _get_spark_llm_gateway(self) -> SparkLLMGateway:

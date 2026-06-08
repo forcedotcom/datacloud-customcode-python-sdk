@@ -40,7 +40,6 @@ class SparkLLMGateway(ABC, UserExtendableNamedConfigMixin):
         self,
         prompt: str,
         model_id: Optional[str] = None,
-        max_tokens: Optional[int] = None,
     ) -> str:
         """Issue a one-shot LLM Gateway call and return the generated text."""
 
@@ -50,6 +49,5 @@ class SparkLLMGateway(ABC, UserExtendableNamedConfigMixin):
         template: str,
         values: Union[Dict[str, "Column"], "Column"],
         model_id: Optional[str] = None,
-        max_tokens: Optional[int] = None,
     ) -> "Column":
         """Build a Spark ``Column`` that invokes the LLM Gateway per row."""

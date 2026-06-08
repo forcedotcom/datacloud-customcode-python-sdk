@@ -266,13 +266,11 @@ class TestClientLlmGatewayGenerateText:
         writer = MagicMock(spec=BaseDataCloudWriter)
         client = Client(reader=reader, writer=writer)
 
-        result = client.llm_gateway_generate_text(
-            "ping", model_id="test-model", max_tokens=42
-        )
+        result = client.llm_gateway_generate_text("ping", model_id="test-model")
 
         assert result == "reply"
         mock_spark_gateway.llm_gateway_generate_text.assert_called_once_with(
-            "ping", model_id="test-model", max_tokens=42
+            "ping", model_id="test-model"
         )
 
     @patch("datacustomcode.client._build_spark_llm_gateway")
@@ -308,7 +306,7 @@ class TestClientLlmGatewayGenerateText:
 
         assert result == "from-injected"
         injected.llm_gateway_generate_text.assert_called_once_with(
-            "hello", model_id=None, max_tokens=None
+            "hello", model_id=None
         )
         mock_build_gateway.assert_not_called()
 
@@ -330,13 +328,11 @@ class TestLLMGatewayGenerateTextCol:
         Client(reader=reader, writer=writer)
 
         values = {"name": MagicMock()}
-        result = llm_gateway_generate_text_col(
-            "Greet {name}", values, model_id="m", max_tokens=7
-        )
+        result = llm_gateway_generate_text_col("Greet {name}", values, model_id="m")
 
         assert result is sentinel_col
         mock_spark_gateway.llm_gateway_generate_text_col.assert_called_once_with(
-            "Greet {name}", values, model_id="m", max_tokens=7
+            "Greet {name}", values, model_id="m"
         )
 
 

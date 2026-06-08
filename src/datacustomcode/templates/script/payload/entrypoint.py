@@ -25,7 +25,6 @@ def main():
             ...         "In one sentence, greet {name} from {city}.",
             ...         {"name": col("name__c"), "city": col("homecity__c")},
             ...         model_id="sfdc_ai__DefaultGPT4Omni",
-            ...         max_tokens=100,
             ...     ),
             ... )
 
@@ -35,7 +34,7 @@ def main():
     Example:
 
         >>> generated_text = client.llm_gateway_generate_text(
-        ...     prompt, model_id, max_tokens
+        ...     prompt, model_id
         ... )
     """
 
