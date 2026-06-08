@@ -264,7 +264,17 @@ def scan_file_for_imports(file_path: str) -> Set[str]:
         tree = ast.parse(code)
         visitor = ImportVisitor()
         visitor.visit(tree)
-        return visitor.imports
+
+        # Filter out local modules
+        file_dir = os.path.dirname(file_path)
+        filtered_imports = set()
+        for package in visitor.imports:
+            # Check if a .py file exists in the same directory
+            local_module_path = os.path.join(file_dir, f"{package}.py")
+            if not os.path.exists(local_module_path):
+                filtered_imports.add(package)
+
+        return filtered_imports
 
 
 def write_requirements_file(file_path: str) -> str:
