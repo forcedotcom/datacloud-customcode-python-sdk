@@ -25,14 +25,6 @@ Given this layout, `client.find_file_path("data.csv")` resolves to
 `client.find_file_path("dir/data.csv")` resolves to
 `$LIBRARY_PATH/files/dir/data.csv`.
 
-## WORKDIR
-
-The customer-function `WORKDIR` MAY be `/app` (or anything else). The SDK does
-not depend on `cwd` for file resolution when `LIBRARY_PATH` is set. Calling
-`os.chdir($LIBRARY_PATH)` from runtime code is no longer required and should be
-removed when the runtime is updated to a `salesforce-data-customcode` release
-that includes this contract.
-
 ## File layout
 
 Customer packages place bundled files under `payload/files/<name>`. After
@@ -57,11 +49,3 @@ first one that exists:
 
 If no candidate exists, `FileNotFoundError` is raised; the message lists every
 path that was tried.
-
-## Versioning
-
-This contract applies to `salesforce-data-customcode` releases that include
-the `$LIBRARY_PATH/files/<name>` lookup step. Older runtime images pinned to
-prior SDK releases must continue to set `cwd = $LIBRARY_PATH` (script
-runtime's existing behavior) or `os.chdir($LIBRARY_PATH)` (function runtime
-workaround) until they upgrade.
