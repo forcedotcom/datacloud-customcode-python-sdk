@@ -50,53 +50,6 @@ class TestDefaultFindFilePath:
         assert finder.code_package == "custom_package"
         assert finder.file_folder == "custom_files"
         assert finder.config_file == "custom_config.json"
-        assert finder.base_path is None
-
-    def test_init_with_base_path(self):
-        """base_path is stored as a Path even when given a string."""
-        finder = DefaultFindFilePath(base_path="/extracted")
-        assert finder.base_path == Path("/extracted")
-
-        finder_path = DefaultFindFilePath(base_path=Path("/extracted"))
-        assert finder_path.base_path == Path("/extracted")
-
-    def test_resolve_with_base_path_files_subdir(self, tmp_path, monkeypatch):
-        """base_path/<file_folder>/<name> is preferred over base_path/<name>."""
-        monkeypatch.delenv("LIBRARY_PATH", raising=False)
-        files_dir = tmp_path / "files"
-        files_dir.mkdir()
-        target = files_dir / "data1.csv"
-        target.write_text("hello")
-        # Also a stray at the root to prove files/ wins.
-        (tmp_path / "data1.csv").write_text("stray")
-
-        finder = DefaultFindFilePath(base_path=tmp_path)
-        assert finder.find_file_path("data1.csv") == target
-
-    def test_resolve_with_base_path_root_fallback(self, tmp_path, monkeypatch):
-        """When base_path/files/<name> is missing, fall back to base_path/<name>."""
-        monkeypatch.delenv("LIBRARY_PATH", raising=False)
-        target = tmp_path / "data1.csv"
-        target.write_text("hello")
-
-        finder = DefaultFindFilePath(base_path=tmp_path)
-        assert finder.find_file_path("data1.csv") == target
-
-    def test_resolve_base_path_takes_precedence_over_env(self, tmp_path, monkeypatch):
-        """base_path is checked before $LIBRARY_PATH."""
-        # base_path holds the file; LIBRARY_PATH points elsewhere.
-        base_files = tmp_path / "base" / "files"
-        base_files.mkdir(parents=True)
-        target = base_files / "data1.csv"
-        target.write_text("from-base")
-
-        env_dir = tmp_path / "env"
-        env_dir.mkdir()
-        (env_dir / "data1.csv").write_text("from-env")
-        monkeypatch.setenv("LIBRARY_PATH", str(env_dir))
-
-        finder = DefaultFindFilePath(base_path=tmp_path / "base")
-        assert finder.find_file_path("data1.csv") == target
 
     def test_resolve_library_path_files_subdir(self, tmp_path, monkeypatch):
         """$LIBRARY_PATH/<file_folder>/<name> resolves the BYOC layout."""
@@ -130,11 +83,10 @@ class TestDefaultFindFilePath:
         assert finder.find_file_path("file/data2.csv") == target
 
     def test_local_run_payload_files_default_layout(self, tmp_path, monkeypatch):
-        """AC1: local-run resolves payload/files/<name> with no env, no base_path.
+        """AC1: local-run resolves payload/files/<name> with no LIBRARY_PATH set.
 
         Mirrors ``datacustomcode run payload/entrypoint.py`` from a freshly
-        ``init``ed package where neither ``LIBRARY_PATH`` nor ``base_path`` is
-        in play.
+        ``init``ed package.
         """
         monkeypatch.delenv("LIBRARY_PATH", raising=False)
         package_dir = tmp_path / "my_package"
@@ -316,16 +268,13 @@ class TestDefaultFindFilePath:
         env_dir.mkdir()
         monkeypatch.setenv("LIBRARY_PATH", str(env_dir))
 
-        finder = DefaultFindFilePath(base_path=tmp_path / "base")
+        finder = DefaultFindFilePath()
         with pytest.raises(FileNotFoundError) as exc_info:
             finder.find_file_path("missing.txt")
 
         message = str(exc_info.value)
         assert "missing.txt" in message
         assert "Tried:" in message
-        # base_path candidates should appear
-        assert str(tmp_path / "base" / "files" / "missing.txt") in message
-        assert str(tmp_path / "base" / "missing.txt") in message
         # LIBRARY_PATH candidates should appear
         assert str(env_dir / "files" / "missing.txt") in message
         assert str(env_dir / "missing.txt") in message

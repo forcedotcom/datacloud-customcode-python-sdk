@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Iterator, Optional, Union
+from typing import Iterator, Optional
 
 from datacustomcode.file.base import BaseDataAccessLayer
 
@@ -44,7 +44,6 @@ class DefaultFindFilePath(BaseDataAccessLayer):
 
     def __init__(
         self,
-        base_path: Optional[Union[Path, str]] = None,
         code_package: Optional[str] = None,
         file_folder: Optional[str] = None,
         config_file: Optional[str] = None,
@@ -52,16 +51,10 @@ class DefaultFindFilePath(BaseDataAccessLayer):
         """Initialize the file reader with configuration.
 
         Args:
-            base_path: Optional explicit anchor for resolution. When provided,
-                ``base_path/<file_folder>/<name>`` and ``base_path/<name>`` are
-                tried before any environment- or cwd-based lookups. Used by
-                runtime hosts that know the package root and don't want to
-                rely on ``LIBRARY_PATH`` or the current working directory.
             code_package: The default code package directory to search
             file_folder: The folder containing files relative to the code package
             config_file: The configuration file to use for path resolution
         """
-        self.base_path = Path(base_path) if base_path is not None else None
         self.code_package = code_package or self.DEFAULT_CODE_PACKAGE
         self.file_folder = file_folder or self.DEFAULT_FILE_FOLDER
         self.config_file = config_file or self.DEFAULT_CONFIG_FILE
@@ -101,22 +94,17 @@ class DefaultFindFilePath(BaseDataAccessLayer):
         Returns:
             An iterator of candidate paths
         """
-        # 1. base_path/<file_folder>/<file_name>, then base_path/<file_name>
-        if self.base_path is not None:
-            yield self.base_path / self.file_folder / file_name
-            yield self.base_path / file_name
-
-        # 2. $LIBRARY_PATH/<file_folder>/<file_name>, then $LIBRARY_PATH/<file_name>
+        # 1. $LIBRARY_PATH/<file_folder>/<file_name>, then $LIBRARY_PATH/<file_name>
         env_path = os.getenv(self.DEFAULT_ENV_VAR)
         if env_path:
             yield Path(env_path) / self.file_folder / file_name
             yield Path(env_path) / file_name
 
-        # 3. <code_package>/<file_folder>/<file_name> relative to cwd
+        # 2. <code_package>/<file_folder>/<file_name> relative to cwd
         if self._code_package_exists():
             yield self._get_code_package_file_path(file_name)
 
-        # 4. <config_dir>/<file_folder>/<file_name> via config.json discovery
+        # 3. <config_dir>/<file_folder>/<file_name> via config.json discovery
         config_path = self._find_config_file()
         if config_path is not None:
             yield self._get_config_based_file_path(file_name, config_path)

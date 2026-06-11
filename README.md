@@ -124,8 +124,8 @@ The SDK automatically handles all dependency packaging for Data Cloud deployment
 ├── payload
 │   ├── config.json
 │   ├── entrypoint.py
-├── files
-│   ├── data.csv
+│   ├── files
+│   │   ├── data.csv
 ```
 
 ## py-files directory
@@ -137,10 +137,10 @@ Your Python dependencies can be packaged as .py files, .zip archives (containing
 ├── payload
 │   ├── config.json
 │   ├── entrypoint.py
-├── py-files
-│   ├── moduleA
-│   │   ├── __init__.py
-│   │   ├── moduleA.py
+│   ├── py-files
+│   │   ├── moduleA
+│   │   │   ├── __init__.py
+│   │   │   ├── moduleA.py
 ```
 
 ## API
@@ -179,14 +179,13 @@ Place bundled files (CSVs, prompt files, etc.) under `payload/files/`. The same 
 
 Resolution order (first existing path wins):
 
-1. `<base_path>/files/<file_name>`, then `<base_path>/<file_name>` — when the SDK is constructed with an explicit `base_path`.
-2. `$LIBRARY_PATH/files/<file_name>`, then `$LIBRARY_PATH/<file_name>` — when `LIBRARY_PATH` is set. Data Cloud sets this for you to the package root.
-3. `payload/files/<file_name>` relative to the current working directory.
-4. `<config_dir>/files/<file_name>` where `<config_dir>` is the directory of the nearest `config.json` discoverable by walking down from cwd.
+1. `$LIBRARY_PATH/files/<file_name>`, then `$LIBRARY_PATH/<file_name>` — when `LIBRARY_PATH` is set. Data Cloud sets this for you to the package root.
+2. `payload/files/<file_name>` relative to the current working directory.
+3. `<config_dir>/files/<file_name>` where `<config_dir>` is the directory of the nearest `config.json` discoverable by walking down from cwd.
 
 If none of these exist, `find_file_path` raises `FileNotFoundError` with the list of paths it tried.
 
-`LIBRARY_PATH` MUST point to the directory that *contains* `files/` — i.e., the package root (the directory that holds `config.json` and `entrypoint.py`). See [BYOC runtime contract](./docs/byoc_runtime_contract.md) for the full runtime contract between the SDK and Data Cloud.
+`$LIBRARY_PATH` is set automatically to the root of the package at runtime inside Data Cloud.
 
 
 ## CLI
@@ -464,5 +463,4 @@ If you're using OAuth Tokens authentication, the initial configure will retrieve
 ## Other docs
 
 - [Troubleshooting](./docs/troubleshooting.md)
-- [BYOC runtime contract](./docs/byoc_runtime_contract.md)
 - [For Contributors](./FOR_CONTRIBUTORS.md)

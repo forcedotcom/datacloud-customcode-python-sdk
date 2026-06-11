@@ -225,17 +225,14 @@ class Client:
 
         Resolution order (first existing path wins):
 
-        1. ``base_path/<file_folder>/<file_name>`` then ``base_path/<file_name>``
-           — when the underlying ``DefaultFindFilePath`` was constructed with
-           an explicit ``base_path``.
-        2. ``$LIBRARY_PATH/<file_folder>/<file_name>`` then
+        1. ``$LIBRARY_PATH/<file_folder>/<file_name>`` then
            ``$LIBRARY_PATH/<file_name>`` — when the ``LIBRARY_PATH`` environment
-           variable is set. The Data Cloud runtime sets this to the
-           directory containing the extracted package.
-        3. ``<code_package>/<file_folder>/<file_name>`` relative to the current
+           variable is set. The Data Cloud runtime sets this to the directory
+           containing the extracted package.
+        2. ``<code_package>/<file_folder>/<file_name>`` relative to the current
            working directory — the default ``payload/files/<file_name>`` layout
            used by ``datacustomcode run`` from a project root.
-        4. ``<config_dir>/<file_folder>/<file_name>`` where ``<config_dir>`` is
+        3. ``<config_dir>/<file_folder>/<file_name>`` where ``<config_dir>`` is
            the directory containing the nearest ``config.json`` discoverable
            by walking the cwd subtree.
 
