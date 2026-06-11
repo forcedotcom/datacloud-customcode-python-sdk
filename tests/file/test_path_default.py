@@ -63,7 +63,7 @@ class TestDefaultFindFilePath:
         assert finder.find_file_path("data1.csv") == target
 
     def test_resolve_library_path_root_fallback(self, tmp_path, monkeypatch):
-        """When $LIBRARY_PATH/files/<name> is missing, fall back to $LIBRARY_PATH/<name>."""
+        """Fall back to $LIBRARY_PATH/<name> when files/<name> is missing."""
         target = tmp_path / "data1.csv"
         target.write_text("hello")
         monkeypatch.setenv("LIBRARY_PATH", str(tmp_path))
@@ -72,7 +72,7 @@ class TestDefaultFindFilePath:
         assert finder.find_file_path("data1.csv") == target
 
     def test_resolve_library_path_subpath_under_files(self, tmp_path, monkeypatch):
-        """Relative subpaths like 'file/data2.csv' resolve under $LIBRARY_PATH/files/."""
+        """Relative subpaths like 'file/data2.csv' resolve under $LIBRARY_PATH/files."""
         nested = tmp_path / "files" / "file"
         nested.mkdir(parents=True)
         target = nested / "data2.csv"
