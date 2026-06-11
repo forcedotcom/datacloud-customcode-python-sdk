@@ -221,8 +221,41 @@ class Client:
         return self._writer.write_to_dmo(name, dataframe, write_mode, **kwargs)  # type: ignore[no-any-return]
 
     def find_file_path(self, file_name: str) -> Path:
-        """Return a file path"""
+        """Resolve a bundled file shipped in the package to an absolute path.
 
+        Resolution order (first existing path wins):
+
+        1. ``base_path/<file_folder>/<file_name>`` then ``base_path/<file_name>``
+           — when the underlying ``DefaultFindFilePath`` was constructed with
+           an explicit ``base_path``.
+        2. ``$LIBRARY_PATH/<file_folder>/<file_name>`` then
+           ``$LIBRARY_PATH/<file_name>`` — when the ``LIBRARY_PATH`` environment
+           variable is set. The Data Cloud runtime sets this to the
+           directory containing the extracted package.
+        3. ``<code_package>/<file_folder>/<file_name>`` relative to the current
+           working directory — the default ``payload/files/<file_name>`` layout
+           used by ``datacustomcode run`` from a project root.
+        4. ``<config_dir>/<file_folder>/<file_name>`` where ``<config_dir>`` is
+           the directory containing the nearest ``config.json`` discoverable
+           by walking the cwd subtree.
+
+        ``LIBRARY_PATH`` must point to the directory that *contains*
+        ``files/`` — i.e., the package root, the same directory that holds
+        ``config.json`` and ``entrypoint.py``. See
+        ``docs/byoc_runtime_contract.md`` for the full runtime contract.
+
+        Args:
+            file_name: A file under the package's ``files/`` folder. Relative
+                subpaths (e.g., ``"file/data2.csv"``) are supported.
+
+        Returns:
+            A ``pathlib.Path`` that exists.
+
+        Raises:
+            FileNotFoundError: If the file does not exist at any of the
+                resolution-order locations. The message lists every candidate
+                path that was tried.
+        """
         return self._file.find_file_path(file_name)  # type: ignore[no-any-return]
 
     def _validate_data_layer_history_does_not_contain(
