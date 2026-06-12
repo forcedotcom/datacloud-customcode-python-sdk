@@ -238,8 +238,8 @@ class Client:
 
         ``LIBRARY_PATH`` must point to the directory that *contains*
         ``files/`` — i.e., the package root, the same directory that holds
-        ``config.json`` and ``entrypoint.py``. See
-        ``docs/byoc_runtime_contract.md`` for the full runtime contract.
+        ``config.json`` and ``entrypoint.py``. See ``Bundled file resolution``
+        in the ``readme.md`` for more details.
 
         Args:
             file_name: A file under the package's ``files/`` folder. Relative
