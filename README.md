@@ -124,8 +124,8 @@ The SDK automatically handles all dependency packaging for Data Cloud deployment
 ├── payload
 │   ├── config.json
 │   ├── entrypoint.py
-├── files
-│   ├── data.csv
+│   ├── files
+│   │   ├── data.csv
 ```
 
 ## py-files directory
@@ -137,10 +137,10 @@ Your Python dependencies can be packaged as .py files, .zip archives (containing
 ├── payload
 │   ├── config.json
 │   ├── entrypoint.py
-├── py-files
-│   ├── moduleA
-│   │   ├── __init__.py
-│   │   ├── moduleA.py
+│   ├── py-files
+│   │   ├── moduleA
+│   │   │   ├── __init__.py
+│   │   │   ├── moduleA.py
 ```
 
 ## API
@@ -148,7 +148,7 @@ Your Python dependencies can be packaged as .py files, .zip archives (containing
 Your entry point script will define logic using the `Client` object which wraps data access layers.
 
 You should only need the following methods:
-* `find_file_path(file_name)` - Returns a file path
+* `find_file_path(file_name)` – Resolve a bundled file (placed under `payload/files/`) to a `pathlib.Path` that exists. Works the same locally and inside Data Cloud — see [Bundled file resolution](#bundled-file-resolution) below for the full lookup order. Raises `FileNotFoundError` if the file isn't found.
 * `read_dlo(name)` – Read from a Data Lake Object by name
 * `read_dmo(name)` – Read from a Data Model Object by name
 * `write_to_dlo(name, spark_dataframe, write_mode)` – Write to a Data Model Object by name with a Spark dataframe
@@ -168,6 +168,24 @@ client.write_to_dlo('output_DLO')
 
 > [!WARNING]
 > Currently we only support reading from DMOs and writing to DMOs or reading from DLOs and writing to DLOs, but they cannot mix.
+
+### Bundled file resolution
+
+Place bundled files (CSVs, prompt files, etc.) under `payload/files/`. The same `client.find_file_path("data.csv")` call resolves consistently across all three runtimes:
+
+- `datacustomcode run` (local) → `<cwd>/payload/files/data.csv`
+- Data Cloud script package → `$LIBRARY_PATH/files/data.csv`
+- Data Cloud function package → `$LIBRARY_PATH/files/data.csv`
+
+Resolution order (first existing path wins):
+
+1. `$LIBRARY_PATH/files/<file_name>`, then `$LIBRARY_PATH/<file_name>` — when `LIBRARY_PATH` is set. Data Cloud sets this for you to the package root.
+2. `payload/files/<file_name>` relative to the current working directory.
+3. `<config_dir>/files/<file_name>` where `<config_dir>` is the directory of the nearest `config.json` discoverable by walking down from cwd.
+
+If none of these exist, `find_file_path` raises `FileNotFoundError` with the list of paths it tried.
+
+`$LIBRARY_PATH` is set automatically to the root of the package at runtime inside Data Cloud.
 
 
 ## CLI

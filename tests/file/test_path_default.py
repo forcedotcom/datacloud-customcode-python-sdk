@@ -51,6 +51,79 @@ class TestDefaultFindFilePath:
         assert finder.file_folder == "custom_files"
         assert finder.config_file == "custom_config.json"
 
+    def test_resolve_library_path_files_subdir(self, tmp_path, monkeypatch):
+        """$LIBRARY_PATH/<file_folder>/<name> resolves the BYOC layout."""
+        files_dir = tmp_path / "files"
+        files_dir.mkdir()
+        target = files_dir / "data1.csv"
+        target.write_text("hello")
+        monkeypatch.setenv("LIBRARY_PATH", str(tmp_path))
+
+        finder = DefaultFindFilePath()
+        assert finder.find_file_path("data1.csv") == target
+
+    def test_resolve_library_path_root_fallback(self, tmp_path, monkeypatch):
+        """Fall back to $LIBRARY_PATH/<name> when files/<name> is missing."""
+        target = tmp_path / "data1.csv"
+        target.write_text("hello")
+        monkeypatch.setenv("LIBRARY_PATH", str(tmp_path))
+
+        finder = DefaultFindFilePath()
+        assert finder.find_file_path("data1.csv") == target
+
+    def test_resolve_library_path_subpath_under_files(self, tmp_path, monkeypatch):
+        """Relative subpaths like 'file/data2.csv' resolve under $LIBRARY_PATH/files."""
+        nested = tmp_path / "files" / "file"
+        nested.mkdir(parents=True)
+        target = nested / "data2.csv"
+        target.write_text("hello")
+        monkeypatch.setenv("LIBRARY_PATH", str(tmp_path))
+
+        finder = DefaultFindFilePath()
+        assert finder.find_file_path("file/data2.csv") == target
+
+    def test_local_run_payload_files_default_layout(self, tmp_path, monkeypatch):
+        """AC1: local-run resolves payload/files/<name> with no LIBRARY_PATH set.
+
+        Mirrors ``datacustomcode run payload/entrypoint.py`` from a freshly
+        ``init``ed package.
+        """
+        monkeypatch.delenv("LIBRARY_PATH", raising=False)
+        package_dir = tmp_path / "my_package"
+        files_dir = package_dir / "payload" / "files"
+        files_dir.mkdir(parents=True)
+        target = files_dir / "data1.csv"
+        target.write_text("hello")
+        monkeypatch.chdir(package_dir)
+
+        finder = DefaultFindFilePath()
+        result = finder.find_file_path("data1.csv")
+
+        assert result.resolve() == target.resolve()
+
+    def test_resolve_config_based_anchors_on_config_dir(self, tmp_path, monkeypatch):
+        """config.json discovery anchors on the config's parent, not cwd.
+
+        ``_find_config_file`` walks down from cwd via ``rglob``, so we put cwd
+        at an ancestor of the package. The file lives only under
+        ``<config_dir>/files/`` — a cwd-relative ``files/<name>`` would miss it.
+        """
+        monkeypatch.delenv("LIBRARY_PATH", raising=False)
+        package_dir = tmp_path / "pkg"
+        files_dir = package_dir / "files"
+        files_dir.mkdir(parents=True)
+        (package_dir / "config.json").write_text("{}")
+        target = files_dir / "data1.csv"
+        target.write_text("hello")
+
+        monkeypatch.chdir(tmp_path)
+
+        # Use a code_package that doesn't exist relative to tmp_path, so step 3
+        # is skipped and resolution falls through to config.json discovery.
+        finder = DefaultFindFilePath(code_package="nonexistent_pkg")
+        result = finder.find_file_path("data1.csv")
+        assert result.resolve() == target.resolve()
+
     def test_find_file_path_empty_filename(self):
         """Test find_file_path with empty filename raises ValueError."""
         finder = DefaultFindFilePath()
@@ -65,10 +138,10 @@ class TestDefaultFindFilePath:
         """Test find_file_path when file doesn't exist raises FileNotFoundError."""
         finder = DefaultFindFilePath()
 
-        with patch.object(finder, "_resolve_file_path") as mock_resolve:
+        with patch.object(finder, "_candidate_paths") as mock_candidates:
             mock_path = MagicMock()
             mock_path.exists.return_value = False
-            mock_resolve.return_value = mock_path
+            mock_candidates.return_value = iter([mock_path])
 
             with pytest.raises(
                 FileNotFoundError,
@@ -80,33 +153,34 @@ class TestDefaultFindFilePath:
         """Test find_file_path when file exists returns Path."""
         finder = DefaultFindFilePath()
 
-        with patch.object(finder, "_resolve_file_path") as mock_resolve:
+        with patch.object(finder, "_candidate_paths") as mock_candidates:
             mock_path = MagicMock()
             mock_path.exists.return_value = True
-            mock_resolve.return_value = mock_path
+            mock_candidates.return_value = iter([mock_path])
 
             result = finder.find_file_path("test.txt")
 
             assert result == mock_path
-            mock_resolve.assert_called_once_with("test.txt")
+            mock_candidates.assert_called_once_with("test.txt")
 
-    def test_resolve_file_path_env_var_set_file_exists(self):
-        """Test _resolve_file_path when environment variable is set and file exists."""
+    def test_find_file_path_env_var_set_file_exists(self):
+        """find_file_path returns $LIBRARY_PATH/files/<name> when present."""
         finder = DefaultFindFilePath()
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            test_file = Path(temp_dir) / "test.txt"
+            files_dir = Path(temp_dir) / "files"
+            files_dir.mkdir()
+            test_file = files_dir / "test.txt"
             test_file.write_text("test content")
 
             with patch.dict(os.environ, {finder.DEFAULT_ENV_VAR: str(temp_dir)}):
-                result = finder._resolve_file_path("test.txt")
+                result = finder.find_file_path("test.txt")
 
                 assert result == test_file
                 assert result.exists()
 
-    def test_resolve_file_path_env_var_set_file_not_found(self):
-        """Test _resolve_file_path when environment variable is set but file not found,
-        falls back to code package."""
+    def test_find_file_path_env_var_set_falls_through_to_code_package(self):
+        """When $LIBRARY_PATH has no match, resolution falls through to code_package."""
         finder = DefaultFindFilePath()
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -122,68 +196,33 @@ class TestDefaultFindFilePath:
                         mock_path.exists.return_value = True
                         mock_get_path.return_value = mock_path
 
-                        result = finder._resolve_file_path("test.txt")
+                        result = finder.find_file_path("test.txt")
 
                         assert result == mock_path
                         mock_exists.assert_called_once()
                         mock_get_path.assert_called_once_with("test.txt")
 
-    def test_resolve_file_path_env_var_not_set(self):
-        """Test _resolve_file_path when environment variable is not set,
-        uses normal flow."""
+    def test_find_file_path_env_var_not_set_uses_code_package(self, monkeypatch):
+        """With LIBRARY_PATH unset, code_package is the next candidate."""
+        monkeypatch.delenv("LIBRARY_PATH", raising=False)
         finder = DefaultFindFilePath()
 
-        # Ensure env var is not set
-        env_backup = os.environ.pop(finder.DEFAULT_ENV_VAR, None)
-        try:
-            with patch.object(
-                finder, "_code_package_exists", return_value=True
-            ) as mock_exists:
-                with patch.object(
-                    finder, "_get_code_package_file_path"
-                ) as mock_get_path:
-                    mock_path = MagicMock()
-                    mock_path.exists.return_value = True
-                    mock_get_path.return_value = mock_path
+        with patch.object(
+            finder, "_code_package_exists", return_value=True
+        ) as mock_exists:
+            with patch.object(finder, "_get_code_package_file_path") as mock_get_path:
+                mock_path = MagicMock()
+                mock_path.exists.return_value = True
+                mock_get_path.return_value = mock_path
 
-                    result = finder._resolve_file_path("test.txt")
+                result = finder.find_file_path("test.txt")
 
-                    assert result == mock_path
-                    mock_exists.assert_called_once()
-                    mock_get_path.assert_called_once_with("test.txt")
-        finally:
-            if env_backup is not None:
-                os.environ[finder.DEFAULT_ENV_VAR] = env_backup
+                assert result == mock_path
+                mock_exists.assert_called_once()
+                mock_get_path.assert_called_once_with("test.txt")
 
-    def test_resolve_file_path_code_package_exists(self):
-        """Test _resolve_file_path when code package exists and file is found."""
-        finder = DefaultFindFilePath()
-
-        # Ensure env var is not set to test normal flow
-        env_backup = os.environ.pop(finder.DEFAULT_ENV_VAR, None)
-        try:
-            with patch.object(
-                finder, "_code_package_exists", return_value=True
-            ) as mock_exists:
-                with patch.object(
-                    finder, "_get_code_package_file_path"
-                ) as mock_get_path:
-                    mock_path = MagicMock()
-                    mock_path.exists.return_value = True
-                    mock_get_path.return_value = mock_path
-
-                    result = finder._resolve_file_path("test.txt")
-
-                    assert result == mock_path
-                    mock_exists.assert_called_once()
-                    mock_get_path.assert_called_once_with("test.txt")
-        finally:
-            if env_backup is not None:
-                os.environ[finder.DEFAULT_ENV_VAR] = env_backup
-
-    def test_resolve_file_path_code_package_exists_file_not_found(self):
-        """Test _resolve_file_path when code package exists but file not found,
-        falls back to config."""
+    def test_find_file_path_code_package_exists_falls_through_to_config(self):
+        """When code_package candidate is missing, config.json discovery runs."""
         finder = DefaultFindFilePath()
 
         with patch.object(finder, "_code_package_exists", return_value=True):
@@ -205,7 +244,7 @@ class TestDefaultFindFilePath:
                         mock_config_file_path.exists.return_value = True
                         mock_get_config_path.return_value = mock_config_file_path
 
-                        result = finder._resolve_file_path("test.txt")
+                        result = finder.find_file_path("test.txt")
 
                         assert result == mock_config_file_path
                         mock_find_config.assert_called_once()
@@ -213,16 +252,32 @@ class TestDefaultFindFilePath:
                             "test.txt", mock_config_path
                         )
 
-    def test_resolve_file_path_fallback_to_filename(self):
-        """Test _resolve_file_path falls back to Path(filename)
-        when no other location works."""
+    def test_find_file_path_no_candidates_raises(self, monkeypatch):
+        """When no candidate paths exist, find_file_path raises FileNotFoundError."""
+        monkeypatch.delenv("LIBRARY_PATH", raising=False)
         finder = DefaultFindFilePath()
 
         with patch.object(finder, "_code_package_exists", return_value=False):
             with patch.object(finder, "_find_config_file", return_value=None):
-                result = finder._resolve_file_path("test.txt")
+                with pytest.raises(FileNotFoundError):
+                    finder.find_file_path("test.txt")
 
-                assert result == Path("test.txt")
+    def test_find_file_path_error_lists_tried_locations(self, tmp_path, monkeypatch):
+        """FileNotFoundError lists every candidate location that was tried."""
+        env_dir = tmp_path / "env"
+        env_dir.mkdir()
+        monkeypatch.setenv("LIBRARY_PATH", str(env_dir))
+
+        finder = DefaultFindFilePath()
+        with pytest.raises(FileNotFoundError) as exc_info:
+            finder.find_file_path("missing.txt")
+
+        message = str(exc_info.value)
+        assert "missing.txt" in message
+        assert "Tried:" in message
+        # LIBRARY_PATH candidates should appear
+        assert str(env_dir / "files" / "missing.txt") in message
+        assert str(env_dir / "missing.txt") in message
 
     def test_code_package_exists_true(self):
         """Test _code_package_exists returns True when directory exists."""
@@ -281,23 +336,23 @@ class TestDefaultFindFilePath:
             assert result is None
 
     def test_get_config_based_file_path(self):
-        """Test _get_config_based_file_path constructs correct path."""
+        """_get_config_based_file_path anchors on the discovered config dir."""
         finder = DefaultFindFilePath()
         config_path = Path("/some/path/config.json")
 
         result = finder._get_config_based_file_path("test.txt", config_path)
 
-        expected = Path("files/test.txt")
+        expected = Path("/some/path/files/test.txt")
         assert result == expected
 
     def test_get_config_based_file_path_custom_folder(self):
-        """Test _get_config_based_file_path with custom file folder."""
+        """_get_config_based_file_path uses custom file_folder under config dir."""
         finder = DefaultFindFilePath(file_folder="custom_files")
         config_path = Path("/some/path/config.json")
 
         result = finder._get_config_based_file_path("test.txt", config_path)
 
-        expected = Path("custom_files/test.txt")
+        expected = Path("/some/path/custom_files/test.txt")
         assert result == expected
 
     def test_find_file_in_tree_found(self):

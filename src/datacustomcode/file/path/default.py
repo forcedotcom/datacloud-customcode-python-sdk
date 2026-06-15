@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Iterator, Optional
 
 from datacustomcode.file.base import BaseDataAccessLayer
 
@@ -66,7 +66,7 @@ class DefaultFindFilePath(BaseDataAccessLayer):
             file_name: The name of the file to open
 
         Returns:
-            A file path
+            A file path that exists
 
         Raises:
             FileNotFoundError: If the file cannot be found
@@ -74,46 +74,40 @@ class DefaultFindFilePath(BaseDataAccessLayer):
         if not file_name:
             raise ValueError("file_name cannot be empty")
 
-        file_path = self._resolve_file_path(file_name)
+        tried: list[Path] = []
+        for candidate in self._candidate_paths(file_name):
+            tried.append(candidate)
+            if candidate.exists():
+                return candidate
 
-        if not file_path.exists():
-            raise FileNotFoundError(
-                f"File '{file_name}' not found in any search location"
-            )
+        raise FileNotFoundError(
+            f"File '{file_name}' not found in any search location. "
+            f"Tried: {[str(p) for p in tried]}"
+        )
 
-        return file_path
-
-    def _resolve_file_path(self, file_name: str) -> Path:
-        """Resolve the full path to a file.
+    def _candidate_paths(self, file_name: str) -> Iterator[Path]:
+        """Yield candidate paths for ``file_name`` in resolution order.
 
         Args:
             file_name: The name of the file to resolve
 
         Returns:
-            The full path to the file
+            An iterator of candidate paths
         """
-        # First check if environment variable is set
+        # 1. $LIBRARY_PATH/<file_folder>/<file_name>, then $LIBRARY_PATH/<file_name>
         env_path = os.getenv(self.DEFAULT_ENV_VAR)
         if env_path:
-            file_path = Path(env_path) / file_name
-            if file_path.exists():
-                return file_path
+            yield Path(env_path) / self.file_folder / file_name
+            yield Path(env_path) / file_name
 
-        # First try the default code package location
+        # 2. <code_package>/<file_folder>/<file_name> relative to cwd
         if self._code_package_exists():
-            file_path = self._get_code_package_file_path(file_name)
-            if file_path.exists():
-                return file_path
+            yield self._get_code_package_file_path(file_name)
 
-        # Fall back to config.json-based location
+        # 3. <config_dir>/<file_folder>/<file_name> via config.json discovery
         config_path = self._find_config_file()
-        if config_path:
-            file_path = self._get_config_based_file_path(file_name, config_path)
-            if file_path.exists():
-                return file_path
-
-        # Return the file name as a Path if not found in any location
-        return Path(file_name)
+        if config_path is not None:
+            yield self._get_config_based_file_path(file_name, config_path)
 
     def _code_package_exists(self) -> bool:
         """Check if the default code package directory exists.
@@ -146,6 +140,10 @@ class DefaultFindFilePath(BaseDataAccessLayer):
     def _get_config_based_file_path(self, file_name: str, config_path: Path) -> Path:
         """Get the file path relative to the config file location.
 
+        Anchors on the directory containing the discovered ``config.json`` so a
+        package found by walking up from cwd resolves files relative to its own
+        root, not the caller's cwd.
+
         Args:
             file_name: The name of the file
             config_path: The path to the config file
@@ -153,8 +151,7 @@ class DefaultFindFilePath(BaseDataAccessLayer):
         Returns:
             The full path to the file
         """
-        relative_path = f"{self.file_folder}/{file_name}"
-        return Path(relative_path)
+        return config_path.parent / self.file_folder / file_name
 
     def _find_file_in_tree(self, filename: str, search_path: Path) -> Optional[Path]:
         """Find a file within a directory tree.
