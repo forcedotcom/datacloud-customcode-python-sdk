@@ -201,8 +201,20 @@ def run_function_with_test(entrypoint: str, test_file: str) -> None:
 
 
 def add_py_folder(entrypoint: str):
-    default_py_folder = "py-files"  # Hardcoded folder name
-    cwd = Path.cwd().joinpath(entrypoint)
-    py_folder = cwd.parent.joinpath(default_py_folder)
+    """Add py-files subfolder and entrypoint directory to sys.path.
 
-    sys.path.append(str(py_folder))
+    This ensures:
+    1. py-files/ is available for additional dependencies
+    2. The entrypoint directory is available for local module imports
+    """
+    default_py_folder = "py-files"
+    cwd = Path.cwd().joinpath(entrypoint)
+    entrypoint_dir = cwd.parent
+    py_folder = entrypoint_dir.joinpath(default_py_folder)
+
+    # Add py-files folder if it exists
+    if py_folder.exists():
+        sys.path.insert(0, str(py_folder))
+
+    # Add entrypoint directory to allow local module imports
+    sys.path.insert(0, str(entrypoint_dir))
