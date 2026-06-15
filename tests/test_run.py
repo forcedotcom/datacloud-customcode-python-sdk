@@ -237,6 +237,48 @@ def test_run_entrypoint_with_dependencies():
             sys.path.remove(module_dir)
 
 
+def test_add_py_folder_enables_local_imports():
+    """Test that add_py_folder adds entrypoint directory to sys.path."""
+    from datacustomcode.run import add_py_folder
+
+    # Create a temporary directory structure
+    temp_dir = tempfile.mkdtemp()
+
+    try:
+        # Create a utility module in the temp directory
+        utility_path = os.path.join(temp_dir, "utility.py")
+        with open(utility_path, "w") as f:
+            f.write("TEST_VALUE = 'local_module_works'\n")
+
+        # Create an entrypoint file
+        entrypoint_path = os.path.join(temp_dir, "entrypoint.py")
+        with open(entrypoint_path, "w") as f:
+            f.write("# Test entrypoint\n")
+
+        # Save original sys.path
+        original_path = sys.path.copy()
+
+        # Call add_py_folder with relative path from current directory
+        relative_entrypoint = os.path.relpath(entrypoint_path)
+        add_py_folder(relative_entrypoint)
+
+        # verify we can now import the utility module
+        import utility
+
+        assert hasattr(utility, "TEST_VALUE"), "utility module should have TEST_VALUE"
+        assert (
+            utility.TEST_VALUE == "local_module_works"
+        ), f"Expected 'local_module_works', got {utility.TEST_VALUE}"
+
+    finally:
+        # Cleanup
+        sys.path = original_path
+        if "utility" in sys.modules:
+            del sys.modules["utility"]
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
+
+
 class TestDataspaceScenarios:
     """Test dataspace functionality in run_entrypoint."""
 
