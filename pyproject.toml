@@ -5,7 +5,7 @@ requires = ["poetry-core>=2.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
 [project]
 authors = []
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 5 - Production/Stable",
   "Operating System :: Unix",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
