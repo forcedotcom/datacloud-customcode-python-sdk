@@ -721,7 +721,7 @@ version = "0.6.2"
 description = "Pythonic argument parser, that will make you smile"
 optional = false
 python-versions = "*"
-groups = ["dev"]
+groups = ["main"]
 files = [
     {file = "docopt-0.6.2.tar.gz", hash = "sha256:49b3a825280bd66b3aa83585ef59c4a8c82f2c8a522dbe754a8bc8d08c85c491"},
 ]
@@ -1978,7 +1978,7 @@ version = "0.4.13"
 description = "Pip requirements.txt generator based on imports in project"
 optional = false
 python-versions = ">=3.7"
-groups = ["dev"]
+groups = ["main"]
 files = [
     {file = "pipreqs-0.4.13-py2.py3-none-any.whl", hash = "sha256:e522b9ed54aa3e8b7978ff251ab7a9af2f75d2cd8de4c102e881b666a79a308e"},
     {file = "pipreqs-0.4.13.tar.gz", hash = "sha256:a17f167880b6921be37533ce4c81ddc6e22b465c107aad557db43b1add56a99b"},
@@ -3437,7 +3437,7 @@ version = "0.1.10"
 description = "A semi hard Cornish cheese, also queries PyPI (PyPI client)"
 optional = false
 python-versions = "*"
-groups = ["dev"]
+groups = ["main"]
 files = [
     {file = "yarg-0.1.10-py2.py3-none-any.whl", hash = "sha256:4413145825e5d0e8b370754b3e829cf7c95ab0131dbc29fb5b52a8e27e1b7234"},
     {file = "yarg-0.1.10.tar.gz", hash = "sha256:1fbc94af89d5ebc2d2dfe46a5006a570de549c43e78f0913ce8390a1c5848b7e"},
@@ -3581,4 +3581,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.12"
-content-hash = "44b63b352175fe0d10dff5124b8bb638af5c5cb42107e85afbfd0032ac2f25ba"
+content-hash = "4547098cab9c49f56c37d396c4ba4d23baef5fd9d5bbf18d53e98b165d5fbef5"
