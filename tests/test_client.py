@@ -9,6 +9,7 @@ from datacustomcode.client import (
     Client,
     DataCloudAccessLayerException,
     DataCloudObjectType,
+    einstein_predict_col,
     llm_gateway_generate_text_col,
 )
 from datacustomcode.config import (
@@ -16,6 +17,7 @@ from datacustomcode.config import (
     ClientConfig,
     SparkConfig,
 )
+from datacustomcode.einstein_predictions.types import PredictionType
 from datacustomcode.io.reader.base import BaseDataCloudReader
 from datacustomcode.io.writer.base import BaseDataCloudWriter, WriteMode
 
@@ -333,6 +335,94 @@ class TestLLMGatewayGenerateTextCol:
         assert result is sentinel_col
         mock_spark_gateway.llm_gateway_generate_text_col.assert_called_once_with(
             "Greet {name}", values, model_id="m"
+        )
+
+
+class TestClientEinsteinPredict:
+
+    @patch("datacustomcode.client._build_spark_einstein_predictions")
+    def test_forwards_args_to_spark_predictions(self, mock_build, reset_client):
+        mock_predictions = MagicMock()
+        mock_predictions.einstein_predict.return_value = {"results": [1]}
+        mock_build.return_value = mock_predictions
+
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        client = Client(reader=reader, writer=writer)
+
+        result = client.einstein_predict(
+            "model1", PredictionType.REGRESSION, {"beds": 3}, settings={"k": 1}
+        )
+
+        assert result == {"results": [1]}
+        mock_predictions.einstein_predict.assert_called_once_with(
+            "model1", PredictionType.REGRESSION, {"beds": 3}, settings={"k": 1}
+        )
+
+    @patch("datacustomcode.client._build_spark_einstein_predictions")
+    def test_predictions_built_lazily_and_cached(self, mock_build, reset_client):
+        mock_predictions = MagicMock()
+        mock_predictions.einstein_predict.return_value = {}
+        mock_build.return_value = mock_predictions
+
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        client = Client(reader=reader, writer=writer)
+
+        mock_build.assert_not_called()
+
+        client.einstein_predict("m", PredictionType.REGRESSION, {"a": 1})
+        client.einstein_predict("m", PredictionType.REGRESSION, {"b": 2})
+
+        mock_build.assert_called_once_with()
+        assert mock_predictions.einstein_predict.call_count == 2
+
+    @patch("datacustomcode.client._build_spark_einstein_predictions")
+    def test_uses_injected_spark_predictions_without_config_lookup(
+        self, mock_build, reset_client
+    ):
+        injected = MagicMock()
+        injected.einstein_predict.return_value = {"from": "injected"}
+
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        client = Client(
+            reader=reader, writer=writer, spark_einstein_predictions=injected
+        )
+
+        result = client.einstein_predict("m", PredictionType.REGRESSION, {"a": 1})
+
+        assert result == {"from": "injected"}
+        injected.einstein_predict.assert_called_once_with(
+            "m", PredictionType.REGRESSION, {"a": 1}, settings=None
+        )
+        mock_build.assert_not_called()
+
+
+class TestEinsteinPredictCol:
+    """The module-level ``einstein_predict_col`` is a thin wrapper that resolves
+    the client-owned :class:`SparkEinsteinPredictions` and delegates.
+    """
+
+    @patch("datacustomcode.client._build_spark_einstein_predictions")
+    def test_delegates_to_spark_predictions(self, mock_build):
+        mock_predictions = MagicMock()
+        sentinel_col = MagicMock(name="col")
+        mock_predictions.einstein_predict_col.return_value = sentinel_col
+        mock_build.return_value = mock_predictions
+
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        Client(reader=reader, writer=writer)
+
+        features = {"beds": MagicMock()}
+        result = einstein_predict_col(
+            "model1", PredictionType.REGRESSION, features, settings={"k": 1}
+        )
+
+        assert result is sentinel_col
+        mock_predictions.einstein_predict_col.assert_called_once_with(
+            "model1", PredictionType.REGRESSION, features, settings={"k": 1}
         )
 
 

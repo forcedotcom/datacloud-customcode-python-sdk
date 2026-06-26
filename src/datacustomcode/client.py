@@ -17,6 +17,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
+    Any,
     ClassVar,
     Dict,
     Optional,
@@ -24,6 +25,7 @@ from typing import (
 )
 
 from datacustomcode.config import config
+from datacustomcode.einstein_predictions_config import spark_einstein_predictions_config
 from datacustomcode.file.path.default import DefaultFindFilePath
 from datacustomcode.io.reader.base import BaseDataCloudReader
 from datacustomcode.llm_gateway_config import spark_llm_gateway_config
@@ -34,6 +36,8 @@ if TYPE_CHECKING:
 
     from pyspark.sql import Column, DataFrame as PySparkDataFrame
 
+    from datacustomcode.einstein_predictions.spark_base import SparkEinsteinPredictions
+    from datacustomcode.einstein_predictions.types import PredictionType
     from datacustomcode.io.reader.base import BaseDataCloudReader
     from datacustomcode.io.writer.base import BaseDataCloudWriter, WriteMode
     from datacustomcode.llm_gateway.spark_base import SparkLLMGateway
@@ -99,6 +103,70 @@ def llm_gateway_generate_text_col(
     return gateway.llm_gateway_generate_text_col(template, values, model_id=model_id)
 
 
+def _build_spark_einstein_predictions() -> "SparkEinsteinPredictions":
+    """Instantiate the SDK-configured :class:`SparkEinsteinPredictions`.
+
+    Raises:
+        RuntimeError: If no ``spark_einstein_predictions_config`` has been loaded.
+    """
+    cfg = spark_einstein_predictions_config.spark_einstein_predictions_config
+    if cfg is None:
+        raise RuntimeError(
+            "spark_einstein_predictions_config is not configured. Add a "
+            "'spark_einstein_predictions_config' section to config.yaml."
+        )
+    return cfg.to_object()
+
+
+def einstein_predict_col(
+    model_api_name: str,
+    prediction_type: "PredictionType",
+    features: Dict[str, "Column"],
+    settings: Optional[Dict[str, Any]] = None,
+) -> "Column":
+    """Build a Spark Column that runs an Einstein prediction per row.
+
+    The returned Column yields a struct ``{status, response, error_code,
+    error_message}`` for each row. Use ``[...]`` (or ``getField``) to pick the
+    field you want, e.g. ``einstein_predict_col(...)["response"]``. ``response``
+    holds the prediction response payload as a JSON string. Per-row failures
+    populate ``status`` / ``error_code`` / ``error_message`` so a single bad row
+    does not abort the whole Spark job.
+
+    Example:
+
+        >>> from datacustomcode.einstein_predictions.types import PredictionType
+        >>> result = einstein_predict_col(
+        ...     "my_regression_model",
+        ...     PredictionType.REGRESSION,
+        ...     {"square_feet": col("square_feet__c"), "beds": col("beds__c")},
+        ... )
+        >>> df.withColumn("prediction__c", result["response"])
+        >>> # …or keep the struct around and inspect failures:
+        >>> df.withColumn("pred", result).select(
+        ...     "pred.status", "pred.response", "pred.error_message"
+        ... )
+
+    Args:
+        model_api_name: API name of the Einstein model to invoke.
+        prediction_type: The :class:`PredictionType` of the model.
+        features: A mapping from model feature column name to a Spark ``Column``
+            supplying that feature's per-row value.
+        settings: Optional prediction settings forwarded to the model.
+
+    Returns:
+        A Spark ``Column`` of ``StructType`` with fields ``status``,
+        ``response``, ``error_code``, and ``error_message`` (all nullable
+        strings). On success, ``status == "SUCCESS"`` and ``response`` holds
+        the JSON-serialized prediction payload; on failure, ``status ==
+        "ERROR"`` and the ``error_*`` fields carry diagnostic detail.
+    """
+    predictions = Client()._get_spark_einstein_predictions()
+    return predictions.einstein_predict_col(
+        model_api_name, prediction_type, features, settings=settings
+    )
+
+
 class DataCloudObjectType(Enum):
     DLO = "dlo"
     DMO = "dmo"
@@ -158,6 +226,8 @@ class Client:
         reader: A custom reader to use for reading Data Cloud objects.
         writer: A custom writer to use for writing Data Cloud objects.
         spark_llm_gateway: Optional custom :class:`SparkLLMGateway`.
+        spark_einstein_predictions: Optional custom
+            :class:`SparkEinsteinPredictions`.
 
     Example:
     >>> client = Client()
@@ -172,6 +242,7 @@ class Client:
     _writer: BaseDataCloudWriter
     _file: DefaultFindFilePath
     _spark_llm_gateway: Optional[SparkLLMGateway]
+    _spark_einstein_predictions: Optional[SparkEinsteinPredictions]
     _data_layer_history: dict[DataCloudObjectType, set[str]]
     _code_type: str
 
@@ -181,12 +252,14 @@ class Client:
         writer: Optional[BaseDataCloudWriter] = None,
         spark_provider: Optional[BaseSparkSessionProvider] = None,
         spark_llm_gateway: Optional[SparkLLMGateway] = None,
+        spark_einstein_predictions: Optional[SparkEinsteinPredictions] = None,
         code_type: str = "script",
     ) -> Client:
 
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._spark_llm_gateway = spark_llm_gateway
+            cls._instance._spark_einstein_predictions = spark_einstein_predictions
             # Initialize Readers and Writers from config
             # and/or provided reader and writer
             if reader is None or writer is None:
@@ -357,6 +430,49 @@ class Client:
         if self._spark_llm_gateway is None:
             self._spark_llm_gateway = _build_spark_llm_gateway()
         return self._spark_llm_gateway
+
+    def einstein_predict(
+        self,
+        model_api_name: str,
+        prediction_type: "PredictionType",
+        features: Dict[str, Any],
+        settings: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Issue a one-shot Einstein prediction. This is the scalar counterpart
+        to :func:`einstein_predict_col`: it runs **once** — not per row. Use the
+        column helper method instead when you want to fan a prediction out
+        across every row of a DataFrame.
+
+        Example:
+
+            >>> from datacustomcode.einstein_predictions.types import PredictionType
+            >>> response = Client().einstein_predict(
+            ...     "my_regression_model",
+            ...     PredictionType.REGRESSION,
+            ...     {"square_feet": 1800, "beds": 3},
+            ... )
+
+        Args:
+            model_api_name: API name of the Einstein model to invoke.
+            prediction_type: The :class:`PredictionType` of the model.
+            features: A mapping from model feature column name to a single
+                scalar value (``str`` / ``float`` / ``bool``).
+            settings: Optional prediction settings forwarded to the model.
+
+        Returns:
+            The prediction response payload as a plain Python ``dict``.
+
+        Raises:
+            EinsteinPredictionsCallError: If the prediction call fails.
+        """
+        return self._get_spark_einstein_predictions().einstein_predict(
+            model_api_name, prediction_type, features, settings=settings
+        )
+
+    def _get_spark_einstein_predictions(self) -> SparkEinsteinPredictions:
+        if self._spark_einstein_predictions is None:
+            self._spark_einstein_predictions = _build_spark_einstein_predictions()
+        return self._spark_einstein_predictions
 
     def _validate_data_layer_history_does_not_contain(
         self, data_cloud_object_type: DataCloudObjectType

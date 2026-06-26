@@ -19,9 +19,14 @@ import tempfile
 import yaml
 
 from datacustomcode.einstein_predictions.impl.default import DefaultEinsteinPredictions
+from datacustomcode.einstein_predictions.spark_default import (
+    DefaultSparkEinsteinPredictions,
+)
 from datacustomcode.einstein_predictions_config import (
     EinsteinPredictionsConfig,
     EinsteinPredictionsObjectConfig,
+    SparkEinsteinPredictionsConfig,
+    SparkEinsteinPredictionsObjectConfig,
 )
 
 
@@ -95,5 +100,78 @@ class TestEinsteinPredictionsConfigLoad:
             einstein_predictions = config.einstein_predictions_config.to_object()
             assert einstein_predictions is not None
             assert isinstance(einstein_predictions, DefaultEinsteinPredictions)
+        finally:
+            os.unlink(temp_file)
+
+
+class TestSparkEinsteinPredictionsConfigUpdate:
+    def test_update_replaces_config_without_force(self):
+        config1 = SparkEinsteinPredictionsConfig(
+            spark_einstein_predictions_config=SparkEinsteinPredictionsObjectConfig(
+                type_config_name="OldImplementation", options={"old": True}
+            )
+        )
+
+        config2 = SparkEinsteinPredictionsConfig(
+            spark_einstein_predictions_config=SparkEinsteinPredictionsObjectConfig(
+                type_config_name="NewImplementation", options={"new": True}
+            )
+        )
+
+        config1.update(config2)
+
+        assert (
+            config1.spark_einstein_predictions_config.type_config_name
+            == "NewImplementation"
+        )
+
+    def test_update_respects_force_flag(self):
+        config1 = SparkEinsteinPredictionsConfig(
+            spark_einstein_predictions_config=SparkEinsteinPredictionsObjectConfig(
+                type_config_name="ForcedImplementation",
+                options={"forced": True},
+                force=True,
+            )
+        )
+
+        config2 = SparkEinsteinPredictionsConfig(
+            spark_einstein_predictions_config=SparkEinsteinPredictionsObjectConfig(
+                type_config_name="NewImplementation", options={"new": True}
+            )
+        )
+
+        config1.update(config2)
+
+        assert (
+            config1.spark_einstein_predictions_config.type_config_name
+            == "ForcedImplementation"
+        )
+        assert config1.spark_einstein_predictions_config.force is True
+
+
+class TestSparkEinsteinPredictionsConfigLoad:
+    def test_load_from_yaml_file(self):
+        config_data = {
+            "spark_einstein_predictions_config": {
+                "type_config_name": "DefaultSparkEinsteinPredictions"
+            }
+        }
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            yaml.dump(config_data, f)
+            temp_file = f.name
+
+        try:
+            config = SparkEinsteinPredictionsConfig()
+            config.load(temp_file)
+
+            assert config.spark_einstein_predictions_config is not None
+            assert (
+                config.spark_einstein_predictions_config.type_config_name
+                == "DefaultSparkEinsteinPredictions"
+            )
+            spark_predictions = config.spark_einstein_predictions_config.to_object()
+            assert spark_predictions is not None
+            assert isinstance(spark_predictions, DefaultSparkEinsteinPredictions)
         finally:
             os.unlink(temp_file)
