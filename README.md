@@ -91,7 +91,7 @@ After modifying the `entrypoint.py` as needed, using any dependencies you add in
 ```zsh
 cd my_package
 datacustomcode scan ./payload/entrypoint.py
-datacustomcode deploy --path ./payload --name my_custom_script --cpu-size CPU_L
+datacustomcode deploy --path ./payload --name my_custom_script --cpu-size CPU_L --sf-cli-org myorg
 ```
 
 > [!TIP]
@@ -320,6 +320,7 @@ Options:
 - `--description TEXT`: Description of the transformation job (default: "")
 - `--network TEXT`: docker network (default: "default")
 - `--cpu-size TEXT`: CPU size for the deployment (default: `CPU_2XL`). Available options: CPU_L(Large), CPU_XL(Extra Large), CPU_2XL(2X Large), CPU_4XL(4X Large)
+- `--sf-cli-org TEXT`: Salesforce CLI org alias or username (e.g. `myorg`). Fetches credentials via `sf org display` — no `datacustomcode configure` step needed. Takes precedence over `--profile` if both are supplied.
 - `--function-invoke-opt TEXT`: Currently we support only `UnstructuredChunking` for functions.
 
 
@@ -483,7 +484,7 @@ sf --version
 **Browser-based (recommended for developer orgs and sandboxes):**
 ```zsh
 # Production / Developer Edition
-sf org login web --alias myorg
+sf org login web --alias myorg --instance-url <your-instance-url>
 
 # Sandbox
 sf org login web --alias mysandbox --instance-url https://test.salesforce.com
