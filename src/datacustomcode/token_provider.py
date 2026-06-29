@@ -98,6 +98,7 @@ class SFCLITokenProvider(TokenProvider):
         """Get token from Salesforce SF CLI"""
         import json
         import subprocess
+        import sys
 
         from datacustomcode.deploy import AccessTokenResponse
 
@@ -109,6 +110,7 @@ class SFCLITokenProvider(TokenProvider):
                     text=True,
                     check=True,
                     timeout=30,
+                    shell=sys.platform == "win32",
                 )
             except FileNotFoundError as exc:
                 raise RuntimeError(
