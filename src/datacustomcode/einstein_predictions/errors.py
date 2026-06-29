@@ -12,19 +12,25 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Exceptions raised by Einstein Predictions implementations."""
 
-from datacustomcode.einstein_predictions.base import EinsteinPredictions
-from datacustomcode.einstein_predictions.errors import EinsteinPredictionsCallError
-from datacustomcode.einstein_predictions.impl.default import DefaultEinsteinPredictions
-from datacustomcode.einstein_predictions.spark_base import SparkEinsteinPredictions
-from datacustomcode.einstein_predictions.spark_default import (
-    DefaultSparkEinsteinPredictions,
-)
+from __future__ import annotations
 
-__all__ = [
-    "DefaultEinsteinPredictions",
-    "DefaultSparkEinsteinPredictions",
-    "EinsteinPredictions",
-    "EinsteinPredictionsCallError",
-    "SparkEinsteinPredictions",
-]
+from typing import Optional
+
+
+class EinsteinPredictionsCallError(RuntimeError):
+    """Raised when an Einstein Predictions call returns an error."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        status: Optional[object] = None,
+        error_code: Optional[str] = None,
+        error_message: Optional[str] = None,
+    ) -> None:
+        super().__init__(message)
+        self.status = status
+        self.error_code = error_code
+        self.error_message = error_message

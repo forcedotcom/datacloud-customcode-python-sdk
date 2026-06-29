@@ -373,6 +373,56 @@ datacustomcode run ./payload/entrypoint.py --sf-cli-org myorg
 ```
 
 
+## Testing Einstein Predictions
+
+You can use AI models configured in Einstein Studio to score your data while
+transforming it. As with the LLM Gateway, there are two flavors: a one-shot
+scalar call (`client.einstein_predict`) and a per-row column helper
+(`einstein_predict_col`). Below is a sample code example:
+
+```
+from datacustomcode.client import Client, einstein_predict_col
+from datacustomcode.einstein_predictions.types import PredictionType
+
+
+def main():
+  client = Client()
+  df = client.read_dlo("Input__dll")
+  # einstein_predict_col returns a struct
+  # {status, response, error_code, error_message} per row, so per-row
+  # failures don't abort the Spark job. `response` is the prediction
+  # payload as a JSON string. Pick the field you want with [].
+  df_scored = df.withColumn(
+    "prediction__c",
+    einstein_predict_col(
+        "my_regression_model",  # An AI model in your org
+        PredictionType.REGRESSION,
+        {"square_feet": col("square_feet__c"), "beds": col("beds__c")},
+    )["response"],
+  )
+
+  dlo_name = "Output_dll"
+  client.write_to_dlo(dlo_name, df_scored, write_mode=WriteMode.APPEND)
+
+  # One-shot scalar prediction returns the response payload as a dict
+  prediction = client.einstein_predict(
+    "my_regression_model",
+    PredictionType.REGRESSION,
+    {"square_feet": 1800, "beds": 3},
+  )
+
+if __name__ == "__main__":
+  main()
+```
+
+Testing this code locally uses the same External Client App setup described in
+[Testing LLM Gateway](#testing-llm-gateway). Once your `myorg` alias is set up,
+run:
+```
+datacustomcode run ./payload/entrypoint.py --sf-cli-org myorg
+```
+
+
 ## Docker usage
 
 The SDK provides Docker-based development options that allow you to test your code in an environment that closely resembles Data Cloud's execution environment.

@@ -17,10 +17,13 @@ __all__ = [
     "AuthType",
     "Client",
     "Credentials",
+    "DefaultSparkEinsteinPredictions",
     "DefaultSparkLLMGateway",
     "PrintDataCloudWriter",
     "QueryAPIDataCloudReader",
+    "SparkEinsteinPredictions",
     "SparkLLMGateway",
+    "einstein_predict_col",
     "llm_gateway_generate_text_col",
 ]
 
@@ -59,4 +62,16 @@ def __getattr__(name: str):
         from datacustomcode.client import llm_gateway_generate_text_col
 
         return llm_gateway_generate_text_col
+    elif name == "SparkEinsteinPredictions":
+        from datacustomcode.einstein_predictions import SparkEinsteinPredictions
+
+        return SparkEinsteinPredictions
+    elif name == "DefaultSparkEinsteinPredictions":
+        from datacustomcode.einstein_predictions import DefaultSparkEinsteinPredictions
+
+        return DefaultSparkEinsteinPredictions
+    elif name == "einstein_predict_col":
+        from datacustomcode.client import einstein_predict_col
+
+        return einstein_predict_col
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

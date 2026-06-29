@@ -38,6 +38,23 @@ def main():
         >>> generated_text = client.llm_gateway_generate_text(
         ...     prompt, model_id
         ... )
+
+    You can also score rows with an Einstein Studio model. The per-row helper
+    returns the same ``{status, response, error_code, error_message}`` struct,
+    where ``response`` is the prediction payload as a JSON string.
+
+    Example:
+
+        >>> from datacustomcode.client import einstein_predict_col
+        >>> from datacustomcode.einstein_predictions.types import PredictionType
+            df_scored = df.withColumn(
+            ...     "prediction__c",
+            ...     einstein_predict_col(
+            ...         "my_regression_model",
+            ...         PredictionType.REGRESSION,
+            ...         {"beds": col("beds__c"), "baths": col("baths__c")},
+            ...     )["response"],
+            ... )
     """
 
     # Drop specific columns related to relationships

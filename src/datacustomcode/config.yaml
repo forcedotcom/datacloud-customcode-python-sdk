@@ -24,6 +24,9 @@ einstein_predictions_config:
   options:
     credentials_profile: default
 
+spark_einstein_predictions_config:
+  type_config_name: DefaultSparkEinsteinPredictions
+
 llm_gateway_config:
   type_config_name: DefaultLLMGateway
   options:
