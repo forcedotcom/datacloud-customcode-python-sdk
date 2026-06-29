@@ -22,11 +22,12 @@ from typing import (
     Optional,
 )
 
-from datacustomcode.einstein_predictions.types import PredictionType
 from datacustomcode.mixin import UserExtendableNamedConfigMixin
 
 if TYPE_CHECKING:
     from pyspark.sql import Column
+
+    from datacustomcode.einstein_predictions.types import PredictionType
 
 
 class SparkEinsteinPredictions(ABC, UserExtendableNamedConfigMixin):

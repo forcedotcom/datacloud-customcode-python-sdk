@@ -159,8 +159,7 @@ def _build_request(
     settings: Optional[Dict[str, Any]],
 ) -> PredictionRequest:
     prediction_columns = [
-        _feature_to_prediction_column(name, value)
-        for name, value in features.items()
+        _feature_to_prediction_column(name, value) for name, value in features.items()
     ]
     return PredictionRequest(
         prediction_type=prediction_type,

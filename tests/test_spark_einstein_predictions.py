@@ -17,10 +17,7 @@ from datacustomcode.einstein_predictions.spark_default import (
     _invoke_predictions,
     _invoke_predictions_as_struct,
 )
-from datacustomcode.einstein_predictions.types import (
-    PredictionResponse,
-    PredictionType,
-)
+from datacustomcode.einstein_predictions.types import PredictionResponse, PredictionType
 
 
 def _success_response(data: dict | None = None) -> PredictionResponse:
@@ -76,7 +73,7 @@ class TestBuildUnderlyingPredictions:
             )
 
             assert _build_underlying_predictions() is mock_predictions
-            mock_obj_config.einstein_predictions_config.to_object.assert_called_once_with()  # noqa: E501
+            mock_obj_config.einstein_predictions_config.to_object.assert_called_once_with()
 
     def test_raises_when_config_missing(self):
         with patch(
