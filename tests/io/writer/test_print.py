@@ -59,6 +59,12 @@ class TestPrintDataCloudWriter:
         # Verify show() was called
         mock_dataframe.show.assert_called_once()
 
+    def test_write_dlo_deltas_not_supported_locally(self, print_writer, mock_dataframe):
+        """Streaming delta writes are not supported by the local writer."""
+        with pytest.raises(NotImplementedError) as exc_info:
+            print_writer.write_dlo_deltas("test_dll", mock_dataframe, WriteMode.APPEND)
+        assert "write_dlo_deltas" in str(exc_info.value)
+
     def test_config_name(self):
         """Test that the CONFIG_NAME class variable is set correctly."""
         assert PrintDataCloudWriter.CONFIG_NAME == "PrintDataCloudWriter"

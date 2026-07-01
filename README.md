@@ -154,6 +154,11 @@ You should only need the following methods:
 * `write_to_dlo(name, spark_dataframe, write_mode)` – Write to a Data Model Object by name with a Spark dataframe
 * `write_to_dmo(name, spark_dataframe, write_mode)` – Write to a Data Lake Object by name with a Spark dataframe
 
+For streaming (delta) transforms, the streaming counterparts are:
+* `read_dlo_deltas(name)` – Read the streaming change feed (deltas) of a Data Lake Object as a streaming DataFrame
+* `read_dmo_deltas(name)` – Read the streaming change feed (deltas) of a Data Model Object as a streaming DataFrame
+* `write_dlo_deltas(name, spark_dataframe, write_mode)` – Write a streaming DataFrame of deltas to a Data Lake Object; returns the started `StreamingQuery`
+
 For example:
 ```python
 from datacustomcode import Client
@@ -168,6 +173,39 @@ client.write_to_dlo('output_DLO')
 
 > [!WARNING]
 > Currently we only support reading from DMOs and writing to DMOs or reading from DLOs and writing to DLOs, but they cannot mix.
+
+### Streaming (delta) transforms
+
+Streaming BYOC transforms process a Data Lake Object's Change Data Feed continuously instead of reading a bounded snapshot. Use the `*_deltas` methods in place of the batch read/write methods:
+
+```python
+from pyspark.sql.functions import col, upper
+
+from datacustomcode import Client
+from datacustomcode.io.writer.base import WriteMode
+
+client = Client()
+
+# read_dlo_deltas returns a *streaming* DataFrame over the change feed.
+deltas = client.read_dlo_deltas("Input__dll")
+
+# Ordinary PySpark transform. Keep the change-feed metadata columns
+# (those starting with "_") — the streaming sink needs them to apply
+# inserts, updates, and deletes to the target DLO.
+transformed = deltas.withColumn("description__c", upper(col("description__c")))
+
+# write_dlo_deltas starts a streaming query and returns the StreamingQuery.
+# The runtime owns the trigger and checkpoint location; you choose only the
+# target table and write mode.
+query = client.write_dlo_deltas("Output__dll", transformed, WriteMode.APPEND)
+query.awaitTermination()
+```
+
+Notes:
+
+- Supported streaming write modes are `WriteMode.APPEND`, `WriteMode.OVERWRITE`, and `WriteMode.MERGE_UPSERT_DELETE`.
+- These methods only run inside the Data Cloud streaming (`DELTA_SYNC`) runtime. Locally (`datacustomcode run`) they raise `NotImplementedError`, since there is no change feed to stream.
+- A complete runnable entry point is provided in [`examples/streaming_deltas/entrypoint.py`](src/datacustomcode/templates/script/examples/streaming_deltas/entrypoint.py).
 
 ### Bundled file resolution
 
