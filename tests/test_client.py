@@ -229,12 +229,10 @@ class TestClient:
         client = Client(reader=reader, writer=writer)
         client._record_dlo_access("some_dlo")
 
-        result = client.write_dlo_deltas(
-            "test_dlo", mock_df, WriteMode.APPEND, extra_param=True
-        )
+        result = client.write_dlo_deltas("test_dlo", mock_df, extra_param=True)
 
         writer.write_dlo_deltas.assert_called_once_with(
-            "test_dlo", mock_df, WriteMode.APPEND, extra_param=True
+            "test_dlo", mock_df, extra_param=True
         )
         assert result is mock_query
 
@@ -250,7 +248,7 @@ class TestClient:
         client._record_dmo_access("test_dmo")
 
         with pytest.raises(DataCloudAccessLayerException) as exc_info:
-            client.write_dlo_deltas("test_dlo", mock_df, WriteMode.APPEND)
+            client.write_dlo_deltas("test_dlo", mock_df)
 
         assert "test_dmo" in str(exc_info.value)
         writer.write_dlo_deltas.assert_not_called()
@@ -265,12 +263,10 @@ class TestClient:
         client = Client(reader=reader, writer=writer)
 
         df = client.read_dlo_deltas("source_dll")
-        client.write_dlo_deltas("target_dll", df, WriteMode.MERGE_UPSERT_DELETE)
+        client.write_dlo_deltas("target_dll", df)
 
         reader.read_dlo_deltas.assert_called_once_with("source_dll")
-        writer.write_dlo_deltas.assert_called_once_with(
-            "target_dll", stream_df, WriteMode.MERGE_UPSERT_DELETE
-        )
+        writer.write_dlo_deltas.assert_called_once_with("target_dll", stream_df)
         assert "source_dll" in client._data_layer_history[DataCloudObjectType.DLO]
 
     def test_mixed_dlo_dmo_raises_exception(self, reset_client, mock_spark):

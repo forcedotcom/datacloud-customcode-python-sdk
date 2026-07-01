@@ -396,7 +396,7 @@ class Client:
         return self._writer.write_to_dmo(name, dataframe, write_mode, **kwargs)  # type: ignore[no-any-return]
 
     def write_dlo_deltas(
-        self, name: str, dataframe: PySparkDataFrame, write_mode: WriteMode, **kwargs
+        self, name: str, dataframe: PySparkDataFrame, **kwargs
     ) -> StreamingQuery:
         """Write a streaming DataFrame of deltas to a DLO in Data Cloud.
 
@@ -409,15 +409,12 @@ class Client:
         Args:
             name: The name of the DLO to write to.
             dataframe: The streaming PySpark DataFrame to write.
-            write_mode: The write mode to use. Supported streaming modes are
-                ``WriteMode.APPEND``, ``WriteMode.OVERWRITE``, and
-                ``WriteMode.MERGE_UPSERT_DELETE``.
 
         Returns:
             The started ``StreamingQuery``.
         """
         self._validate_data_layer_history_does_not_contain(DataCloudObjectType.DMO)
-        return self._writer.write_dlo_deltas(name, dataframe, write_mode, **kwargs)  # type: ignore[no-any-return]
+        return self._writer.write_dlo_deltas(name, dataframe, **kwargs)  # type: ignore[no-any-return]
 
     def find_file_path(self, file_name: str) -> Path:
         """Resolve a bundled file shipped in the package to an absolute path.
