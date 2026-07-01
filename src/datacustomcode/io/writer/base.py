@@ -60,7 +60,7 @@ class BaseDataCloudWriter(BaseDataAccessLayer):
     ) -> None: ...
 
     def write_dlo_deltas(
-        self, name: str, dataframe: PySparkDataFrame, write_mode: WriteMode
+        self, name: str, dataframe: PySparkDataFrame
     ) -> StreamingQuery:
         """Write a streaming DataFrame of deltas to a Data Lake Object.
 
@@ -68,17 +68,14 @@ class BaseDataCloudWriter(BaseDataAccessLayer):
         that writes each micro-batch to the target DLO via the Data Cloud
         streaming sink and returns the resulting ``StreamingQuery`` handle. The
         runtime owns the trigger and checkpoint location; callers pass only the
-        table name and write mode. Concrete streaming behavior is provided by
-        the deployed Data Cloud runtime; the base implementation raises
+        table name. Concrete streaming behavior is provided by the deployed
+        Data Cloud runtime; the base implementation raises
         :class:`NotImplementedError`.
 
         Args:
             name: Target Data Lake Object name.
             dataframe: Streaming PySpark DataFrame produced from a
                 ``read_dlo_deltas`` / ``read_dmo_deltas`` source.
-            write_mode: Write mode for the streaming sink. Supported modes are
-                ``WriteMode.APPEND``, ``WriteMode.OVERWRITE``, and
-                ``WriteMode.MERGE_UPSERT_DELETE``.
 
         Returns:
             The started ``StreamingQuery``; the caller drives its lifecycle
