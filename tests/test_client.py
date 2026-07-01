@@ -193,6 +193,82 @@ class TestClient:
             "test_dmo", mock_df, WriteMode.OVERWRITE, extra_param=True
         )
 
+    def test_read_dlo_deltas(self, reset_client, mock_spark):
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        mock_df = MagicMock(spec=DataFrame)
+        reader.read_dlo_deltas.return_value = mock_df
+
+        client = Client(reader=reader, writer=writer)
+        result = client.read_dlo_deltas("test_dlo")
+
+        reader.read_dlo_deltas.assert_called_once_with("test_dlo")
+        assert result is mock_df
+        assert "test_dlo" in client._data_layer_history[DataCloudObjectType.DLO]
+
+    def test_read_dmo_deltas(self, reset_client, mock_spark):
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        mock_df = MagicMock(spec=DataFrame)
+        reader.read_dmo_deltas.return_value = mock_df
+
+        client = Client(reader=reader, writer=writer)
+        result = client.read_dmo_deltas("test_dmo")
+
+        reader.read_dmo_deltas.assert_called_once_with("test_dmo")
+        assert result is mock_df
+        assert "test_dmo" in client._data_layer_history[DataCloudObjectType.DMO]
+
+    def test_write_dlo_deltas(self, reset_client, mock_spark):
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        mock_df = MagicMock(spec=DataFrame)
+        mock_query = MagicMock()
+        writer.write_dlo_deltas.return_value = mock_query
+
+        client = Client(reader=reader, writer=writer)
+        client._record_dlo_access("some_dlo")
+
+        result = client.write_dlo_deltas("test_dlo", mock_df, extra_param=True)
+
+        writer.write_dlo_deltas.assert_called_once_with(
+            "test_dlo", mock_df, extra_param=True
+        )
+        assert result is mock_query
+
+    def test_write_dlo_deltas_after_dmo_read_raises_exception(
+        self, reset_client, mock_spark
+    ):
+        """Streaming DLO write is subject to the same DLO/DMO mixing guard."""
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        mock_df = MagicMock(spec=DataFrame)
+
+        client = Client(reader=reader, writer=writer)
+        client._record_dmo_access("test_dmo")
+
+        with pytest.raises(DataCloudAccessLayerException) as exc_info:
+            client.write_dlo_deltas("test_dlo", mock_df)
+
+        assert "test_dmo" in str(exc_info.value)
+        writer.write_dlo_deltas.assert_not_called()
+
+    def test_streaming_read_write_flow(self, reset_client, mock_spark):
+        """A read_dlo_deltas → write_dlo_deltas flow stays within the DLO layer."""
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        stream_df = MagicMock(spec=DataFrame)
+        reader.read_dlo_deltas.return_value = stream_df
+
+        client = Client(reader=reader, writer=writer)
+
+        df = client.read_dlo_deltas("source_dll")
+        client.write_dlo_deltas("target_dll", df)
+
+        reader.read_dlo_deltas.assert_called_once_with("source_dll")
+        writer.write_dlo_deltas.assert_called_once_with("target_dll", stream_df)
+        assert "source_dll" in client._data_layer_history[DataCloudObjectType.DLO]
+
     def test_mixed_dlo_dmo_raises_exception(self, reset_client, mock_spark):
         """Test that mixing DLOs and DMOs raises an exception."""
         reader = MagicMock(spec=BaseDataCloudReader)

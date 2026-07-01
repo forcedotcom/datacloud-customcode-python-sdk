@@ -1,5 +1,25 @@
 # Changelog
 
+## 6.1.0
+
+### Added
+
+- **Streaming (delta) read/write methods on `Client` for BYOC streaming transforms.**
+
+  New methods let an entry point process a Data Lake Object's Change Data Feed continuously instead of reading a bounded snapshot:
+
+  - `read_dlo_deltas(name)` / `read_dmo_deltas(name)` – return a streaming DataFrame over the object's change feed.
+  - `write_dlo_deltas(name, dataframe)` – start a streaming query that writes each micro-batch to the target DLO and return the `StreamingQuery` handle.
+
+  ```python
+  deltas = client.read_dlo_deltas("Input__dll")
+  transformed = deltas.withColumn("description__c", upper(col("description__c")))
+  query = client.write_dlo_deltas("Output__dll", transformed)
+  query.awaitTermination()
+  ```
+
+  These methods run only inside the Data Cloud streaming (`DELTA_SYNC`) runtime; locally they raise `NotImplementedError`. See the `examples/streaming_deltas/entrypoint.py` example and the "Streaming (delta) transforms" section of the README.
+
 ## 6.0.0
 
 ### Breaking Changes
