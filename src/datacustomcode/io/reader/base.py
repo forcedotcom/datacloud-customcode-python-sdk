@@ -41,3 +41,63 @@ class BaseDataCloudReader(BaseDataAccessLayer):
         name: str,
         schema: Union[AtomicType, StructType, str, None] = None,
     ) -> PySparkDataFrame: ...
+
+    def read_dlo_deltas(
+        self,
+        name: str,
+        schema: Union[AtomicType, StructType, str, None] = None,
+    ) -> PySparkDataFrame:
+        """Read the streaming change feed (deltas) for a Data Lake Object.
+
+        This is the streaming counterpart to :meth:`read_dlo`. It returns a
+        streaming DataFrame over the change feed the Data Cloud runtime
+        publishes for a streaming (``DELTA_SYNC``) transform. Concrete
+        streaming behavior is provided by the deployed Data Cloud runtime; the
+        base implementation raises :class:`NotImplementedError` so local
+        readers that do not support streaming fail clearly.
+
+        Args:
+            name: Data Lake Object name.
+            schema: Accepted for parity with :meth:`read_dlo`; implementations
+                may ignore it.
+
+        Returns:
+            A streaming PySpark DataFrame over the DLO change feed.
+
+        Raises:
+            NotImplementedError: If the active reader does not support streaming
+                deltas (e.g. the local development readers).
+        """
+        raise NotImplementedError(
+            "read_dlo_deltas is only supported when running in the Data Cloud "
+            "streaming runtime; the local reader does not support streaming "
+            "deltas."
+        )
+
+    def read_dmo_deltas(
+        self,
+        name: str,
+        schema: Union[AtomicType, StructType, str, None] = None,
+    ) -> PySparkDataFrame:
+        """Read the streaming change feed (deltas) for a Data Model Object.
+
+        Streaming counterpart to :meth:`read_dmo`. See :meth:`read_dlo_deltas`
+        for behavior and the local-development caveat.
+
+        Args:
+            name: Data Model Object name.
+            schema: Accepted for parity with :meth:`read_dmo`; implementations
+                may ignore it.
+
+        Returns:
+            A streaming PySpark DataFrame over the DMO change feed.
+
+        Raises:
+            NotImplementedError: If the active reader does not support streaming
+                deltas (e.g. the local development readers).
+        """
+        raise NotImplementedError(
+            "read_dmo_deltas is only supported when running in the Data Cloud "
+            "streaming runtime; the local reader does not support streaming "
+            "deltas."
+        )

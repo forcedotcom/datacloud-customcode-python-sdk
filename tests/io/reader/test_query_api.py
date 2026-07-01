@@ -224,6 +224,18 @@ class TestQueryAPIDataCloudReader:
         assert args[0] is mock_pandas_dataframe  # First arg is the pandas DataFrame
         assert isinstance(args[1], StructType)  # Second arg is the schema
 
+    def test_read_dlo_deltas_not_supported_locally(self, reader_without_init):
+        """Streaming delta reads are not supported by the local reader."""
+        with pytest.raises(NotImplementedError) as exc_info:
+            reader_without_init.read_dlo_deltas("test_dlo")
+        assert "read_dlo_deltas" in str(exc_info.value)
+
+    def test_read_dmo_deltas_not_supported_locally(self, reader_without_init):
+        """Streaming delta reads are not supported by the local reader."""
+        with pytest.raises(NotImplementedError) as exc_info:
+            reader_without_init.read_dmo_deltas("test_dmo")
+        assert "read_dmo_deltas" in str(exc_info.value)
+
     def test_read_dlo_with_schema(
         self, reader_without_init, mock_connection, mock_pandas_dataframe
     ):

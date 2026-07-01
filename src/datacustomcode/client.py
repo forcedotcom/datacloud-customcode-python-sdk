@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from pyspark.sql import Column, DataFrame as PySparkDataFrame
+    from pyspark.sql.streaming import StreamingQuery
 
     from datacustomcode.einstein_predictions.spark_base import SparkEinsteinPredictions
     from datacustomcode.einstein_predictions.types import PredictionType
@@ -335,6 +336,39 @@ class Client:
         self._record_dmo_access(name)
         return self._reader.read_dmo(name)  # type: ignore[no-any-return]
 
+    def read_dlo_deltas(self, name: str) -> PySparkDataFrame:
+        """Read the streaming change feed (deltas) for a DLO from Data Cloud.
+
+        Streaming counterpart to :meth:`read_dlo`, for use in a streaming
+        (``DELTA_SYNC``) BYOC transform. Returns a streaming DataFrame whose
+        rows carry the change-feed metadata columns (``_record_type``,
+        ``_commit_*``) alongside the source columns. Pair with
+        :meth:`write_dlo_deltas` to write the transformed stream back to a DLO.
+
+        Args:
+            name: The name of the DLO to read deltas from.
+
+        Returns:
+            A streaming PySpark DataFrame over the DLO change feed.
+        """
+        self._record_dlo_access(name)
+        return self._reader.read_dlo_deltas(name)  # type: ignore[no-any-return]
+
+    def read_dmo_deltas(self, name: str) -> PySparkDataFrame:
+        """Read the streaming change feed (deltas) for a DMO from Data Cloud.
+
+        Streaming counterpart to :meth:`read_dmo`. See :meth:`read_dlo_deltas`
+        for the shape of the returned change feed.
+
+        Args:
+            name: The name of the DMO to read deltas from.
+
+        Returns:
+            A streaming PySpark DataFrame over the DMO change feed.
+        """
+        self._record_dmo_access(name)
+        return self._reader.read_dmo_deltas(name)  # type: ignore[no-any-return]
+
     def write_to_dlo(
         self, name: str, dataframe: PySparkDataFrame, write_mode: WriteMode, **kwargs
     ) -> None:
@@ -360,6 +394,30 @@ class Client:
         """
         self._validate_data_layer_history_does_not_contain(DataCloudObjectType.DLO)
         return self._writer.write_to_dmo(name, dataframe, write_mode, **kwargs)  # type: ignore[no-any-return]
+
+    def write_dlo_deltas(
+        self, name: str, dataframe: PySparkDataFrame, write_mode: WriteMode, **kwargs
+    ) -> StreamingQuery:
+        """Write a streaming DataFrame of deltas to a DLO in Data Cloud.
+
+        Streaming counterpart to :meth:`write_to_dlo`. Starts a streaming query
+        that writes each micro-batch to the target DLO and returns the
+        ``StreamingQuery`` handle; the caller typically calls
+        ``query.awaitTermination()``. The runtime owns the trigger and
+        checkpoint location.
+
+        Args:
+            name: The name of the DLO to write to.
+            dataframe: The streaming PySpark DataFrame to write.
+            write_mode: The write mode to use. Supported streaming modes are
+                ``WriteMode.APPEND``, ``WriteMode.OVERWRITE``, and
+                ``WriteMode.MERGE_UPSERT_DELETE``.
+
+        Returns:
+            The started ``StreamingQuery``.
+        """
+        self._validate_data_layer_history_does_not_contain(DataCloudObjectType.DMO)
+        return self._writer.write_dlo_deltas(name, dataframe, write_mode, **kwargs)  # type: ignore[no-any-return]
 
     def find_file_path(self, file_name: str) -> Path:
         """Resolve a bundled file shipped in the package to an absolute path.
