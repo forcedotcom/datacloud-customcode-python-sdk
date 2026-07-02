@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from unittest.mock import MagicMock, patch
 
 from pyspark.sql import DataFrame, SparkSession
@@ -200,11 +201,32 @@ class TestClient:
         reader.read_dlo_deltas.return_value = mock_df
 
         client = Client(reader=reader, writer=writer)
-        result = client.read_dlo_deltas("test_dlo")
+        with patch.dict("os.environ", {}, clear=False):
+            os.environ.pop("BYOC_STREAMING_SOURCE_NAME", None)
+            result = client.read_dlo_deltas()
 
-        reader.read_dlo_deltas.assert_called_once_with("test_dlo")
+        reader.read_dlo_deltas.assert_called_once_with()
         assert result is mock_df
-        assert "test_dlo" in client._data_layer_history[DataCloudObjectType.DLO]
+        assert (
+            "<streaming delta source>"
+            in client._data_layer_history[DataCloudObjectType.DLO]
+        )
+
+    def test_read_dlo_deltas_records_runtime_source_name(
+        self, reset_client, mock_spark
+    ):
+        """The runtime source env var populates the access-history entry."""
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        reader.read_dlo_deltas.return_value = MagicMock(spec=DataFrame)
+
+        client = Client(reader=reader, writer=writer)
+        with patch.dict(
+            "os.environ", {"BYOC_STREAMING_SOURCE_NAME": "Account_std__dll"}
+        ):
+            client.read_dlo_deltas()
+
+        assert "Account_std__dll" in client._data_layer_history[DataCloudObjectType.DLO]
 
     def test_read_dmo_deltas(self, reset_client, mock_spark):
         reader = MagicMock(spec=BaseDataCloudReader)
@@ -213,11 +235,16 @@ class TestClient:
         reader.read_dmo_deltas.return_value = mock_df
 
         client = Client(reader=reader, writer=writer)
-        result = client.read_dmo_deltas("test_dmo")
+        with patch.dict(
+            "os.environ", {"BYOC_STREAMING_SOURCE_NAME": "Account_model__dlm"}
+        ):
+            result = client.read_dmo_deltas()
 
-        reader.read_dmo_deltas.assert_called_once_with("test_dmo")
+        reader.read_dmo_deltas.assert_called_once_with()
         assert result is mock_df
-        assert "test_dmo" in client._data_layer_history[DataCloudObjectType.DMO]
+        assert (
+            "Account_model__dlm" in client._data_layer_history[DataCloudObjectType.DMO]
+        )
 
     def test_write_dlo_deltas(self, reset_client, mock_spark):
         reader = MagicMock(spec=BaseDataCloudReader)
@@ -262,10 +289,11 @@ class TestClient:
 
         client = Client(reader=reader, writer=writer)
 
-        df = client.read_dlo_deltas("source_dll")
+        with patch.dict("os.environ", {"BYOC_STREAMING_SOURCE_NAME": "source_dll"}):
+            df = client.read_dlo_deltas()
         client.write_dlo_deltas("target_dll", df)
 
-        reader.read_dlo_deltas.assert_called_once_with("source_dll")
+        reader.read_dlo_deltas.assert_called_once_with()
         writer.write_dlo_deltas.assert_called_once_with("target_dll", stream_df)
         assert "source_dll" in client._data_layer_history[DataCloudObjectType.DLO]
 

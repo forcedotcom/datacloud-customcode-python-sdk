@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 from enum import Enum
+import os
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -43,6 +44,15 @@ if TYPE_CHECKING:
     from datacustomcode.io.writer.base import BaseDataCloudWriter, WriteMode
     from datacustomcode.llm_gateway.spark_base import SparkLLMGateway
     from datacustomcode.spark.base import BaseSparkSessionProvider
+
+
+_STREAMING_SOURCE_ENV = "BYOC_STREAMING_SOURCE_NAME"
+_STREAMING_SOURCE_FALLBACK = "<streaming delta source>"
+
+
+def _streaming_source_name() -> str:
+    """Return the runtime streaming source name, or a readable fallback."""
+    return os.environ.get(_STREAMING_SOURCE_ENV, _STREAMING_SOURCE_FALLBACK)
 
 
 def _build_spark_llm_gateway() -> "SparkLLMGateway":
@@ -336,7 +346,7 @@ class Client:
         self._record_dmo_access(name)
         return self._reader.read_dmo(name)  # type: ignore[no-any-return]
 
-    def read_dlo_deltas(self, name: str) -> PySparkDataFrame:
+    def read_dlo_deltas(self) -> PySparkDataFrame:
         """Read the streaming change feed (deltas) for a DLO from Data Cloud.
 
         Streaming counterpart to :meth:`read_dlo`, for use in a streaming
@@ -345,29 +355,24 @@ class Client:
         ``_commit_*``) alongside the source columns. Pair with
         :meth:`write_dlo_deltas` to write the transformed stream back to a DLO.
 
-        Args:
-            name: The name of the DLO to read deltas from.
-
         Returns:
             A streaming PySpark DataFrame over the DLO change feed.
         """
-        self._record_dlo_access(name)
-        return self._reader.read_dlo_deltas(name)  # type: ignore[no-any-return]
+        self._record_dlo_access(_streaming_source_name())
+        return self._reader.read_dlo_deltas()  # type: ignore[no-any-return]
 
-    def read_dmo_deltas(self, name: str) -> PySparkDataFrame:
+    def read_dmo_deltas(self) -> PySparkDataFrame:
         """Read the streaming change feed (deltas) for a DMO from Data Cloud.
 
         Streaming counterpart to :meth:`read_dmo`. See :meth:`read_dlo_deltas`
-        for the shape of the returned change feed.
-
-        Args:
-            name: The name of the DMO to read deltas from.
+        for the shape of the returned change feed and why no source name is
+        passed.
 
         Returns:
             A streaming PySpark DataFrame over the DMO change feed.
         """
-        self._record_dmo_access(name)
-        return self._reader.read_dmo_deltas(name)  # type: ignore[no-any-return]
+        self._record_dmo_access(_streaming_source_name())
+        return self._reader.read_dmo_deltas()  # type: ignore[no-any-return]
 
     def write_to_dlo(
         self, name: str, dataframe: PySparkDataFrame, write_mode: WriteMode, **kwargs

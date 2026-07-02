@@ -155,8 +155,8 @@ You should only need the following methods:
 * `write_to_dmo(name, spark_dataframe, write_mode)` – Write to a Data Lake Object by name with a Spark dataframe
 
 For streaming (delta) transforms, the streaming counterparts are:
-* `read_dlo_deltas(name)` – Read the streaming change feed (deltas) of a Data Lake Object as a streaming DataFrame
-* `read_dmo_deltas(name)` – Read the streaming change feed (deltas) of a Data Model Object as a streaming DataFrame
+* `read_dlo_deltas()` – Read the streaming change feed (deltas) of a Data Lake Object as a streaming DataFrame.
+* `read_dmo_deltas()` – Read the streaming change feed (deltas) of a Data Model Object as a streaming DataFrame.
 * `write_dlo_deltas(name, spark_dataframe)` – Write a streaming DataFrame of deltas to a Data Lake Object; returns the started `StreamingQuery`
 
 For example:
@@ -186,7 +186,8 @@ from datacustomcode import Client
 client = Client()
 
 # read_dlo_deltas returns a *streaming* DataFrame over the change feed.
-deltas = client.read_dlo_deltas("Input__dll")
+# The runtime resolves the single streaming source, so no name is passed.
+deltas = client.read_dlo_deltas()
 
 # Ordinary PySpark transform.
 transformed = deltas.withColumn("description__c", upper(col("description__c")))

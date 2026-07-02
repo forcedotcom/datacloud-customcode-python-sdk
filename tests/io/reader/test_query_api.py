@@ -227,13 +227,13 @@ class TestQueryAPIDataCloudReader:
     def test_read_dlo_deltas_not_supported_locally(self, reader_without_init):
         """Streaming delta reads are not supported by the local reader."""
         with pytest.raises(NotImplementedError) as exc_info:
-            reader_without_init.read_dlo_deltas("test_dlo")
+            reader_without_init.read_dlo_deltas()
         assert "read_dlo_deltas" in str(exc_info.value)
 
     def test_read_dmo_deltas_not_supported_locally(self, reader_without_init):
         """Streaming delta reads are not supported by the local reader."""
         with pytest.raises(NotImplementedError) as exc_info:
-            reader_without_init.read_dmo_deltas("test_dmo")
+            reader_without_init.read_dmo_deltas()
         assert "read_dmo_deltas" in str(exc_info.value)
 
     def test_read_dlo_with_schema(

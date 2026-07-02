@@ -8,11 +8,11 @@
 
   New methods let an entry point process a Data Lake Object's Change Data Feed continuously instead of reading a bounded snapshot:
 
-  - `read_dlo_deltas(name)` / `read_dmo_deltas(name)` – return a streaming DataFrame over the object's change feed.
+  - `read_dlo_deltas()` / `read_dmo_deltas()` – return a streaming DataFrame over the object's change feed.
   - `write_dlo_deltas(name, dataframe)` – start a streaming query that writes each micro-batch to the target DLO and return the `StreamingQuery` handle.
 
   ```python
-  deltas = client.read_dlo_deltas("Input__dll")
+  deltas = client.read_dlo_deltas()
   transformed = deltas.withColumn("description__c", upper(col("description__c")))
   query = client.write_dlo_deltas("Output__dll", transformed)
   query.awaitTermination()
