@@ -207,18 +207,17 @@ class DataCloudAccessLayerException(Exception):
         return msg
 
 
-_VALID_RUN_MODES = frozenset({"BATCH", "INITIAL_SYNC", "REBUILD", "DELTA_SYNC"})
+class RunMode(Enum):
+    BATCH = "BATCH"
+    INITIAL_SYNC = "INITIAL_SYNC"
+    REBUILD = "REBUILD"
+    DELTA_SYNC = "DELTA_SYNC"
 
 
-def get_run_mode() -> str:
+def get_run_mode() -> RunMode:
     """Read and validate the BYOC_RUN_MODE env var; default to BATCH when unset."""
     run_mode = os.getenv("BYOC_RUN_MODE", "BATCH").upper()
-    if run_mode not in _VALID_RUN_MODES:
-        raise ValueError(
-            f"Invalid BYOC_RUN_MODE: {run_mode}. Must be one of: "
-            f"{', '.join(sorted(_VALID_RUN_MODES))}."
-        )
-    return run_mode
+    return RunMode(run_mode)
 
 
 class Client:

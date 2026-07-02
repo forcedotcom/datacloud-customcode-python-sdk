@@ -10,6 +10,7 @@ from datacustomcode.client import (
     Client,
     DataCloudAccessLayerException,
     DataCloudObjectType,
+    RunMode,
     einstein_predict_col,
     get_run_mode,
     llm_gateway_generate_text_col,
@@ -366,12 +367,12 @@ class TestClient:
     @patch.dict(os.environ, {}, clear=True)
     def test_get_run_mode_default_batch(self, reset_client, mock_spark):
 
-        assert get_run_mode() == "BATCH"
+        assert get_run_mode() == RunMode.BATCH
 
     @patch.dict(os.environ, {"BYOC_RUN_MODE": "INITIAL_SYNC"})
     def test_get_run_mode(self, reset_client, mock_spark):
 
-        assert get_run_mode() == "INITIAL_SYNC"
+        assert get_run_mode() == RunMode.INITIAL_SYNC
 
 
 class TestClientLlmGatewayGenerateText:
