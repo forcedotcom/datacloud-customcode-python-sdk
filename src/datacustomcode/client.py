@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 from enum import Enum
+import os
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -206,6 +207,20 @@ class DataCloudAccessLayerException(Exception):
         return msg
 
 
+_VALID_RUN_MODES = frozenset({"BATCH", "INITIAL_SYNC", "REBUILD", "DELTA_SYNC"})
+
+
+def get_run_mode() -> str:
+    """Read and validate the BYOC_RUN_MODE env var; default to BATCH when unset."""
+    run_mode = os.getenv("BYOC_RUN_MODE", "BATCH").upper()
+    if run_mode not in _VALID_RUN_MODES:
+        raise ValueError(
+            f"Invalid BYOC_RUN_MODE: {run_mode}. Must be one of: "
+            f"{', '.join(sorted(_VALID_RUN_MODES))}."
+        )
+    return run_mode
+
+
 class Client:
     """Entrypoint for accessing DataCloud objects.
 
@@ -382,6 +397,17 @@ class Client:
         self._validate_data_layer_history_does_not_contain(DataCloudObjectType.DMO)
         return self._writer.write_to_dlo(name, dataframe, write_mode, **kwargs)  # type: ignore[no-any-return]
 
+    def auto_write_to_dlo(self, name: str, dataframe: PySparkDataFrame) -> None:
+        """Write a PySpark DataFrame to a DLO in Data Cloud automatically picking
+        the WriteMode.
+        For use with streaming transforms when running in rebuild or initial sync mode.
+        Args:
+            name: The name of the DLO to write to.
+            dataframe: The PySpark DataFrame to write.
+        """
+        self._validate_data_layer_history_does_not_contain(DataCloudObjectType.DMO)
+        return self._writer.auto_write_to_dlo(name, dataframe)
+
     def write_to_dmo(
         self, name: str, dataframe: PySparkDataFrame, write_mode: WriteMode, **kwargs
     ) -> None:
@@ -394,6 +420,17 @@ class Client:
         """
         self._validate_data_layer_history_does_not_contain(DataCloudObjectType.DLO)
         return self._writer.write_to_dmo(name, dataframe, write_mode, **kwargs)  # type: ignore[no-any-return]
+
+    def auto_write_to_dmo(self, name: str, dataframe: PySparkDataFrame) -> None:
+        """Write a PySpark DataFrame to a DMO in Data Cloud automatically picking
+        the WriteMode.
+        For use with streaming transforms when running in rebuild or initial sync mode.
+        Args:
+            name: The name of the DMO to write to.
+            dataframe: The PySpark DataFrame to write.
+        """
+        self._validate_data_layer_history_does_not_contain(DataCloudObjectType.DLO)
+        return self._writer.auto_write_to_dmo(name, dataframe)
 
     def write_dlo_deltas(
         self, name: str, dataframe: PySparkDataFrame, **kwargs

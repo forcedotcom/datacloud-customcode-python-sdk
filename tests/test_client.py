@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from unittest.mock import MagicMock, patch
 
 from pyspark.sql import DataFrame, SparkSession
@@ -10,6 +11,7 @@ from datacustomcode.client import (
     DataCloudAccessLayerException,
     DataCloudObjectType,
     einstein_predict_col,
+    get_run_mode,
     llm_gateway_generate_text_col,
 )
 from datacustomcode.config import (
@@ -46,9 +48,15 @@ class MockDataCloudWriter(BaseDataCloudWriter):
     ) -> None:
         pass
 
+    def auto_write_to_dlo(self, name: str, dataframe: DataFrame) -> None:
+        pass
+
     def write_to_dmo(
         self, name: str, dataframe: DataFrame, write_mode: WriteMode, **kwargs
     ) -> None:
+        pass
+
+    def auto_write_to_dmo(self, name: str, dataframe: DataFrame) -> None:
         pass
 
 
@@ -179,6 +187,18 @@ class TestClient:
             "test_dlo", mock_df, WriteMode.APPEND, extra_param=True
         )
 
+    def test_auto_write_to_dlo(self, reset_client, mock_spark):
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        mock_df = MagicMock(spec=DataFrame)
+
+        client = Client(reader=reader, writer=writer)
+        client._record_dlo_access("some_dlo")
+
+        client.auto_write_to_dlo("test_dlo", mock_df)
+
+        writer.auto_write_to_dlo.assert_called_once_with("test_dlo", mock_df)
+
     def test_write_to_dmo(self, reset_client, mock_spark):
         reader = MagicMock(spec=BaseDataCloudReader)
         writer = MagicMock(spec=BaseDataCloudWriter)
@@ -192,6 +212,18 @@ class TestClient:
         writer.write_to_dmo.assert_called_once_with(
             "test_dmo", mock_df, WriteMode.OVERWRITE, extra_param=True
         )
+
+    def test_auto_write_to_dmo(self, reset_client, mock_spark):
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        mock_df = MagicMock(spec=DataFrame)
+
+        client = Client(reader=reader, writer=writer)
+        client._record_dmo_access("some_dmo")
+
+        client.auto_write_to_dmo("test_dmo", mock_df)
+
+        writer.auto_write_to_dmo.assert_called_once_with("test_dmo", mock_df)
 
     def test_read_dlo_deltas(self, reset_client, mock_spark):
         reader = MagicMock(spec=BaseDataCloudReader)
@@ -330,6 +362,16 @@ class TestClient:
         )
 
         assert "source_dmo" in client._data_layer_history[DataCloudObjectType.DMO]
+
+    @patch.dict(os.environ, {}, clear=True)
+    def test_get_run_mode_default_batch(self, reset_client, mock_spark):
+
+        assert get_run_mode() == "BATCH"
+
+    @patch.dict(os.environ, {"BYOC_RUN_MODE": "INITIAL_SYNC"})
+    def test_get_run_mode(self, reset_client, mock_spark):
+
+        assert get_run_mode() == "INITIAL_SYNC"
 
 
 class TestClientLlmGatewayGenerateText:
