@@ -108,7 +108,7 @@ class SFCLITokenProvider(TokenProvider):
                     capture_output=True,
                     text=True,
                     check=True,
-                    timeout=30,
+                    timeout=120,
                 )
             except FileNotFoundError as exc:
                 raise RuntimeError(

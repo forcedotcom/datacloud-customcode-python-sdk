@@ -99,7 +99,7 @@ class TestGetToken:
             capture_output=True,
             text=True,
             check=True,
-            timeout=30,
+            timeout=120,
         )
         mock_run.assert_any_call(
             [
@@ -114,7 +114,7 @@ class TestGetToken:
             capture_output=True,
             text=True,
             check=True,
-            timeout=30,
+            timeout=120,
         )
 
     def test_file_not_found_raises_runtime_error(self, reader):
