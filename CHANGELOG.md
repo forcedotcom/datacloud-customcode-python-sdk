@@ -4,14 +4,19 @@
 
 ### Added
 
-- **Streaming (delta) read/write methods on `Client` for BYOC streaming transforms.**
+- **`StreamingClient` for BYOC streaming (delta) transforms.**
 
-  New methods let an entry point process a Data Lake Object's Change Data Feed continuously instead of reading a bounded snapshot:
+  A dedicated `StreamingClient` (alongside the batch `Client`) lets an entry point process a Data Lake Object's Change Data Feed continuously instead of reading a bounded snapshot.
 
   - `read_dlo_deltas()` / `read_dmo_deltas()` – return a streaming DataFrame over the object's change feed.
   - `write_dlo_deltas(name, dataframe)` – start a streaming query that writes each micro-batch to the target DLO and return the `StreamingQuery` handle.
 
+  The shared functions (`find_file_path`, `llm_gateway_generate_text`, `einstein_predict`) are available on both `Client` and `StreamingClient`.
+
   ```python
+  from datacustomcode import StreamingClient
+
+  client = StreamingClient()
   deltas = client.read_dlo_deltas()
   transformed = deltas.withColumn("description__c", upper(col("description__c")))
   query = client.write_dlo_deltas("Output__dll", transformed)

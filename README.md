@@ -145,19 +145,21 @@ Your Python dependencies can be packaged as .py files, .zip archives (containing
 
 ## API
 
-Your entry point script will define logic using the `Client` object which wraps data access layers.
+Your entry point script will define logic using the `Client` object (for batch transforms) or the `StreamingClient` object (for streaming delta transforms), which wrap the data access layers. Both are singletons; a single transform should use one or the other, not both.
 
-You should only need the following methods:
+For a batch transform, use `Client`. You should only need the following methods:
 * `find_file_path(file_name)` – Resolve a bundled file (placed under `payload/files/`) to a `pathlib.Path` that exists. Works the same locally and inside Data Cloud — see [Bundled file resolution](#bundled-file-resolution) below for the full lookup order. Raises `FileNotFoundError` if the file isn't found.
 * `read_dlo(name)` – Read from a Data Lake Object by name
 * `read_dmo(name)` – Read from a Data Model Object by name
 * `write_to_dlo(name, spark_dataframe, write_mode)` – Write to a Data Model Object by name with a Spark dataframe
 * `write_to_dmo(name, spark_dataframe, write_mode)` – Write to a Data Lake Object by name with a Spark dataframe
 
-For streaming (delta) transforms, the streaming counterparts are:
+For a streaming (delta) transform, use `StreamingClient`, which exposes the streaming counterparts:
 * `read_dlo_deltas()` – Read the streaming change feed (deltas) of a Data Lake Object as a streaming DataFrame.
 * `read_dmo_deltas()` – Read the streaming change feed (deltas) of a Data Model Object as a streaming DataFrame.
 * `write_dlo_deltas(name, spark_dataframe)` – Write a streaming DataFrame of deltas to a Data Lake Object; returns the started `StreamingQuery`
+
+`find_file_path`, `llm_gateway_generate_text`, and `einstein_predict` are available on both clients.
 
 For example:
 ```python
@@ -176,14 +178,14 @@ client.write_to_dlo('output_DLO')
 
 ### Streaming (delta) transforms
 
-Streaming BYOC transforms process a Data Lake Object's Change Data Feed continuously instead of reading a bounded snapshot. Use the `*_deltas` methods in place of the batch read/write methods:
+Streaming BYOC transforms process a Data Lake Object's Change Data Feed continuously instead of reading a bounded snapshot. Use a `StreamingClient` and its `*_deltas` methods in place of the batch `Client` read/write methods:
 
 ```python
 from pyspark.sql.functions import col, upper
 
-from datacustomcode import Client
+from datacustomcode import StreamingClient
 
-client = Client()
+client = StreamingClient()
 
 # read_dlo_deltas returns a *streaming* DataFrame over the change feed.
 # The runtime resolves the single streaming source, so no name is passed.
