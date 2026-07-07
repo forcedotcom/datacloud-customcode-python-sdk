@@ -97,10 +97,18 @@ class SFCLITokenProvider(TokenProvider):
     def get_token(self) -> "AccessTokenResponse":
         """Get token from Salesforce SF CLI"""
         import json
+        import shutil
         import subprocess
-        import sys
 
         from datacustomcode.deploy import AccessTokenResponse
+
+        sf_path = shutil.which("sf") or shutil.which("sf.cmd")
+        if sf_path is None:
+            raise RuntimeError(
+                "The 'sf' command was not found. "
+                "Install Salesforce CLI: "
+                "https://developer.salesforce.com/tools/salesforcecli"
+            )
 
         def _run_sf_command(args: list[str], description: str) -> dict:
             try:
@@ -110,14 +118,7 @@ class SFCLITokenProvider(TokenProvider):
                     text=True,
                     check=True,
                     timeout=30,
-                    shell=sys.platform == "win32",
                 )
-            except FileNotFoundError as exc:
-                raise RuntimeError(
-                    "The 'sf' command was not found. "
-                    "Install Salesforce CLI: "
-                    "https://developer.salesforce.com/tools/salesforcecli"
-                ) from exc
             except subprocess.TimeoutExpired as exc:
                 raise RuntimeError(
                     f"'{description}' timed out for org '{self.sf_cli_org}'"
@@ -144,7 +145,7 @@ class SFCLITokenProvider(TokenProvider):
 
         # Get org info from sf org display
         display_data = _run_sf_command(
-            ["sf", "org", "display", "--target-org", self.sf_cli_org, "--json"],
+            [sf_path, "org", "display", "--target-org", self.sf_cli_org, "--json"],
             "sf org display",
         )
         result_data = display_data.get("result", {})
@@ -161,7 +162,7 @@ class SFCLITokenProvider(TokenProvider):
         try:
             token_data = _run_sf_command(
                 [
-                    "sf",
+                    sf_path,
                     "org",
                     "auth",
                     "show-access-token",
