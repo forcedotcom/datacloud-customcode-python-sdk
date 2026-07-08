@@ -43,8 +43,7 @@ def _set_config_option(config_obj, key: str, value: Optional[str]) -> None:
 
 
 def _read_streaming_source(config_json: dict) -> Optional[str]:
-    """Return the streaming source name from config.json's ``streamingSource``.
-    """
+    """Return the streaming source name from config.json's ``streamingSource``."""
     source = config_json.get("streamingSource")
     if not isinstance(source, dict):
         return None
