@@ -301,7 +301,7 @@ class TestStreamingClient:
         reader.read_dlo_deltas.return_value = mock_df
 
         client = StreamingClient(reader=reader, writer=writer)
-        
+
         with patch("datacustomcode.client.config") as mock_config:
             mock_config.streaming_source = "Account_std__dll"
             result = client.read_dlo_deltas()
@@ -323,7 +323,7 @@ class TestStreamingClient:
             with pytest.raises(RuntimeError) as exc_info:
                 client.read_dlo_deltas()
 
-        assert "permissions.read" in str(exc_info.value)
+        assert "streamingSource" in str(exc_info.value)
         reader.read_dlo_deltas.assert_not_called()
 
     def test_read_dmo_deltas(self, reset_client, mock_spark):

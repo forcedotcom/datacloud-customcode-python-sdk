@@ -90,7 +90,7 @@ class ClientConfig(BaseConfig):
         SparkProviderConfig[BaseSparkSessionProvider], None
     ] = None
     # Source object name for a streaming (DELTA_SYNC) transform, populated by
-    # ``run_entrypoint`` from config.json's ``permissions.read``
+    # ``run_entrypoint`` from config.json's ``streamingSource`` field
     streaming_source: Union[str, None] = None
 
     def update(self, other: ClientConfig) -> ClientConfig:

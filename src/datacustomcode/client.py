@@ -55,17 +55,17 @@ def _streaming_source_name() -> str:
     """Return the streaming transform's read-source name.
 
     Resolved from ``config.streaming_source``, which ``run_entrypoint``
-    populates from config.json's ``permissions.read`` entry.
+    populates from config.json's ``streamingSource`` field.
 
     Raises:
         RuntimeError: If no ``streaming_source`` has been configured (e.g. the
-            transform's config.json has no ``permissions.read`` entry).
+            transform's config.json has no ``streamingSource`` field).
     """
     source = config.streaming_source
     if not source:
         raise RuntimeError(
             "No streaming source configured. A streaming transform must declare "
-            "its read source in config.json under 'permissions.read'."
+            "its read source in config.json under 'streamingSource'."
         )
     return source
 
