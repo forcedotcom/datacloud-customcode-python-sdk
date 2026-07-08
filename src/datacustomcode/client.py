@@ -15,7 +15,6 @@
 from __future__ import annotations
 
 from enum import Enum
-import os
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -52,18 +51,22 @@ if TYPE_CHECKING:
     from datacustomcode.spark.base import BaseSparkSessionProvider
 
 
-_STREAMING_SOURCE_ENV = "BYOC_STREAMING_SOURCE_NAME"
-
-
 def _streaming_source_name() -> str:
-    """Return the runtime streaming source name.
+    """Return the streaming transform's read-source name.
+
+    Resolved from ``config.streaming_source``, which ``run_entrypoint``
+    populates from config.json's ``permissions.read`` entry.
 
     Raises:
-        RuntimeError: If ``BYOC_STREAMING_SOURCE_NAME`` is not set
+        RuntimeError: If no ``streaming_source`` has been configured (e.g. the
+            transform's config.json has no ``permissions.read`` entry).
     """
-    source = os.environ.get(_STREAMING_SOURCE_ENV)
+    source = config.streaming_source
     if not source:
-        raise RuntimeError(f"{_STREAMING_SOURCE_ENV} is not set.")
+        raise RuntimeError(
+            "No streaming source configured. A streaming transform must declare "
+            "its read source in config.json under 'permissions.read'."
+        )
     return source
 
 
@@ -583,7 +586,7 @@ class StreamingClient(_BaseClient):
         """Write a streaming DataFrame of deltas to a DLO in Data Cloud.
 
         Starts a streaming query that writes each micro-batch to the
-        target DLO and returns the  ``StreamingQuery`` handle; the caller 
+        target DLO and returns the  ``StreamingQuery`` handle; the caller
         typically calls ``query.awaitTermination()``.
 
         Args:

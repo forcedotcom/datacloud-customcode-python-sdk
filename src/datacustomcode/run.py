@@ -42,6 +42,22 @@ def _set_config_option(config_obj, key: str, value: Optional[str]) -> None:
         config_obj.options[key] = value
 
 
+def _read_source_from_permissions(config_json: dict) -> Optional[str]:
+    """Return the read-source name from config.json ``permissions.read``.
+    """
+    permissions = config_json.get("permissions")
+    if not isinstance(permissions, dict):
+        return None
+    read = permissions.get("read")
+    if not isinstance(read, dict):
+        return None
+    for layer in ("dlo", "dmo"):
+        names = read.get(layer)
+        if names:
+            return names[0]
+    return None
+
+
 def _update_config_options(profile: Optional[str], sf_cli_org: Optional[str]):
     if sf_cli_org:
         config_key = "sf_cli_org"
@@ -124,6 +140,8 @@ def run_entrypoint(
         # Add dataspace to reader and writer config options
         _set_config_option(config.reader_config, "dataspace", dataspace)
         _set_config_option(config.writer_config, "dataspace", dataspace)
+
+        config.streaming_source = _read_source_from_permissions(config_json)
 
     _update_config_options(profile, sf_cli_org)
 

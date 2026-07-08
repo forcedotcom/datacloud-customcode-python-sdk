@@ -488,3 +488,102 @@ class TestDataspaceScenarios:
                 os.unlink(entrypoint_file)
             if os.path.exists(config_json_path):
                 os.unlink(config_json_path)
+
+
+class TestReadSourceFromPermissions:
+    """`_read_source_from_permissions` extracts the streaming read source from
+    config.json's `permissions.read`."""
+
+    def test_returns_single_dlo(self):
+        from datacustomcode.run import _read_source_from_permissions
+
+        config_json = {"permissions": {"read": {"dlo": ["Account_std__dll"]}}}
+        assert _read_source_from_permissions(config_json) == "Account_std__dll"
+
+    def test_returns_single_dmo(self):
+        from datacustomcode.run import _read_source_from_permissions
+
+        config_json = {"permissions": {"read": {"dmo": ["Account_model__dlm"]}}}
+        assert _read_source_from_permissions(config_json) == "Account_model__dlm"
+
+    def test_dlo_preferred_when_both_present(self):
+        from datacustomcode.run import _read_source_from_permissions
+
+        config_json = {
+            "permissions": {"read": {"dlo": ["the_dll"], "dmo": ["the_dlm"]}}
+        }
+        assert _read_source_from_permissions(config_json) == "the_dll"
+
+    def test_returns_first_of_multiple(self):
+        from datacustomcode.run import _read_source_from_permissions
+
+        config_json = {"permissions": {"read": {"dlo": ["first__dll", "second__dll"]}}}
+        assert _read_source_from_permissions(config_json) == "first__dll"
+
+    @pytest.mark.parametrize(
+        "config_json",
+        [
+            {},
+            {"permissions": None},
+            {"permissions": {}},
+            {"permissions": {"read": None}},
+            {"permissions": {"read": {}}},
+            {"permissions": {"read": {"dlo": []}}},
+        ],
+    )
+    def test_returns_none_when_absent_or_empty(self, config_json):
+        from datacustomcode.run import _read_source_from_permissions
+
+        assert _read_source_from_permissions(config_json) is None
+
+
+class TestStreamingSourceScenarios:
+    """`run_entrypoint` populates `config.streaming_source` from config.json."""
+
+    def _run_capturing_streaming_source(self, config_json_body):
+        """Run an entrypoint that records config.streaming_source and return it."""
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as temp:
+            entrypoint_content = textwrap.dedent(
+                """
+                from datacustomcode.config import config
+                with open("streaming_source_output.txt", "w") as f:
+                    f.write(f"streaming_source: {config.streaming_source}")
+                """
+            )
+            temp.write(entrypoint_content.encode("utf-8"))
+            entrypoint_file = temp.name
+
+        entrypoint_dir = os.path.dirname(entrypoint_file)
+        config_json_path = os.path.join(entrypoint_dir, "config.json")
+        with open(config_json_path, "w") as f:
+            json.dump(config_json_body, f)
+
+        try:
+            run_entrypoint(
+                entrypoint=entrypoint_file,
+                config_file=None,
+                dependencies=[],
+                profile="default",
+            )
+            with open("streaming_source_output.txt", "r") as f:
+                return f.read()
+        finally:
+            if os.path.exists(entrypoint_file):
+                os.unlink(entrypoint_file)
+            if os.path.exists(config_json_path):
+                os.unlink(config_json_path)
+            if os.path.exists("streaming_source_output.txt"):
+                os.unlink("streaming_source_output.txt")
+
+    def test_streaming_source_set_from_permissions_read(self):
+        content = self._run_capturing_streaming_source(
+            {
+                "dataspace": "default",
+                "permissions": {"read": {"dlo": ["Account_std__dll"]}},
+            }
+        )
+        assert "streaming_source: Account_std__dll" in content
+
+    def test_streaming_source_none_for_batch_without_read(self):
+        content = self._run_capturing_streaming_source({"dataspace": "default"})
+        assert "streaming_source: None" in content

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from unittest.mock import MagicMock, patch
 
 from pyspark.sql import DataFrame, SparkSession
@@ -84,13 +83,17 @@ def mock_config(mock_spark):
 @pytest.fixture
 def reset_client():
     """Reset the client singletons (and the shared Spark session) between tests."""
+    from datacustomcode.client import config as client_config
+
     Client._instance = None
     StreamingClient._instance = None
     _BaseClient._shared_spark = None
+    client_config.streaming_source = None
     yield
     Client._instance = None
     StreamingClient._instance = None
     _BaseClient._shared_spark = None
+    client_config.streaming_source = None
 
 
 class TestClient:
@@ -298,29 +301,29 @@ class TestStreamingClient:
         reader.read_dlo_deltas.return_value = mock_df
 
         client = StreamingClient(reader=reader, writer=writer)
-        # The streaming source is resolved by the runtime and recorded from the
-        # env var it sets; the caller passes no name.
-        with patch.dict(
-            "os.environ", {"BYOC_STREAMING_SOURCE_NAME": "Account_std__dll"}
-        ):
+        
+        with patch("datacustomcode.client.config") as mock_config:
+            mock_config.streaming_source = "Account_std__dll"
             result = client.read_dlo_deltas()
 
         reader.read_dlo_deltas.assert_called_once_with()
         assert result is mock_df
         assert "Account_std__dll" in client._data_layer_history[DataCloudObjectType.DLO]
 
-    def test_read_dlo_deltas_without_source_env_raises(self, reset_client, mock_spark):
-        """Delta reads require the runtime source env var; absence fails fast."""
+    def test_read_dlo_deltas_without_configured_source_raises(
+        self, reset_client, mock_spark
+    ):
+        """Delta reads require a configured streaming source; absence fails fast."""
         reader = MagicMock(spec=BaseDataCloudReader)
         writer = MagicMock(spec=BaseDataCloudWriter)
 
         client = StreamingClient(reader=reader, writer=writer)
-        with patch.dict("os.environ", {}, clear=False):
-            os.environ.pop("BYOC_STREAMING_SOURCE_NAME", None)
+        with patch("datacustomcode.client.config") as mock_config:
+            mock_config.streaming_source = None
             with pytest.raises(RuntimeError) as exc_info:
                 client.read_dlo_deltas()
 
-        assert "BYOC_STREAMING_SOURCE_NAME" in str(exc_info.value)
+        assert "permissions.read" in str(exc_info.value)
         reader.read_dlo_deltas.assert_not_called()
 
     def test_read_dmo_deltas(self, reset_client, mock_spark):
@@ -330,9 +333,8 @@ class TestStreamingClient:
         reader.read_dmo_deltas.return_value = mock_df
 
         client = StreamingClient(reader=reader, writer=writer)
-        with patch.dict(
-            "os.environ", {"BYOC_STREAMING_SOURCE_NAME": "Account_model__dlm"}
-        ):
+        with patch("datacustomcode.client.config") as mock_config:
+            mock_config.streaming_source = "Account_model__dlm"
             result = client.read_dmo_deltas()
 
         reader.read_dmo_deltas.assert_called_once_with()
@@ -384,7 +386,8 @@ class TestStreamingClient:
 
         client = StreamingClient(reader=reader, writer=writer)
 
-        with patch.dict("os.environ", {"BYOC_STREAMING_SOURCE_NAME": "source_dll"}):
+        with patch("datacustomcode.client.config") as mock_config:
+            mock_config.streaming_source = "source_dll"
             df = client.read_dlo_deltas()
         client.write_dlo_deltas("target_dll", df)
 
