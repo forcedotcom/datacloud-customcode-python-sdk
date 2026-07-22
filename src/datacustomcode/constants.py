@@ -38,6 +38,14 @@ USE_IN_FEATURE_MAPPING_FOR_CONNECT_API = {
     "SearchIndexChunking": "UnstructuredChunking",
 }
 
+# Script (data transform) invoke options
+SCRIPT_USE_IN_FEATURE_BATCH = "BatchTransform"
+SCRIPT_USE_IN_FEATURE_STREAMING = "StreamingTransform"
+SCRIPT_USE_IN_FEATURE_OPTIONS = [
+    SCRIPT_USE_IN_FEATURE_BATCH,
+    SCRIPT_USE_IN_FEATURE_STREAMING,
+]
+
 # Pydantic request/response type names to feature names
 REQUEST_TYPE_TO_FEATURE = {
     "SearchIndexChunkingV1Request": "SearchIndexChunking",
