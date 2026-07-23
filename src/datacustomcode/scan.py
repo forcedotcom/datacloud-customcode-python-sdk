@@ -23,7 +23,6 @@ from typing import (
     Any,
     ClassVar,
     Dict,
-    Optional,
     Set,
     Union,
 )
@@ -499,9 +498,7 @@ def update_config(file_path: str) -> dict[str, Any]:
     return existing_config
 
 
-def _update_streaming_config(
-    existing_config: dict[str, Any], file_path: str
-) -> None:
+def _update_streaming_config(existing_config: dict[str, Any], file_path: str) -> None:
     output = scan_file_streaming(file_path)
     read_layer = output.read_layer
 

@@ -673,9 +673,7 @@ class TestCreateDeployment:
         assert result.fileUploadUrl == "https://upload.example.com"
 
     @patch("datacustomcode.deploy._make_api_call")
-    def test_create_deployment_default_path_no_invoke_options(
-        self, mock_make_api_call
-    ):
+    def test_create_deployment_default_path_no_invoke_options(self, mock_make_api_call):
         """Without invokeOptions, the deployment uses the default v63.0 path."""
         access_token = AccessTokenResponse(
             access_token="test_token", instance_url="https://instance.example.com"
