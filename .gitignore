@@ -85,3 +85,5 @@ _version.py
 .terraform
 .terraform.lock.hcl
 terraform.tfstate*
+
+/my-chunking-package

@@ -43,8 +43,8 @@ from datacustomcode.named_credential.direct.credentials import (
 )
 from datacustomcode.scan import find_base_directory, get_package_type
 
-DATA_CUSTOM_CODE_PATH = "services/data/v63.0/ssot/data-custom-code"
-DATA_TRANSFORMS_PATH = "services/data/v63.0/ssot/data-transforms"
+DATA_CUSTOM_CODE_PATH = "services/data/v67.0/ssot/data-custom-code"
+DATA_TRANSFORMS_PATH = "services/data/v67.0/ssot/data-transforms"
 DATA_CUSTOM_CODE_INVOKE_OPTIONS_PATH = "services/data/v67.0/ssot/data-custom-code"
 WAIT_FOR_DEPLOYMENT_TIMEOUT = 3000
 
@@ -207,7 +207,7 @@ def create_deployment(
 ) -> CreateDeploymentResponse:
     """Create a custom code deployment in the DataCloud."""
     # invokeOptions only binds at v67.0; route there when it is set so the
-    # option isn't silently dropped. Everything else stays on v63.0.
+    # option isn't silently dropped. Everything else stays on v67.0.
     code_custom_code_path = (
         DATA_CUSTOM_CODE_INVOKE_OPTIONS_PATH
         if metadata.invokeOptions

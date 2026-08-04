@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 NAMED_CREDENTIAL_PATH = (
-    "services/data/v63.0/named-credentials/named-credential-setup/{name}"
+    "services/data/v67.0/named-credentials/named-credential-setup/{name}"
 )
 
 
