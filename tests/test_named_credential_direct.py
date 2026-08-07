@@ -255,9 +255,72 @@ class TestDirectCalloutTransport:
         # No Content-Type is assumed; headers are passed through verbatim.
         assert "Content-Type" not in captured["headers"]
         assert isinstance(captured["auth"], DynamicAuthHandler)
+        # Default timeout when neither an override header nor the env var is set.
+        assert captured["timeout"] == 30
 
         assert result["status_code"] == 200
         assert result["body"] == '{"ok": true}'
+
+    def test_callout_response_timeout_env_default(self, tmp_path, monkeypatch):
+        from datacustomcode.named_credential.direct import transport as transport_mod
+
+        transport = self._make_transport(tmp_path, monkeypatch, {"auth_type": "Custom"})
+        captured = {}
+
+        class _Resp:
+            def __init__(self):
+                self.status_code = 200
+                self.headers = {}
+                self.text = ""
+
+        def fake_request(**kwargs):
+            captured.update(kwargs)
+            return _Resp()
+
+        monkeypatch.setattr(transport_mod.requests, "request", fake_request)
+        monkeypatch.setenv("BYOC_CALLOUT_RESPONSE_TIMEOUT_SECONDS", "90")
+
+        transport.callout({"path": "callout:NC/x", "method": "GET", "headers": {}})
+
+        assert captured["timeout"] == 90
+
+    def test_callout_response_timeout_override_wins_and_stripped(
+        self, tmp_path, monkeypatch
+    ):
+        from datacustomcode.named_credential.direct import transport as transport_mod
+
+        transport = self._make_transport(tmp_path, monkeypatch, {"auth_type": "Custom"})
+        captured = {}
+
+        class _Resp:
+            def __init__(self):
+                self.status_code = 200
+                self.headers = {}
+                self.text = ""
+
+        def fake_request(**kwargs):
+            captured.update(kwargs)
+            return _Resp()
+
+        monkeypatch.setattr(transport_mod.requests, "request", fake_request)
+        monkeypatch.setenv("BYOC_CALLOUT_RESPONSE_TIMEOUT_SECONDS", "90")
+
+        transport.callout(
+            {
+                "path": "callout:NC/x",
+                "method": "GET",
+                "headers": {
+                    "Accept": "application/json",
+                    "ctx-callout-response-timeout-seconds": "120",
+                },
+            }
+        )
+
+        # Per-request override wins over the env default.
+        assert captured["timeout"] == 120
+        # The control header is stripped and never forwarded to the external service.
+        assert "ctx-callout-response-timeout-seconds" not in captured["headers"]
+        assert captured["headers"] == {"Accept": "application/json"}
 
     @pytest.mark.parametrize("method", ["PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
     def test_callout_forwards_non_get_post_methods(self, tmp_path, monkeypatch, method):

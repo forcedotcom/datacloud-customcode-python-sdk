@@ -25,6 +25,13 @@ from pydantic import (
 
 from datacustomcode.named_credential.types.http_method import HTTPMethod
 
+# Control header carrying the per-request response-timeout override (seconds).
+# byoc-proxy reads this header to override its default callout response timeout;
+# on the local (``datacustomcode run``) path it sets the outbound HTTP timeout.
+# It is a control header for the proxy/transport and must not be forwarded to the
+# external service.
+RESPONSE_TIMEOUT_HEADER = "ctx-callout-response-timeout-seconds"
+
 
 class HTTPRequest(BaseModel):
     """External callout request. The endpoint and its auth are resolved

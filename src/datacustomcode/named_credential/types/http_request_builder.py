@@ -16,7 +16,10 @@
 from typing import Dict, Union
 
 from datacustomcode.named_credential.types.http_method import HTTPMethod
-from datacustomcode.named_credential.types.http_request import HTTPRequest
+from datacustomcode.named_credential.types.http_request import (
+    RESPONSE_TIMEOUT_HEADER,
+    HTTPRequest,
+)
 
 
 class HTTPRequestBuilder:
@@ -45,6 +48,25 @@ class HTTPRequestBuilder:
 
     def set_headers(self, headers: Dict[str, str]) -> "HTTPRequestBuilder":
         self._headers = headers
+        return self
+
+    def set_response_timeout_seconds(self, seconds: int) -> "HTTPRequestBuilder":
+        """Override the callout response timeout for this request.
+
+        Sets the ``ctx-callout-response-timeout-seconds`` control header, which
+        byoc-proxy uses to override its default response timeout (subject to the
+        proxy's own validation and server-side maximum). On the local
+        (``datacustomcode run``) path it sets the outbound HTTP timeout. The
+        header is never forwarded to the external service.
+
+        Args:
+            seconds: The response timeout in seconds; must be a positive integer.
+        """
+        if not isinstance(seconds, int) or isinstance(seconds, bool) or seconds <= 0:
+            raise ValueError(
+                f"response_timeout_seconds must be a positive integer, got {seconds!r}"
+            )
+        self._headers[RESPONSE_TIMEOUT_HEADER] = str(seconds)
         return self
 
     def build(self) -> HTTPRequest:

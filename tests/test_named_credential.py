@@ -111,6 +111,35 @@ class TestHTTPRequestBuilder:
         with pytest.raises(ValidationError):
             HTTPRequestBuilder().set_url("").build()
 
+    def test_builder_sets_response_timeout_header(self):
+        request = (
+            HTTPRequestBuilder()
+            .set_url("callout:NC/path")
+            .set_response_timeout_seconds(60)
+            .build()
+        )
+        assert request.headers["ctx-callout-response-timeout-seconds"] == "60"
+
+    def test_builder_response_timeout_preserves_other_headers(self):
+        request = (
+            HTTPRequestBuilder()
+            .set_url("callout:NC/path")
+            .set_headers({"Accept": "application/json"})
+            .set_response_timeout_seconds(45)
+            .build()
+        )
+        assert request.headers == {
+            "Accept": "application/json",
+            "ctx-callout-response-timeout-seconds": "45",
+        }
+
+    @pytest.mark.parametrize("bad", [0, -5, "60", 1.5, True, None])
+    def test_builder_response_timeout_rejects_non_positive_int(self, bad):
+        with pytest.raises(ValueError):
+            HTTPRequestBuilder().set_url(
+                "callout:NC/path"
+            ).set_response_timeout_seconds(bad)
+
 
 class TestHTTPResponse:
     def test_response_defaults(self):

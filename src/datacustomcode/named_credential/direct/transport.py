@@ -22,6 +22,7 @@ Resolves the ``callout:<NamedCredential>/<path>`` reference to a real endpoint
 
 from __future__ import annotations
 
+import os
 from typing import (
     Any,
     Dict,
@@ -34,11 +35,43 @@ from datacustomcode.named_credential.direct.auth import DynamicAuthHandler
 from datacustomcode.named_credential.direct.credentials import CredentialStore
 from datacustomcode.named_credential.direct.url_resolver import resolve_base_url
 from datacustomcode.named_credential.errors import NamedCredentialCallError
+from datacustomcode.named_credential.types.http_request import (
+    RESPONSE_TIMEOUT_HEADER,
+)
 from datacustomcode.token_provider import (
     CredentialsTokenProvider,
     SFCLITokenProvider,
     TokenProvider,
 )
+
+# Env var carrying the default callout response timeout (seconds) when the caller
+# sets no per-request override. Mirrors the internal SDK / byoc-proxy default.
+_RESPONSE_TIMEOUT_ENV = "BYOC_CALLOUT_RESPONSE_TIMEOUT_SECONDS"
+_DEFAULT_RESPONSE_TIMEOUT_SECONDS = 30
+
+
+def _resolve_timeout_seconds(headers: Dict[str, str]) -> int:
+    """Resolve the outbound HTTP timeout (seconds) for a local callout.
+
+    Precedence: a per-request override in the ``ctx-callout-response-timeout-seconds``
+    header (case-insensitive) wins, otherwise the
+    ``BYOC_CALLOUT_RESPONSE_TIMEOUT_SECONDS`` env default, otherwise 30. Invalid or
+    non-positive values fall back to the env/default rather than raising, keeping the
+    local path lenient like byoc-proxy.
+    """
+    override = next(
+        (v for k, v in headers.items() if k.lower() == RESPONSE_TIMEOUT_HEADER),
+        None,
+    )
+    for candidate in (override, os.getenv(_RESPONSE_TIMEOUT_ENV)):
+        if candidate is not None and str(candidate).strip():
+            try:
+                value = int(str(candidate).strip())
+            except ValueError:
+                continue
+            if value > 0:
+                return value
+    return _DEFAULT_RESPONSE_TIMEOUT_SECONDS
 
 
 class DirectCalloutTransport:
@@ -95,13 +128,20 @@ class DirectCalloutTransport:
         # Headers are passed; the SDK assumes no Content-Type.
         headers = dict(callout_request.get("headers", {}))
 
+        # Resolve the response timeout, then strip the control header (case-insensitive)
+        # so it is applied locally and never forwarded to the external service.
+        timeout_seconds = _resolve_timeout_seconds(headers)
+        headers = {
+            k: v for k, v in headers.items() if k.lower() != RESPONSE_TIMEOUT_HEADER
+        }
+
         response = requests.request(
             method=callout_request["method"],
             url=base_url + path_suffix,
             headers=headers,
             data=body,
             auth=DynamicAuthHandler(cred_config),
-            timeout=30,
+            timeout=timeout_seconds,
         )
         return {
             "status_code": response.status_code,
