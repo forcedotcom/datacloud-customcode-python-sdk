@@ -45,13 +45,24 @@ check_docker() {
     echo "Docker daemon is running"
 }
 
+# Function to check if openssl is installed
+check_openssl() {
+    if ! command -v openssl &> /dev/null; then
+        echo "openssl is not installed. It is required to generate a secure JupyterLab access token."
+        exit 1
+    fi
+}
+
 # Function to start Jupyter server
 start_jupyter() {
     echo "Building the docker image"
     docker build -t datacloud-customcode .
 
+    local TOKEN
+    TOKEN=$(openssl rand -hex 32)
+
     echo "Running the docker container"
-    docker run -d --rm -p 8888:8888 \
+    docker run -d --rm -p 127.0.0.1:8888:8888 \
         -v $(pwd):/workspace \
         --name jupyter-server \
         datacloud-customcode jupyter lab \
@@ -59,12 +70,14 @@ start_jupyter() {
         --port=8888 \
         --no-browser \
         --allow-root \
-        --NotebookApp.token='' \
-        --NotebookApp.password='' \
+        --NotebookApp.token="$TOKEN" \
         --notebook-dir=/workspace
 
     sleep 3  # Wait for server to start
-    open_browser "http://localhost:8888"
+    local URL
+    URL="http://localhost:8888/?token=$TOKEN"
+    echo "Opening $URL"
+    open_browser $URL
 }
 
 # Function to stop Jupyter server
@@ -82,6 +95,7 @@ stop_jupyter() {
 case "$1" in
     "start")
         check_docker
+        check_openssl
         start_jupyter
         ;;
     "stop")
