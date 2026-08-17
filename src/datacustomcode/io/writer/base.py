@@ -59,6 +59,18 @@ class BaseDataCloudWriter(BaseDataAccessLayer):
         self, name: str, dataframe: PySparkDataFrame, write_mode: WriteMode
     ) -> None: ...
 
+    @abstractmethod
+    def auto_write_to_dlo(self, name: str, dataframe: PySparkDataFrame) -> None:
+        """Write to a DLO automatically picking the write mode.
+        For use with streaming transforms when running in rebuild or initial sync mode.
+        """
+
+    @abstractmethod
+    def auto_write_to_dmo(self, name: str, dataframe: PySparkDataFrame) -> None:
+        """Write to a DMO automatically picking the write mode.
+        For use with streaming transforms when running in rebuild or initial sync mode.
+        """
+
     def write_dlo_deltas(
         self, name: str, dataframe: PySparkDataFrame
     ) -> StreamingQuery:
