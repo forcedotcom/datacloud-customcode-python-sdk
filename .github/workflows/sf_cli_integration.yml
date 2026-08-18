@@ -10,12 +10,11 @@ jobs:
     env:
       SF_AUTOUPDATE_DISABLE: true
       NO_COLOR: '1'
-      # The mock server serves TLS with a self-signed cert written to this path.
-      # Point both the CLI (Node) and the SDK (Python requests) at it so they
-      # trust the specific cert rather than disabling verification wholesale.
+      # Path the mock server writes its self-signed TLS cert to. The CA-trust
+      # env vars (NODE_EXTRA_CA_CERTS / REQUESTS_CA_BUNDLE) are set per-step on
+      # only the run/deploy steps — setting them job-wide would point pip/poetry
+      # at a cert file that does not exist yet during setup, breaking installs.
       MOCK_SF_CERT_FILE: ${{ github.workspace }}/mock_sf_cert.pem
-      NODE_EXTRA_CA_CERTS: ${{ github.workspace }}/mock_sf_cert.pem
-      REQUESTS_CA_BUNDLE: ${{ github.workspace }}/mock_sf_cert.pem
 
     steps:
       # ── Setup ─────────────────────────────────────────────────────────────────
@@ -177,6 +176,9 @@ jobs:
       # ── Script: run ───────────────────────────────────────────────────────────
 
     - name: '[script] run — sf data-code-extension script run --entrypoint testScript/payload/entrypoint.py -o dev1'
+      env:
+        NODE_EXTRA_CA_CERTS: ${{ github.workspace }}/mock_sf_cert.pem
+        REQUESTS_CA_BUNDLE: ${{ github.workspace }}/mock_sf_cert.pem
       run: |
         sf data-code-extension script run \
           --entrypoint testScript/payload/entrypoint.py \
@@ -188,6 +190,9 @@ jobs:
       # ── Script: deploy ───────────────────────────────────────────────────────
 
     - name: '[script] deploy — sf data-code-extension script deploy'
+      env:
+        NODE_EXTRA_CA_CERTS: ${{ github.workspace }}/mock_sf_cert.pem
+        REQUESTS_CA_BUNDLE: ${{ github.workspace }}/mock_sf_cert.pem
       run: |
         sf data-code-extension script deploy \
           --name test-script-deploy \
@@ -275,6 +280,9 @@ jobs:
       # ── Function: run ─────────────────────────────────────────────────────────
 
     - name: '[function] run — sf data-code-extension function run --entrypoint testFunction/payload/entrypoint.py  --test-with testFunction/payload/tests/test.json -o dev1'
+      env:
+        NODE_EXTRA_CA_CERTS: ${{ github.workspace }}/mock_sf_cert.pem
+        REQUESTS_CA_BUNDLE: ${{ github.workspace }}/mock_sf_cert.pem
       run: |
         sf data-code-extension function run \
           --entrypoint testFunction/payload/entrypoint.py \
@@ -286,6 +294,9 @@ jobs:
       # ── Function: deploy ─────────────────────────────────────────────────────
 
     - name: '[function] deploy — sf data-code-extension function deploy'
+      env:
+        NODE_EXTRA_CA_CERTS: ${{ github.workspace }}/mock_sf_cert.pem
+        REQUESTS_CA_BUNDLE: ${{ github.workspace }}/mock_sf_cert.pem
       run: |
         sf data-code-extension function deploy \
           --name test-function-deploy \
