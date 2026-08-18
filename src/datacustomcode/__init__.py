@@ -13,6 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from datacustomcode.spark.column_hints import install_column_casing_hints
+
+# Friendlier errors for wrong-case column references. Idempotent.
+install_column_casing_hints()
+
 __all__ = [
     "AuthType",
     "Client",
