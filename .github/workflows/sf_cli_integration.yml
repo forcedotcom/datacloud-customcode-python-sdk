@@ -10,6 +10,12 @@ jobs:
     env:
       SF_AUTOUPDATE_DISABLE: true
       NO_COLOR: '1'
+      # The mock server serves TLS with a self-signed cert written to this path.
+      # Point both the CLI (Node) and the SDK (Python requests) at it so they
+      # trust the specific cert rather than disabling verification wholesale.
+      MOCK_SF_CERT_FILE: ${{ github.workspace }}/mock_sf_cert.pem
+      NODE_EXTRA_CA_CERTS: ${{ github.workspace }}/mock_sf_cert.pem
+      REQUESTS_CA_BUNDLE: ${{ github.workspace }}/mock_sf_cert.pem
 
     steps:
       # ── Setup ─────────────────────────────────────────────────────────────────
@@ -56,7 +62,14 @@ jobs:
       # ── Mock Salesforce server + fake org auth ────────────────────────────────
 
     - name: Start mock Salesforce server
-      run: python scripts/mock_sf_server.py &
+      run: |
+        python scripts/mock_sf_server.py &
+        # Wait for the TLS cert the server writes at startup so clients can trust it.
+        for _ in $(seq 1 30); do
+          [ -f "$MOCK_SF_CERT_FILE" ] && break
+          sleep 0.2
+        done
+        test -f "$MOCK_SF_CERT_FILE" || { echo "::error::mock server never wrote $MOCK_SF_CERT_FILE"; exit 1; }
       env:
         MOCK_SF_PORT: '8888'
 
@@ -73,7 +86,7 @@ jobs:
         sfdx_dir.mkdir(exist_ok=True)
         auth = {
             "accessToken": "00D000000000001AAA!fakeTokenForCITesting",
-            "instanceUrl": "http://localhost:8888",
+            "instanceUrl": "https://localhost:8888",
             "loginUrl": "https://login.salesforce.com",
             "orgId": "00D000000000001AAA",
             "userId": "005000000000001AAA",
