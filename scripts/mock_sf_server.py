@@ -48,13 +48,13 @@ upload URL). Set ``MOCK_SF_CERT_FILE`` to a path the clients can trust via
 
 from __future__ import annotations
 
+from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import os
 import ssl
 import subprocess
 import sys
 import tempfile
-from http.server import BaseHTTPRequestHandler, HTTPServer
 
 PORT = (
     int(sys.argv[1])
@@ -74,15 +74,28 @@ def _self_signed_cert(dirpath: str) -> tuple[str, str]:
     key_path = os.path.join(dirpath, "key.pem")
     subprocess.run(
         [
-            "openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
-            "-keyout", key_path, "-out", cert_path, "-days", "1",
-            "-subj", "/CN=localhost",
-            "-addext", "subjectAltName=DNS:localhost,IP:127.0.0.1",
+            "openssl",
+            "req",
+            "-x509",
+            "-newkey",
+            "rsa:2048",
+            "-nodes",
+            "-keyout",
+            key_path,
+            "-out",
+            cert_path,
+            "-days",
+            "1",
+            "-subj",
+            "/CN=localhost",
+            "-addext",
+            "subjectAltName=DNS:localhost,IP:127.0.0.1",
         ],
         check=True,
         capture_output=True,
     )
     return cert_path, key_path
+
 
 _USERINFO = {
     "sub": "https://test.salesforce.com/id/00D000000000001AAA/005000000000001AAA",
@@ -164,7 +177,9 @@ class MockSFHandler(BaseHTTPRequestHandler):
         elif path == _DATA_CUSTOM_CODE_PATH:
             # create_deployment() — return a presigned upload URL
             self._send_json(
-                {"fileUploadUrl": f"https://localhost:{PORT}/upload/fake-deployment.zip"}
+                {
+                    "fileUploadUrl": f"https://localhost:{PORT}/upload/fake-deployment.zip"
+                }
             )
         elif path == _DATA_TRANSFORMS_PATH:
             # create_data_transform() — script packages only
