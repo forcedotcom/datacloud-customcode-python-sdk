@@ -559,6 +559,15 @@ class StreamingClient(_BaseClient):
 
     _instance: ClassVar[Optional[StreamingClient]] = None
 
+    def read_dlo(self) -> PySparkDataFrame:
+        """Read the streamingSource
+
+        Returns:
+            A standard PySpark DataFrame from the streaming source DLO
+        """
+        self._record_dlo_access(_streaming_source_name())
+        return self._reader.read_dlo(_streaming_source_name())
+
     def read_dlo_deltas(self) -> PySparkDataFrame:
         """Read the streaming change feed (deltas) for a DLO from Data Cloud.
 
@@ -571,6 +580,14 @@ class StreamingClient(_BaseClient):
         """
         self._record_dlo_access(_streaming_source_name())
         return self._reader.read_dlo_deltas()  # type: ignore[no-any-return]
+
+    def read_dmo(self) -> PySparkDataFrame:
+        """Read the streamingSource
+
+        Returns a standard PySpark DataFrame from the streaming source DMO
+        """
+        self._record_dmo_access(_streaming_source_name())
+        return self._reader.read_dmo(_streaming_source_name())
 
     def read_dmo_deltas(self) -> PySparkDataFrame:
         """Read the streaming change feed (deltas) for a DMO from Data Cloud.

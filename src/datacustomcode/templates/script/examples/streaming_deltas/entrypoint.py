@@ -3,22 +3,19 @@
 This example is the streaming counterpart to a normal batch entrypoint. Instead
 of a batch ``Client`` with ``read_dlo`` / ``write_to_dlo`` (which read and write
 a bounded snapshot), it uses a :class:`StreamingClient` and its streaming delta
-methods:
+methods.
 
-* ``client.read_dlo_deltas()`` returns a *streaming* DataFrame over the
-  Change Data Feed of the source DLO. Each row carries the source columns plus
-  change-feed metadata columns (``_record_type``, ``_commit_*``).
-* ``client.write_dlo_deltas(name, df)`` starts a streaming query that writes
-  each micro-batch to the target DLO and returns the ``StreamingQuery`` handle.
-  The runtime owns the trigger, and checkpoint location — the caller only
-  chooses the table.
+The first run of a streaming job will use the run mode INITIAL_SYNC which behaves
+like a batch run on the streaming source. A streaming transform can also use run
+mode REBUILD to do the same thing on demand. Note that these will process all
+source rows and overwrite the target.
 
 The transform in between is ordinary PySpark. Because the source is a change
 feed, keep the metadata columns on the DataFrame you hand to
 ``write_dlo_deltas`` — the sink relies on them to merge changes correctly.
 
-This entrypoint only runs inside the Data Cloud streaming (``DELTA_SYNC``)
-runtime; the local ``datacustomcode run`` readers/writers raise
+This entrypoint only runs inside the Data Cloud runtime;
+ the local ``datacustomcode run`` readers/writers raise
 ``NotImplementedError`` for the delta methods.
 """
 
@@ -26,7 +23,6 @@ from pyspark.sql import DataFrame
 from pyspark.sql.functions import col, upper
 
 from datacustomcode.client import (
-    Client,
     RunMode,
     StreamingClient,
     get_run_mode,
@@ -34,10 +30,10 @@ from datacustomcode.client import (
 
 
 def main():
-    source_dlo = "Account_std__dll"
     target_dlo = "Account_std_copy__dll"
+    client = StreamingClient()
+
     if get_run_mode() == RunMode.DELTA_SYNC:
-        client = StreamingClient()
         # Streaming DataFrame over the source DLO's change feed.
         dataframe = client.read_dlo_deltas()
         # Ordinary PySpark transform.
@@ -51,8 +47,9 @@ def main():
         # the job is stopped by the platform.
         query.awaitTermination()
     else:
-        client = Client()
-        dataframe = client.read_dlo(source_dlo)
+        # initial sync and rebuild read the entire streaming source DLO and
+        # write using a server-decided mode based on the run mode
+        dataframe = client.read_dlo()
         transformed = transform(dataframe)
         client.auto_write_to_dlo(target_dlo, transformed)
 
