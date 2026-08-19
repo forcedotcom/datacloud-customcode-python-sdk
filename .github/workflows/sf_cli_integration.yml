@@ -10,15 +10,17 @@ jobs:
     env:
       SF_AUTOUPDATE_DISABLE: true
       NO_COLOR: '1'
-      # Mock server's TLS cert/key pair.
-      MOCK_SF_CERT_FILE: ${{ runner.temp }}/mock_sf_cert.pem
-      MOCK_SF_KEY_FILE: ${{ runner.temp }}/mock_sf_key.pem
 
     steps:
       # ── Setup ─────────────────────────────────────────────────────────────────
 
     - name: Checkout code
       uses: actions/checkout@v4
+
+    - name: Set mock server TLS cert paths
+      run: |
+        echo "MOCK_SF_CERT_FILE=$RUNNER_TEMP/mock_sf_cert.pem" >> "$GITHUB_ENV"
+        echo "MOCK_SF_KEY_FILE=$RUNNER_TEMP/mock_sf_key.pem" >> "$GITHUB_ENV"
 
     - name: Generate mock server TLS cert
       run: |
