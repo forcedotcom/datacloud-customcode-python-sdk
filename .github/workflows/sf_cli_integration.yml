@@ -10,17 +10,22 @@ jobs:
     env:
       SF_AUTOUPDATE_DISABLE: true
       NO_COLOR: '1'
-      # Path the mock server writes its self-signed TLS cert to. The CA-trust
-      # env vars (NODE_EXTRA_CA_CERTS / REQUESTS_CA_BUNDLE) are set per-step on
-      # only the run/deploy steps — setting them job-wide would point pip/poetry
-      # at a cert file that does not exist yet during setup, breaking installs.
+      # Mock server's TLS cert/key pair.
       MOCK_SF_CERT_FILE: ${{ github.workspace }}/mock_sf_cert.pem
+      MOCK_SF_KEY_FILE: ${{ github.workspace }}/mock_sf_key.pem
 
     steps:
       # ── Setup ─────────────────────────────────────────────────────────────────
 
     - name: Checkout code
       uses: actions/checkout@v4
+
+    - name: Generate mock server TLS cert
+      run: |
+        openssl req -x509 -newkey rsa:2048 -nodes \
+          -keyout "$MOCK_SF_KEY_FILE" -out "$MOCK_SF_CERT_FILE" \
+          -days 1 -subj "/CN=localhost" \
+          -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
 
     - name: Set up Python 3.11
       uses: actions/setup-python@v5
@@ -61,14 +66,7 @@ jobs:
       # ── Mock Salesforce server + fake org auth ────────────────────────────────
 
     - name: Start mock Salesforce server
-      run: |
-        python scripts/mock_sf_server.py &
-        # Wait for the TLS cert the server writes at startup so clients can trust it.
-        for _ in $(seq 1 30); do
-          [ -f "$MOCK_SF_CERT_FILE" ] && break
-          sleep 0.2
-        done
-        test -f "$MOCK_SF_CERT_FILE" || { echo "::error::mock server never wrote $MOCK_SF_CERT_FILE"; exit 1; }
+      run: python scripts/mock_sf_server.py &
       env:
         MOCK_SF_PORT: '8888'
 
@@ -177,8 +175,8 @@ jobs:
 
     - name: '[script] run — sf data-code-extension script run --entrypoint testScript/payload/entrypoint.py -o dev1'
       env:
-        NODE_EXTRA_CA_CERTS: ${{ github.workspace }}/mock_sf_cert.pem
-        REQUESTS_CA_BUNDLE: ${{ github.workspace }}/mock_sf_cert.pem
+        NODE_EXTRA_CA_CERTS: ${{ env.MOCK_SF_CERT_FILE }}
+        REQUESTS_CA_BUNDLE: ${{ env.MOCK_SF_CERT_FILE }}
       run: |
         sf data-code-extension script run \
           --entrypoint testScript/payload/entrypoint.py \
@@ -191,8 +189,8 @@ jobs:
 
     - name: '[script] deploy — sf data-code-extension script deploy'
       env:
-        NODE_EXTRA_CA_CERTS: ${{ github.workspace }}/mock_sf_cert.pem
-        REQUESTS_CA_BUNDLE: ${{ github.workspace }}/mock_sf_cert.pem
+        NODE_EXTRA_CA_CERTS: ${{ env.MOCK_SF_CERT_FILE }}
+        REQUESTS_CA_BUNDLE: ${{ env.MOCK_SF_CERT_FILE }}
       run: |
         sf data-code-extension script deploy \
           --name test-script-deploy \
@@ -281,8 +279,8 @@ jobs:
 
     - name: '[function] run — sf data-code-extension function run --entrypoint testFunction/payload/entrypoint.py  --test-with testFunction/payload/tests/test.json -o dev1'
       env:
-        NODE_EXTRA_CA_CERTS: ${{ github.workspace }}/mock_sf_cert.pem
-        REQUESTS_CA_BUNDLE: ${{ github.workspace }}/mock_sf_cert.pem
+        NODE_EXTRA_CA_CERTS: ${{ env.MOCK_SF_CERT_FILE }}
+        REQUESTS_CA_BUNDLE: ${{ env.MOCK_SF_CERT_FILE }}
       run: |
         sf data-code-extension function run \
           --entrypoint testFunction/payload/entrypoint.py \
@@ -295,8 +293,8 @@ jobs:
 
     - name: '[function] deploy — sf data-code-extension function deploy'
       env:
-        NODE_EXTRA_CA_CERTS: ${{ github.workspace }}/mock_sf_cert.pem
-        REQUESTS_CA_BUNDLE: ${{ github.workspace }}/mock_sf_cert.pem
+        NODE_EXTRA_CA_CERTS: ${{ env.MOCK_SF_CERT_FILE }}
+        REQUESTS_CA_BUNDLE: ${{ env.MOCK_SF_CERT_FILE }}
       run: |
         sf data-code-extension function deploy \
           --name test-function-deploy \

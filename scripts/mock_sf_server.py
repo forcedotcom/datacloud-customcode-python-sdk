@@ -41,9 +41,16 @@ Usage
     MOCK_SF_PORT=9000 python scripts/mock_sf_server.py
     python scripts/mock_sf_server.py 9000
 
-Serves TLS with a throwaway self-signed cert (the deploy path requires an HTTPS
-upload URL). Set ``MOCK_SF_CERT_FILE`` to a path the clients can trust via
-``NODE_EXTRA_CA_CERTS`` (CLI) and ``REQUESTS_CA_BUNDLE`` (SDK).
+Serves TLS (the deploy path requires an HTTPS upload URL) using a pre-generated
+cert/key pair — this script does not generate one. Set ``MOCK_SF_CERT_FILE`` /
+``MOCK_SF_KEY_FILE`` to the pair's paths; generate a throwaway one with:
+
+    openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem \\
+      -days 1 -subj "/CN=localhost" \\
+      -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+
+Point clients at the cert so they trust it: ``NODE_EXTRA_CA_CERTS`` (CLI) and
+``REQUESTS_CA_BUNDLE`` (SDK).
 """
 
 from __future__ import annotations
@@ -52,50 +59,13 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import os
 import ssl
-import subprocess
 import sys
-import tempfile
 
 PORT = (
     int(sys.argv[1])
     if len(sys.argv) > 1
     else int(os.environ.get("MOCK_SF_PORT", "8888"))
 )
-
-
-def _self_signed_cert(dirpath: str) -> tuple[str, str]:
-    """Generate a throwaway self-signed cert for localhost via openssl.
-
-    The plugin's deploy path requires an HTTPS upload URL, so the server must
-    speak TLS. Set ``MOCK_SF_CERT_FILE`` to write the cert to a known path so
-    clients can trust it (``REQUESTS_CA_BUNDLE`` / ``NODE_EXTRA_CA_CERTS``).
-    """
-    cert_path = os.environ.get("MOCK_SF_CERT_FILE") or os.path.join(dirpath, "cert.pem")
-    key_path = os.path.join(dirpath, "key.pem")
-    subprocess.run(
-        [
-            "openssl",
-            "req",
-            "-x509",
-            "-newkey",
-            "rsa:2048",
-            "-nodes",
-            "-keyout",
-            key_path,
-            "-out",
-            cert_path,
-            "-days",
-            "1",
-            "-subj",
-            "/CN=localhost",
-            "-addext",
-            "subjectAltName=DNS:localhost,IP:127.0.0.1",
-        ],
-        check=True,
-        capture_output=True,
-    )
-    return cert_path, key_path
-
 
 _USERINFO = {
     "sub": "https://test.salesforce.com/id/00D000000000001AAA/005000000000001AAA",
@@ -194,12 +164,18 @@ class MockSFHandler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    cert_path = os.environ.get("MOCK_SF_CERT_FILE")
+    key_path = os.environ.get("MOCK_SF_KEY_FILE")
+    if not cert_path or not key_path:
+        sys.exit(
+            "MOCK_SF_CERT_FILE and MOCK_SF_KEY_FILE must both be set to an "
+            "existing TLS cert/key pair — see the module docstring."
+        )
+
     server = HTTPServer(("localhost", PORT), MockSFHandler)
     server.allow_reuse_address = True
-    with tempfile.TemporaryDirectory() as certdir:
-        cert_path, key_path = _self_signed_cert(certdir)
-        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        ctx.load_cert_chain(cert_path, key_path)
-        server.socket = ctx.wrap_socket(server.socket, server_side=True)
-        print(f"[MOCK SF] Listening on https://localhost:{PORT}", flush=True)
-        server.serve_forever()
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.load_cert_chain(cert_path, key_path)
+    server.socket = ctx.wrap_socket(server.socket, server_side=True)
+    print(f"[MOCK SF] Listening on https://localhost:{PORT}", flush=True)
+    server.serve_forever()
