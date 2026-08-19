@@ -284,6 +284,11 @@ class TestClient:
 
         assert get_run_mode() == RunMode.INITIAL_SYNC
 
+    @patch.dict(os.environ, {"BYOC_RUN_MODE": "INVALID"})
+    def test_get_run_mode_throws(self):
+        with pytest.raises(ValueError, match="Set BYOC_RUN_MODE to a valid value"):
+            get_run_mode()
+
 
 class TestStreamingClient:
 
