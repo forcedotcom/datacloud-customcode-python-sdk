@@ -11,8 +11,8 @@ jobs:
       SF_AUTOUPDATE_DISABLE: true
       NO_COLOR: '1'
       # Mock server's TLS cert/key pair.
-      MOCK_SF_CERT_FILE: ${{ github.workspace }}/mock_sf_cert.pem
-      MOCK_SF_KEY_FILE: ${{ github.workspace }}/mock_sf_key.pem
+      MOCK_SF_CERT_FILE: ${{ runner.temp }}/mock_sf_cert.pem
+      MOCK_SF_KEY_FILE: ${{ runner.temp }}/mock_sf_key.pem
 
     steps:
       # ── Setup ─────────────────────────────────────────────────────────────────
