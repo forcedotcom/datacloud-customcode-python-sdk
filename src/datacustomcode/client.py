@@ -650,4 +650,7 @@ class RunMode(Enum):
 def get_run_mode() -> RunMode:
     """Read and validate the BYOC_RUN_MODE env var; default to BATCH when unset."""
     run_mode = os.getenv("BYOC_RUN_MODE", "BATCH").upper()
-    return RunMode(run_mode)
+    try:
+        return RunMode(run_mode)
+    except ValueError as exc:
+        raise ValueError("Set BYOC_RUN_MODE to a valid value") from exc
