@@ -122,6 +122,10 @@ class PrintDataCloudWriter(BaseDataCloudWriter):
 
         dataframe.show()
 
+    def auto_write_to_dlo(self, name: str, dataframe: PySparkDataFrame) -> None:
+        self.validate_dataframe_columns_against_dlo(dataframe, name)
+        dataframe.show()
+
     def write_to_dmo(
         self, name: str, dataframe: PySparkDataFrame, write_mode: WriteMode
     ) -> None:
@@ -129,4 +133,7 @@ class PrintDataCloudWriter(BaseDataCloudWriter):
         # its not going to work for DMO because DMO may not exists,
         # so just show the dataframe.
 
+        dataframe.show()
+
+    def auto_write_to_dmo(self, name: str, dataframe: PySparkDataFrame) -> None:
         dataframe.show()
