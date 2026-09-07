@@ -28,6 +28,7 @@ __all__ = [
     "QueryAPIDataCloudReader",
     "SparkEinsteinPredictions",
     "SparkLLMGateway",
+    "StreamingClient",
     "einstein_predict_col",
     "llm_gateway_generate_text_col",
 ]
@@ -39,6 +40,10 @@ def __getattr__(name: str):
         from datacustomcode.client import Client
 
         return Client
+    elif name == "StreamingClient":
+        from datacustomcode.client import StreamingClient
+
+        return StreamingClient
     elif name == "AuthType":
         from datacustomcode.credentials import AuthType
 

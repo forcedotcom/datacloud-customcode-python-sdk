@@ -17,6 +17,7 @@ from datacustomcode.deploy import (
     DloPermission,
     DmoPermission,
     Permissions,
+    StreamingSource,
     get_config,
 )
 
@@ -657,7 +658,7 @@ class TestCreateDeployment:
             version="1.0.0",
             description="Test job",
             computeType="CPU_M",
-            functionInvokeOptions=["option1", "option2"],
+            invokeOptions=["option1", "option2"],
             codeType="function",
         )
 
@@ -670,6 +671,54 @@ class TestCreateDeployment:
         mock_make_api_call.assert_called_once()
         assert isinstance(result, CreateDeploymentResponse)
         assert result.fileUploadUrl == "https://upload.example.com"
+
+    @patch("datacustomcode.deploy._make_api_call")
+    def test_create_deployment_default_path_no_invoke_options(self, mock_make_api_call):
+        """Without invokeOptions, the deployment uses the default v63.0 path."""
+        access_token = AccessTokenResponse(
+            access_token="test_token", instance_url="https://instance.example.com"
+        )
+        metadata = CodeExtensionMetadata(
+            name="test_job",
+            version="1.0.0",
+            description="Test job",
+            computeType="CPU_M",
+            codeType="script",
+        )
+        mock_make_api_call.return_value = {
+            "fileUploadUrl": "https://upload.example.com"
+        }
+
+        create_deployment(access_token, metadata)
+
+        url = mock_make_api_call.call_args[0][0]
+        assert "v63.0" in url
+        body = mock_make_api_call.call_args[1]["json"]
+        assert "invokeOptions" not in body
+
+    @patch("datacustomcode.deploy._make_api_call")
+    def test_create_deployment_invoke_options_routes_to_v67(self, mock_make_api_call):
+        access_token = AccessTokenResponse(
+            access_token="test_token", instance_url="https://instance.example.com"
+        )
+        metadata = CodeExtensionMetadata(
+            name="test_job",
+            version="1.0.0",
+            description="Test job",
+            computeType="CPU_M",
+            codeType="script",
+            invokeOptions=["StreamingTransform"],
+        )
+        mock_make_api_call.return_value = {
+            "fileUploadUrl": "https://upload.example.com"
+        }
+
+        create_deployment(access_token, metadata)
+
+        url = mock_make_api_call.call_args[0][0]
+        assert "v67.0" in url
+        body = mock_make_api_call.call_args[1]["json"]
+        assert body["invokeOptions"] == ["StreamingTransform"]
 
 
 class TestZip:
@@ -760,6 +809,36 @@ class TestZip:
             "deployment.zip", "w", zipfile.ZIP_DEFLATED
         )
         assert mock_zipfile_instance.write.call_count == 3  # One call per file
+
+    @patch("datacustomcode.deploy.has_nonempty_requirements_file")
+    @patch("datacustomcode.deploy.prepare_dependency_archive")
+    @patch("zipfile.ZipFile")
+    @patch("os.walk")
+    def test_zip_excludes_ds_store_and_external_credentials(
+        self, mock_walk, mock_zipfile, mock_prepare, mock_has_requirements
+    ):
+        """Local credentials and .DS_Store must never be packaged into the zip."""
+        mock_has_requirements.return_value = False
+        mock_zipfile_instance = MagicMock()
+        mock_zipfile.return_value.__enter__.return_value = mock_zipfile_instance
+        mock_zipfile_instance.write = MagicMock()
+
+        mock_walk.return_value = [
+            (
+                "/test/dir",
+                [],
+                ["entrypoint.py", ".DS_Store", "external_callout_config.json"],
+            ),
+        ]
+
+        zip("/test/dir", "default", "script")
+
+        # Only entrypoint.py is written; excluded files are skipped.
+        assert mock_zipfile_instance.write.call_count == 1
+        written = [call.args[0] for call in mock_zipfile_instance.write.call_args_list]
+        assert written == ["/test/dir/entrypoint.py"]
+        assert not any("external_callout_config.json" in path for path in written)
+        assert not any(".DS_Store" in path for path in written)
 
 
 class TestUploadZip:
@@ -1353,6 +1432,151 @@ class TestCreateDataTransform:
                 "/test/dir", access_token, metadata, data_transform_config
             )
 
+    @patch("datacustomcode.deploy.get_config")
+    @patch("datacustomcode.deploy._make_api_call")
+    def test_create_data_transform_batch_type(
+        self, mock_make_api_call, mock_get_config
+    ):
+        """A non-streaming transform sends type BATCH."""
+        access_token = AccessTokenResponse(
+            access_token="test_token", instance_url="https://instance.example.com"
+        )
+        metadata = CodeExtensionMetadata(
+            name="batch_job",
+            version="1.0.0",
+            description="Batch job",
+            computeType="CPU_M",
+            codeType="script",
+        )
+        data_transform_config = DataTransformConfig(
+            sdkVersion="1.0.0",
+            entryPoint="entrypoint.py",
+            dataspace="test_dataspace",
+            permissions=Permissions(
+                read=DloPermission(dlo=["input_dlo"]),
+                write=DloPermission(dlo=["output_dlo"]),
+            ),
+        )
+        mock_make_api_call.return_value = {"id": "transform_id"}
+
+        create_data_transform(
+            "/test/dir", access_token, metadata, data_transform_config
+        )
+
+        request_body = mock_make_api_call.call_args[1]["json"]
+        assert request_body["type"] == "BATCH"
+
+    @patch("datacustomcode.deploy.get_config")
+    @patch("datacustomcode.deploy._make_api_call")
+    def test_create_data_transform_streaming_type(
+        self, mock_make_api_call, mock_get_config
+    ):
+        """A streaming (streamingSource) transform sends type STREAMING."""
+        access_token = AccessTokenResponse(
+            access_token="test_token", instance_url="https://instance.example.com"
+        )
+        metadata = CodeExtensionMetadata(
+            name="streaming_job",
+            version="1.0.0",
+            description="Streaming job",
+            computeType="CPU_M",
+            codeType="script",
+        )
+        data_transform_config = DataTransformConfig(
+            sdkVersion="1.0.0",
+            entryPoint="entrypoint.py",
+            dataspace="test_dataspace",
+            streamingSource=StreamingSource(type="dlo", name="input_dlo"),
+            permissions=Permissions(
+                read=DloPermission(dlo=["input_dlo"]),
+                write=DloPermission(dlo=["output_dlo"]),
+            ),
+        )
+        mock_make_api_call.return_value = {"id": "transform_id"}
+
+        create_data_transform(
+            "/test/dir", access_token, metadata, data_transform_config
+        )
+
+        request_body = mock_make_api_call.call_args[1]["json"]
+        assert request_body["type"] == "STREAMING"
+        manifest = request_body["definition"]["manifest"]
+        assert manifest["sources"] == {"source1": {"relation_name": "input_dlo"}}
+        assert manifest["nodes"]["node1"]["relation_name"] == "output_dlo"
+
+
+class TestDataTransformConfigStreaming:
+    """The streamingSource field and its effect on layer validation."""
+
+    def test_is_streaming_true_when_source_present(self):
+        config = DataTransformConfig(
+            sdkVersion="1.0.0",
+            entryPoint="entrypoint.py",
+            dataspace="default",
+            streamingSource=StreamingSource(type="dlo", name="input_dlo"),
+            permissions=Permissions(
+                read=DloPermission(dlo=["input_dlo"]),
+                write=DloPermission(dlo=["output_dlo"]),
+            ),
+        )
+        assert config.is_streaming is True
+
+    def test_is_streaming_false_when_source_absent(self):
+        config = DataTransformConfig(
+            sdkVersion="1.0.0",
+            entryPoint="entrypoint.py",
+            dataspace="default",
+            permissions=Permissions(
+                read=DloPermission(dlo=["input_dlo"]),
+                write=DloPermission(dlo=["output_dlo"]),
+            ),
+        )
+        assert config.is_streaming is False
+
+    def test_streaming_allows_dmo_read_dlo_write(self):
+        """Streaming may read a DMO change feed and write a DLO (writes are
+        DLO-only)"""
+        config = DataTransformConfig(
+            sdkVersion="1.0.0",
+            entryPoint="entrypoint.py",
+            dataspace="default",
+            streamingSource=StreamingSource(type="dmo", name="input_dmo__dlm"),
+            permissions=Permissions(
+                read=DmoPermission(dmo=["input_dmo__dlm"]),
+                write=DloPermission(dlo=["output_dlo"]),
+            ),
+        )
+        assert config.is_streaming is True
+        assert isinstance(config.permissions.read, DmoPermission)
+        assert isinstance(config.permissions.write, DloPermission)
+
+    def test_streaming_rejects_dmo_write(self):
+        """Streaming writes must target a DLO."""
+        with pytest.raises(ValueError, match="must write to a DLO"):
+            DataTransformConfig(
+                sdkVersion="1.0.0",
+                entryPoint="entrypoint.py",
+                dataspace="default",
+                streamingSource=StreamingSource(type="dlo", name="input_dlo"),
+                permissions=Permissions(
+                    read=DloPermission(dlo=["input_dlo"]),
+                    write=DmoPermission(dmo=["output_dmo__dlm"]),
+                ),
+            )
+
+    def test_batch_still_rejects_mixed_layers(self):
+        """Without a streamingSource, mixed read/write layers are still rejected."""
+        with pytest.raises(ValueError, match="both reference"):
+            DataTransformConfig(
+                sdkVersion="1.0.0",
+                entryPoint="entrypoint.py",
+                dataspace="default",
+                permissions=Permissions(
+                    read=DloPermission(dlo=["input_dlo"]),
+                    write=DmoPermission(dmo=["output_dmo__dlm"]),
+                ),
+            )
+
 
 class TestDeployFull:
     @patch("datacustomcode.deploy.get_config")
@@ -1465,6 +1689,96 @@ class TestDeployFull:
             "/test/dir", access_token, metadata, data_transform_config
         )
         assert result == access_token
+
+    @patch("datacustomcode.deploy.get_config")
+    @patch("datacustomcode.deploy.create_data_transform")
+    @patch("datacustomcode.deploy.wait_for_deployment")
+    @patch("datacustomcode.deploy.upload_zip")
+    @patch("datacustomcode.deploy.zip")
+    @patch("datacustomcode.deploy.create_deployment")
+    def test_deploy_full_streaming_sets_invoke_options(
+        self,
+        mock_create_deployment,
+        mock_zip,
+        mock_upload_zip,
+        mock_wait,
+        mock_create_transform,
+        mock_get_config,
+    ):
+        """A streaming config makes deploy_full set invokeOptions on the
+        metadata before creating the deployment."""
+        data_transform_config = DataTransformConfig(
+            sdkVersion="1.0.0",
+            entryPoint="entrypoint.py",
+            dataspace="test_dataspace",
+            streamingSource=StreamingSource(type="dlo", name="input_dlo"),
+            permissions=Permissions(
+                read=DloPermission(dlo=["input_dlo"]),
+                write=DloPermission(dlo=["output_dlo"]),
+            ),
+        )
+        mock_get_config.return_value = data_transform_config
+        metadata = CodeExtensionMetadata(
+            name="test_job",
+            version="1.0.0",
+            description="Test job",
+            computeType="CPU_M",
+            codeType="script",
+        )
+        access_token = AccessTokenResponse(
+            access_token="test_token", instance_url="https://instance.example.com"
+        )
+        mock_create_deployment.return_value = CreateDeploymentResponse(
+            fileUploadUrl="https://upload.example.com"
+        )
+
+        deploy_full("/test/dir", metadata, access_token, "default")
+
+        assert metadata.invokeOptions == ["StreamingTransform"]
+
+    @patch("datacustomcode.deploy.get_config")
+    @patch("datacustomcode.deploy.create_data_transform")
+    @patch("datacustomcode.deploy.wait_for_deployment")
+    @patch("datacustomcode.deploy.upload_zip")
+    @patch("datacustomcode.deploy.zip")
+    @patch("datacustomcode.deploy.create_deployment")
+    def test_deploy_full_batch_leaves_invoke_options_unset(
+        self,
+        mock_create_deployment,
+        mock_zip,
+        mock_upload_zip,
+        mock_wait,
+        mock_create_transform,
+        mock_get_config,
+    ):
+        """A batch config must not set invokeOptions (stays on the v63.0 path)."""
+        data_transform_config = DataTransformConfig(
+            sdkVersion="1.0.0",
+            entryPoint="entrypoint.py",
+            dataspace="test_dataspace",
+            permissions=Permissions(
+                read=DloPermission(dlo=["input_dlo"]),
+                write=DloPermission(dlo=["output_dlo"]),
+            ),
+        )
+        mock_get_config.return_value = data_transform_config
+        metadata = CodeExtensionMetadata(
+            name="test_job",
+            version="1.0.0",
+            description="Test job",
+            computeType="CPU_M",
+            codeType="script",
+        )
+        access_token = AccessTokenResponse(
+            access_token="test_token", instance_url="https://instance.example.com"
+        )
+        mock_create_deployment.return_value = CreateDeploymentResponse(
+            fileUploadUrl="https://upload.example.com"
+        )
+
+        deploy_full("/test/dir", metadata, access_token, "default")
+
+        assert metadata.invokeOptions is None
 
 
 class TestRunDataTransform:

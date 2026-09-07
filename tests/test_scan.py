@@ -12,8 +12,10 @@ from datacustomcode.scan import (
     SDK_CONFIG_FILE,
     DataAccessLayerCalls,
     dc_config_json_from_file,
+    file_is_streaming,
     scan_file,
     scan_file_for_imports,
+    scan_file_streaming,
     update_config,
     write_requirements_file,
     write_sdk_config,
@@ -338,6 +340,27 @@ class TestDcConfigJson:
             if os.path.exists(sdk_config_path):
                 os.remove(sdk_config_path)
                 os.rmdir(os.path.dirname(sdk_config_path))
+
+    def test_streaming_config_scaffolds_streaming_source(self):
+        """dc_config_json_from_file(streaming=True) scaffolds streamingSource."""
+        temp_path = create_test_script(STREAMING_DLO_ENTRYPOINT)
+        try:
+            result = dc_config_json_from_file(temp_path, "script", streaming=True)
+            assert result["entryPoint"] == os.path.basename(temp_path)
+            assert result["dataspace"] == "default"
+            assert result["sdkVersion"] == get_version()
+            assert result["streamingSource"] == {"type": "dlo", "name": ""}
+        finally:
+            os.unlink(temp_path)
+
+    def test_batch_config_has_no_streaming_source(self):
+        """The default (batch) script template has no streamingSource."""
+        temp_path = create_test_script("x = 1\n")
+        try:
+            result = dc_config_json_from_file(temp_path, "script")
+            assert "streamingSource" not in result
+        finally:
+            os.unlink(temp_path)
 
     def test_dmo_to_dmo_config(self):
         """Test generating config JSON for DMO to DMO operations."""
@@ -692,6 +715,190 @@ class TestDcConfigJson:
             if os.path.exists(sdk_config_path):
                 os.remove(sdk_config_path)
                 os.rmdir(os.path.dirname(sdk_config_path))
+
+
+STREAMING_DLO_ENTRYPOINT = textwrap.dedent(
+    """
+    from datacustomcode.client import StreamingClient
+
+    client = StreamingClient()
+    deltas = client.read_dlo_deltas()
+    transformed = deltas.withColumn("x", deltas.x)
+    query = client.write_dlo_deltas("Account_copy__dll", transformed)
+    query.awaitTermination()
+    """
+)
+
+STREAMING_DMO_ENTRYPOINT = textwrap.dedent(
+    """
+    from datacustomcode.client import StreamingClient
+
+    client = StreamingClient()
+    deltas = client.read_dmo_deltas()
+    query = client.write_dlo_deltas("Account_copy__dll", deltas)
+    query.awaitTermination()
+    """
+)
+
+
+class TestStreamingScan:
+    """Tests for streaming (delta) detection and extraction."""
+
+    def test_file_is_streaming_true_for_delta_methods(self):
+        temp_path = create_test_script(STREAMING_DLO_ENTRYPOINT)
+        try:
+            assert file_is_streaming(temp_path) is True
+        finally:
+            os.unlink(temp_path)
+
+    def test_file_is_streaming_false_for_batch(self):
+        content = textwrap.dedent(
+            """
+            from datacustomcode.client import Client
+
+            client = Client()
+            df = client.read_dlo("input_dlo")
+            client.write_to_dlo("output_dlo", df, "overwrite")
+            """
+        )
+        temp_path = create_test_script(content)
+        try:
+            assert file_is_streaming(temp_path) is False
+        finally:
+            os.unlink(temp_path)
+
+    def test_scan_file_streaming_dlo(self):
+        temp_path = create_test_script(STREAMING_DLO_ENTRYPOINT)
+        try:
+            result = scan_file_streaming(temp_path)
+            assert result.read_dlo_deltas is True
+            assert result.read_dmo_deltas is False
+            assert result.read_layer == "dlo"
+            assert "Account_copy__dll" in result.write_dlo_deltas
+        finally:
+            os.unlink(temp_path)
+
+    def test_scan_file_streaming_dmo_read(self):
+        temp_path = create_test_script(STREAMING_DMO_ENTRYPOINT)
+        try:
+            result = scan_file_streaming(temp_path)
+            assert result.read_dmo_deltas is True
+            assert result.read_layer == "dmo"
+            assert "Account_copy__dll" in result.write_dlo_deltas
+        finally:
+            os.unlink(temp_path)
+
+    def test_scan_file_streaming_requires_read(self):
+        content = textwrap.dedent(
+            """
+            from datacustomcode.client import StreamingClient
+
+            client = StreamingClient()
+            client.write_dlo_deltas("Account_copy__dll", some_df)
+            """
+        )
+        temp_path = create_test_script(content)
+        try:
+            with pytest.raises(ValueError, match="at least one DLO or DMO delta"):
+                scan_file_streaming(temp_path)
+        finally:
+            os.unlink(temp_path)
+
+    def test_scan_file_streaming_requires_write(self):
+        content = textwrap.dedent(
+            """
+            from datacustomcode.client import StreamingClient
+
+            client = StreamingClient()
+            deltas = client.read_dlo_deltas()
+            """
+        )
+        temp_path = create_test_script(content)
+        try:
+            with pytest.raises(ValueError, match="must write to at least one DLO"):
+                scan_file_streaming(temp_path)
+        finally:
+            os.unlink(temp_path)
+
+
+class TestStreamingUpdateConfig:
+    """Tests for update_config on streaming entrypoints."""
+
+    def _run(self, entrypoint_src: str, initial_config: dict) -> dict:
+        temp_path = create_test_script(entrypoint_src)
+        file_dir = os.path.dirname(temp_path)
+        config_path = os.path.join(file_dir, "config.json")
+        sdk_config_path = create_sdk_config(file_dir, "script")
+        try:
+            with open(config_path, "w") as f:
+                json.dump(initial_config, f)
+            return update_config(temp_path)
+        finally:
+            os.remove(temp_path)
+            if os.path.exists(config_path):
+                os.remove(config_path)
+            if os.path.exists(sdk_config_path):
+                os.remove(sdk_config_path)
+                os.rmdir(os.path.dirname(sdk_config_path))
+
+    def test_preserves_streaming_source_name(self):
+        """config.json's streamingSource.name is authoritative and preserved."""
+        updated = self._run(
+            STREAMING_DLO_ENTRYPOINT,
+            {
+                "sdkVersion": "1.0.0",
+                "entryPoint": "old.py",
+                "dataspace": "default",
+                "streamingSource": {"type": "dlo", "name": "Account_Home__dll"},
+                "permissions": {"read": {}, "write": {}},
+            },
+        )
+        assert updated["streamingSource"] == {
+            "type": "dlo",
+            "name": "Account_Home__dll",
+        }
+        assert updated["permissions"]["read"]["dlo"] == ["Account_Home__dll"]
+        assert updated["permissions"]["write"]["dlo"] == ["Account_copy__dll"]
+
+    def test_reasserts_layer_from_code(self):
+        """A code read layer of DMO overrides a stale DLO type in config."""
+        updated = self._run(
+            STREAMING_DMO_ENTRYPOINT,
+            {
+                "sdkVersion": "1.0.0",
+                "entryPoint": "old.py",
+                "dataspace": "default",
+                "streamingSource": {"type": "dlo", "name": "Account__dlm"},
+                "permissions": {"read": {}, "write": {}},
+            },
+        )
+        assert updated["streamingSource"]["type"] == "dmo"
+        assert updated["streamingSource"]["name"] == "Account__dlm"
+        assert updated["permissions"]["read"]["dmo"] == ["Account__dlm"]
+
+    def test_batch_entrypoint_drops_stale_streaming_source(self):
+        """Switching a streaming entrypoint to batch clears streamingSource."""
+        batch_src = textwrap.dedent(
+            """
+            from datacustomcode.client import Client
+
+            client = Client()
+            df = client.read_dlo("input_dlo")
+            client.write_to_dlo("output_dlo", df, "overwrite")
+            """
+        )
+        updated = self._run(
+            batch_src,
+            {
+                "sdkVersion": "1.0.0",
+                "entryPoint": "old.py",
+                "dataspace": "default",
+                "streamingSource": {"type": "dlo", "name": "stale__dll"},
+                "permissions": {"read": {}, "write": {}},
+            },
+        )
+        assert "streamingSource" not in updated
+        assert updated["permissions"]["read"]["dlo"] == ["input_dlo"]
 
 
 class TestDataAccessLayerCalls:

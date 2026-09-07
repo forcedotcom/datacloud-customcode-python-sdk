@@ -9,8 +9,11 @@ from datacustomcode.client import (
     Client,
     DataCloudAccessLayerException,
     DataCloudObjectType,
+    StreamingClient,
+    _BaseClient,
     einstein_predict_col,
     llm_gateway_generate_text_col,
+    named_credential_request_col,
 )
 from datacustomcode.config import (
     AccessLayerObjectConfig,
@@ -80,10 +83,18 @@ def mock_config(mock_spark):
 
 @pytest.fixture
 def reset_client():
-    """Reset the Client singleton between tests."""
+    """Reset the client singletons (and the shared Spark session) between tests."""
+    from datacustomcode.client import config as client_config
+
     Client._instance = None
+    StreamingClient._instance = None
+    _BaseClient._shared_spark = None
+    client_config.streaming_source = None
     yield
     Client._instance = None
+    StreamingClient._instance = None
+    _BaseClient._shared_spark = None
+    client_config.streaming_source = None
 
 
 class TestClient:
@@ -256,7 +267,232 @@ class TestClient:
         assert "source_dmo" in client._data_layer_history[DataCloudObjectType.DMO]
 
 
-class TestClientLlmGatewayGenerateText:
+class TestStreamingClient:
+
+    def test_singleton_pattern(self, reset_client, mock_spark):
+        """StreamingClient is a singleton, independent of Client."""
+        reader = MockDataCloudReader(mock_spark)
+        writer = MockDataCloudWriter(mock_spark)
+
+        client1 = StreamingClient(reader=reader, writer=writer)
+        client2 = StreamingClient()
+
+        assert client1 is client2
+
+        with pytest.raises(ValueError):
+            StreamingClient(reader=MagicMock(spec=BaseDataCloudReader))
+
+    def test_streaming_client_is_distinct_from_batch_client(
+        self, reset_client, mock_spark
+    ):
+        """The two clients keep separate singleton instances and histories."""
+        reader = MockDataCloudReader(mock_spark)
+        writer = MockDataCloudWriter(mock_spark)
+
+        batch = Client(reader=reader, writer=writer)
+        streaming = StreamingClient(reader=reader, writer=writer)
+
+        assert batch is not streaming
+        assert batch._data_layer_history is not streaming._data_layer_history
+
+    def test_read_dlo_deltas(self, reset_client, mock_spark):
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        mock_df = MagicMock(spec=DataFrame)
+        reader.read_dlo_deltas.return_value = mock_df
+
+        client = StreamingClient(reader=reader, writer=writer)
+
+        with patch("datacustomcode.client.config") as mock_config:
+            mock_config.streaming_source = "Account_std__dll"
+            result = client.read_dlo_deltas()
+
+        reader.read_dlo_deltas.assert_called_once_with()
+        assert result is mock_df
+        assert "Account_std__dll" in client._data_layer_history[DataCloudObjectType.DLO]
+
+    def test_read_dlo_deltas_without_configured_source_raises(
+        self, reset_client, mock_spark
+    ):
+        """Delta reads require a configured streaming source; absence fails fast."""
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+
+        client = StreamingClient(reader=reader, writer=writer)
+        with patch("datacustomcode.client.config") as mock_config:
+            mock_config.streaming_source = None
+            with pytest.raises(RuntimeError) as exc_info:
+                client.read_dlo_deltas()
+
+        assert "streamingSource" in str(exc_info.value)
+        reader.read_dlo_deltas.assert_not_called()
+
+    def test_read_dmo_deltas(self, reset_client, mock_spark):
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        mock_df = MagicMock(spec=DataFrame)
+        reader.read_dmo_deltas.return_value = mock_df
+
+        client = StreamingClient(reader=reader, writer=writer)
+        with patch("datacustomcode.client.config") as mock_config:
+            mock_config.streaming_source = "Account_model__dlm"
+            result = client.read_dmo_deltas()
+
+        reader.read_dmo_deltas.assert_called_once_with()
+        assert result is mock_df
+        assert (
+            "Account_model__dlm" in client._data_layer_history[DataCloudObjectType.DMO]
+        )
+
+    def test_write_dlo_deltas(self, reset_client, mock_spark):
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        mock_df = MagicMock(spec=DataFrame)
+        mock_query = MagicMock()
+        writer.write_dlo_deltas.return_value = mock_query
+
+        client = StreamingClient(reader=reader, writer=writer)
+        client._record_dlo_access("some_dlo")
+
+        result = client.write_dlo_deltas("test_dlo", mock_df, extra_param=True)
+
+        writer.write_dlo_deltas.assert_called_once_with(
+            "test_dlo", mock_df, extra_param=True
+        )
+        assert result is mock_query
+
+    def test_write_dlo_deltas_after_dmo_read_raises_exception(
+        self, reset_client, mock_spark
+    ):
+        """Streaming DLO write is subject to the same DLO/DMO mixing guard."""
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        mock_df = MagicMock(spec=DataFrame)
+
+        client = StreamingClient(reader=reader, writer=writer)
+        client._record_dmo_access("test_dmo")
+
+        with pytest.raises(DataCloudAccessLayerException) as exc_info:
+            client.write_dlo_deltas("test_dlo", mock_df)
+
+        assert "test_dmo" in str(exc_info.value)
+        writer.write_dlo_deltas.assert_not_called()
+
+    def test_streaming_read_write_flow(self, reset_client, mock_spark):
+        """A read_dlo_deltas → write_dlo_deltas flow stays within the DLO layer."""
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        stream_df = MagicMock(spec=DataFrame)
+        reader.read_dlo_deltas.return_value = stream_df
+
+        client = StreamingClient(reader=reader, writer=writer)
+
+        with patch("datacustomcode.client.config") as mock_config:
+            mock_config.streaming_source = "source_dll"
+            df = client.read_dlo_deltas()
+        client.write_dlo_deltas("target_dll", df)
+
+        reader.read_dlo_deltas.assert_called_once_with()
+        writer.write_dlo_deltas.assert_called_once_with("target_dll", stream_df)
+        assert "source_dll" in client._data_layer_history[DataCloudObjectType.DLO]
+
+
+class TestSharedSparkSession:
+    """Both client types must share a single Spark session (one connection)."""
+
+    def _make_config_client(self, client_cls, mock_spark):
+        """Build ``client_cls`` through the config path so it resolves a session
+        via the provider (rather than skipping it with an injected reader/writer).
+        Returns the provider's patched ``get_session`` mock."""
+        from datacustomcode.spark.default import DefaultSparkSessionProvider
+
+        with (
+            patch("datacustomcode.client.config") as mock_config,
+            patch.object(
+                DefaultSparkSessionProvider, "get_session"
+            ) as mock_get_session,
+        ):
+            mock_get_session.return_value = mock_spark
+
+            mock_reader_config = MagicMock()
+            mock_reader_config.to_object.return_value = MagicMock(
+                spec=BaseDataCloudReader
+            )
+            mock_reader_config.force = False
+
+            mock_writer_config = MagicMock()
+            mock_writer_config.to_object.return_value = MagicMock(
+                spec=BaseDataCloudWriter
+            )
+            mock_writer_config.force = False
+
+            mock_config.spark_provider_config = None
+            mock_config.reader_config = mock_reader_config
+            mock_config.writer_config = mock_writer_config
+            mock_config.spark_config = MagicMock(spec=SparkConfig)
+
+            client_cls()
+            return mock_get_session
+
+    def test_two_client_types_reuse_one_session(self, reset_client, mock_spark):
+        """A StreamingClient created after a Client reuses the same session and
+        does not open a second connection."""
+        batch_get_session = self._make_config_client(Client, mock_spark)
+        streaming_get_session = self._make_config_client(StreamingClient, mock_spark)
+
+        # The first client builds the session; the second reuses the cached one
+        # instead of asking the provider for another.
+        batch_get_session.assert_called_once()
+        streaming_get_session.assert_not_called()
+
+        assert _BaseClient._shared_spark is mock_spark
+        assert Client._instance is not StreamingClient._instance
+
+    def test_reader_and_writer_built_against_shared_session(
+        self, reset_client, mock_spark
+    ):
+        """The reused session is the one handed to the second client's
+        reader/writer factories."""
+        self._make_config_client(Client, mock_spark)
+
+        from datacustomcode.spark.default import DefaultSparkSessionProvider
+
+        with (
+            patch("datacustomcode.client.config") as mock_config,
+            patch.object(
+                DefaultSparkSessionProvider, "get_session"
+            ) as mock_get_session,
+        ):
+            # Give the second client a *different* session if it were to build one,
+            # so a stale/duplicate build would be detectable.
+            mock_get_session.return_value = MagicMock(spec=SparkSession)
+
+            mock_reader_config = MagicMock()
+            mock_reader_config.force = False
+            mock_writer_config = MagicMock()
+            mock_writer_config.force = False
+            mock_config.spark_provider_config = None
+            mock_config.reader_config = mock_reader_config
+            mock_config.writer_config = mock_writer_config
+            mock_config.spark_config = MagicMock(spec=SparkConfig)
+
+            StreamingClient()
+
+            mock_get_session.assert_not_called()
+            mock_reader_config.to_object.assert_called_once_with(mock_spark)
+            mock_writer_config.to_object.assert_called_once_with(mock_spark)
+
+    def test_injected_reader_writer_does_not_build_session(
+        self, reset_client, mock_spark
+    ):
+        """Injecting reader+writer skips session creation entirely, leaving the
+        shared session untouched for a later config-based client to populate."""
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+
+        Client(reader=reader, writer=writer)
+
+        assert _BaseClient._shared_spark is None
 
     @patch("datacustomcode.client._build_spark_llm_gateway")
     def test_forwards_args_to_spark_llm_gateway(self, mock_build_gateway, reset_client):
@@ -424,6 +660,65 @@ class TestEinsteinPredictCol:
         mock_predictions.einstein_predict_col.assert_called_once_with(
             "model1", PredictionType.REGRESSION, features, settings={"k": 1}
         )
+
+
+class TestNamedCredentialRequestCol:
+    """The module-level ``named_credential_request_col`` is a thin wrapper that
+    resolves the client-owned :class:`SparkNamedCredential` and delegates.
+    """
+
+    @patch("datacustomcode.client._build_spark_named_credential")
+    def test_delegates_to_spark_named_credential(self, mock_build, reset_client):
+        mock_nc = MagicMock()
+        sentinel_col = MagicMock(name="col")
+        mock_nc.request_col.return_value = sentinel_col
+        mock_build.return_value = mock_nc
+
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        Client(reader=reader, writer=writer)
+
+        request = MagicMock(name="request")
+        body_col = MagicMock(name="body_col")
+        result = named_credential_request_col(request, body_col)
+
+        assert result is sentinel_col
+        mock_nc.request_col.assert_called_once_with(request, body=body_col)
+
+
+class TestClientNamedCredentialRequest:
+
+    @patch("datacustomcode.client._build_spark_named_credential")
+    def test_forwards_request_and_body(self, mock_build, reset_client):
+        mock_nc = MagicMock()
+        sentinel = MagicMock(name="response")
+        mock_nc.request.return_value = sentinel
+        mock_build.return_value = mock_nc
+
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        client = Client(reader=reader, writer=writer)
+
+        request = MagicMock(name="request")
+        result = client.named_credential_request(request, '{"k": "v"}')
+
+        assert result is sentinel
+        mock_nc.request.assert_called_once_with(request, body='{"k": "v"}')
+
+    @patch("datacustomcode.client._build_spark_named_credential")
+    def test_named_credential_built_lazily_and_cached(self, mock_build, reset_client):
+        mock_build.return_value = MagicMock()
+
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        client = Client(reader=reader, writer=writer)
+
+        mock_build.assert_not_called()
+
+        client.named_credential_request(MagicMock())
+        client.named_credential_request(MagicMock())
+
+        mock_build.assert_called_once_with()
 
 
 # Add tests for DefaultSparkSessionProvider

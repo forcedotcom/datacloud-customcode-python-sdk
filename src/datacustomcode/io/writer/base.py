@@ -22,6 +22,7 @@ from datacustomcode.io.base import BaseDataAccessLayer
 
 if TYPE_CHECKING:
     from pyspark.sql import DataFrame as PySparkDataFrame, SparkSession
+    from pyspark.sql.streaming import StreamingQuery
 
 
 class WriteMode(str, Enum):
@@ -57,3 +58,35 @@ class BaseDataCloudWriter(BaseDataAccessLayer):
     def write_to_dmo(
         self, name: str, dataframe: PySparkDataFrame, write_mode: WriteMode
     ) -> None: ...
+
+    def write_dlo_deltas(
+        self, name: str, dataframe: PySparkDataFrame
+    ) -> StreamingQuery:
+        """Write a streaming DataFrame of deltas to a Data Lake Object.
+
+        Streaming counterpart to :meth:`write_to_dlo`. Starts a streaming query
+        that writes each micro-batch to the target DLO via the Data Cloud
+        streaming sink and returns the resulting ``StreamingQuery`` handle. The
+        runtime owns the trigger and checkpoint location; callers pass only the
+        table name. Concrete streaming behavior is provided by the deployed
+        Data Cloud runtime; the base implementation raises
+        :class:`NotImplementedError`.
+
+        Args:
+            name: Target Data Lake Object name.
+            dataframe: Streaming PySpark DataFrame produced from a
+                ``read_dlo_deltas`` / ``read_dmo_deltas`` source.
+
+        Returns:
+            The started ``StreamingQuery``; the caller drives its lifecycle
+            (typically ``query.awaitTermination()``).
+
+        Raises:
+            NotImplementedError: If the active writer does not support streaming
+                deltas (e.g. the local development writers).
+        """
+        raise NotImplementedError(
+            "write_dlo_deltas is only supported when running in the Data Cloud "
+            "streaming runtime; the local writer does not support streaming "
+            "deltas."
+        )

@@ -21,7 +21,9 @@ from typing import (
     ClassVar,
     Dict,
     Optional,
+    TypeVar,
     Union,
+    cast,
 )
 
 from datacustomcode.config import config
@@ -29,19 +31,62 @@ from datacustomcode.einstein_predictions_config import spark_einstein_prediction
 from datacustomcode.file.path.default import DefaultFindFilePath
 from datacustomcode.io.reader.base import BaseDataCloudReader
 from datacustomcode.llm_gateway_config import spark_llm_gateway_config
+from datacustomcode.named_credential_config import spark_named_credential_config
 from datacustomcode.spark.default import DefaultSparkSessionProvider
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from pyspark.sql import Column, DataFrame as PySparkDataFrame
+    from pyspark.sql import (
+        Column,
+        DataFrame as PySparkDataFrame,
+        SparkSession,
+    )
+    from pyspark.sql.streaming import StreamingQuery
 
     from datacustomcode.einstein_predictions.spark_base import SparkEinsteinPredictions
     from datacustomcode.einstein_predictions.types import PredictionType
     from datacustomcode.io.reader.base import BaseDataCloudReader
     from datacustomcode.io.writer.base import BaseDataCloudWriter, WriteMode
     from datacustomcode.llm_gateway.spark_base import SparkLLMGateway
+    from datacustomcode.named_credential.spark_base import SparkNamedCredential
+    from datacustomcode.named_credential.types.http_request import HTTPRequest
+    from datacustomcode.named_credential.types.http_response import HTTPResponse
     from datacustomcode.spark.base import BaseSparkSessionProvider
+
+
+def _streaming_source_name() -> str:
+    """Return the streaming transform's read-source name.
+
+    Resolved from ``config.streaming_source``, which ``run_entrypoint``
+    populates from config.json's ``streamingSource`` field.
+
+    Raises:
+        RuntimeError: If no ``streaming_source`` has been configured (e.g. the
+            transform's config.json has no ``streamingSource`` field).
+    """
+    source = config.streaming_source
+    if not source:
+        raise RuntimeError(
+            "No streaming source configured. A streaming transform must declare "
+            "its read source in config.json under 'streamingSource'."
+        )
+    return source
+
+
+def _active_client() -> "_BaseClient":
+    """Return the client backing the module-level Spark column helpers.
+
+    Prefers an already-initialized singleton so a streaming job reuses its
+    :class:`StreamingClient` (and a batch job its :class:`Client`) rather than
+    forcing an unrelated client into existence. Falls back to building the
+    batch :class:`Client` when neither has been created yet.
+    """
+    if Client._instance is not None:
+        return Client._instance
+    if StreamingClient._instance is not None:
+        return StreamingClient._instance
+    return Client()
 
 
 def _build_spark_llm_gateway() -> "SparkLLMGateway":
@@ -99,7 +144,7 @@ def llm_gateway_generate_text_col(
         the generated text; on failure, ``status == "ERROR"`` and the
         ``error_*`` fields carry diagnostic detail.
     """
-    gateway = Client()._get_spark_llm_gateway()
+    gateway = _active_client()._get_spark_llm_gateway()
     return gateway.llm_gateway_generate_text_col(template, values, model_id=model_id)
 
 
@@ -114,6 +159,21 @@ def _build_spark_einstein_predictions() -> "SparkEinsteinPredictions":
         raise RuntimeError(
             "spark_einstein_predictions_config is not configured. Add a "
             "'spark_einstein_predictions_config' section to config.yaml."
+        )
+    return cfg.to_object()
+
+
+def _build_spark_named_credential() -> "SparkNamedCredential":
+    """Instantiate the SDK-configured :class:`SparkNamedCredential`.
+
+    Raises:
+        RuntimeError: If no ``spark_named_credential_config`` has been loaded.
+    """
+    cfg = spark_named_credential_config.spark_named_credential_config
+    if cfg is None:
+        raise RuntimeError(
+            "spark_named_credential_config is not configured. Add a "
+            "'spark_named_credential_config' section to config.yaml."
         )
     return cfg.to_object()
 
@@ -161,10 +221,44 @@ def einstein_predict_col(
         the JSON-serialized prediction payload; on failure, ``status ==
         "ERROR"`` and the ``error_*`` fields carry diagnostic detail.
     """
-    predictions = Client()._get_spark_einstein_predictions()
+    predictions = _active_client()._get_spark_einstein_predictions()
     return predictions.einstein_predict_col(
         model_api_name, prediction_type, features, settings=settings
     )
+
+
+def named_credential_request_col(
+    request: "HTTPRequest",
+    body: Optional["Column"] = None,
+) -> "Column":
+    """Build a Spark Column that makes one Named Credential callout per row.
+
+    The endpoint, method, and headers are fixed for the call (taken from
+    ``request``); only ``body`` varies per row. Use this instead of
+    :meth:`Client.named_credential_request` when the callout runs across a
+    DataFrame so each row is dispatched independently rather than one-shot on
+    the driver.
+
+    The returned Column yields a struct ``{status, response, error_code,
+    error_message}`` for each row. ``response`` is itself a struct
+    ``{status_code, body, headers}``. Use ``[...]`` to pick a field, e.g.
+    ``named_credential_request_col(...)["response"]["status_code"]``. A transport
+    failure sets ``status`` to ``ERROR`` and populates ``error_message`` (a non-2xx
+    HTTP response is still ``SUCCESS`` with its code in ``response.status_code``),
+    so a single bad row does not abort the whole Spark job.
+
+    Args:
+        request: The callout template — its symbolic reference, method, and
+            headers are applied to every row.
+        body: Optional per-row ``Column`` holding the request body as a
+            string (or null for no body).
+
+    Returns:
+        A Spark ``Column`` of ``StructType`` with fields ``status``,
+        ``response``, ``error_code``, and ``error_message``.
+    """
+    named_credential = Client()._get_spark_named_credential()
+    return named_credential.request_col(request, body=body)
 
 
 class DataCloudObjectType(Enum):
@@ -205,29 +299,26 @@ class DataCloudAccessLayerException(Exception):
         return msg
 
 
-class Client:
-    """Entrypoint for accessing DataCloud objects.
+_ClientT = TypeVar("_ClientT", bound="_BaseClient")
 
-    This is the object used to access Data Cloud DLOs and DMOs. Accessing DLOs/DMOs
-    are tracked and will throw an exception if they are mixed. In other words, you
-    can read from DLOs and write to DLOs, read from DMOs and write to DMOs, but you
-    cannot read from DLOs and write to DMOs or read from DMOs and write to DLOs.
-    Furthermore you cannot mix during merging tables. This class is a singleton to
-    prevent accidental mixing of DLOs and DMOs.
 
-    You can provide custom readers and writers to the client for advanced use
-    cases, but this is not recommended for testing as they may result in unexpected
-    behavior once deployed to Data Cloud. By default, the client intercepts all
-    read/write operations and mocks access to Data Cloud. For example, during
-    writing, we print to the console instead of writing to Data Cloud.
+class _BaseClient:
+    """Shared machinery for the Data Cloud client singletons.
+
+    Holds the wiring common to :class:`Client` (batch) and
+    :class:`StreamingClient`
+
+    This base class is not meant to be instantiated directly; use
+    :class:`Client` or :class:`StreamingClient`.
 
     Args:
-        finder: Find a file path
         reader: A custom reader to use for reading Data Cloud objects.
         writer: A custom writer to use for writing Data Cloud objects.
+        spark_provider: Optional custom :class:`BaseSparkSessionProvider`.
         spark_llm_gateway: Optional custom :class:`SparkLLMGateway`.
         spark_einstein_predictions: Optional custom
             :class:`SparkEinsteinPredictions`.
+        spark_named_credential: Optional custom :class:`SparkNamedCredential`.
 
     Example:
     >>> client = Client()
@@ -237,47 +328,68 @@ class Client:
     >>> answer = client.llm_gateway_generate_text("Generate a greeting message")
     """
 
-    _instance: ClassVar[Optional[Client]] = None
+    # Each concrete subclass gets its own ``_instance`` slot: reads fall through
+    # to this base default of ``None``, but ``cls._instance = ...`` in __new__
+    # always writes to the subclass, so ``Client`` and ``StreamingClient`` never
+    # share an instance.
+    _instance: ClassVar[Optional[_BaseClient]] = None
+    # Process-wide Spark session shared across BOTH client types. Unlike
+    # ``_instance``, this is written via ``_BaseClient._shared_spark`` (never
+    # ``cls._shared_spark``), so the slot lives on the base class and a
+    # ``Client`` and a ``StreamingClient`` in the same process reuse one session
+    # — and therefore one underlying connection — instead of opening two
+    # containing differing state
+    _shared_spark: ClassVar[Optional[SparkSession]] = None
     _reader: BaseDataCloudReader
     _writer: BaseDataCloudWriter
     _file: DefaultFindFilePath
     _spark_llm_gateway: Optional[SparkLLMGateway]
     _spark_einstein_predictions: Optional[SparkEinsteinPredictions]
+    _spark_named_credential: Optional[SparkNamedCredential]
     _data_layer_history: dict[DataCloudObjectType, set[str]]
     _code_type: str
 
     def __new__(
-        cls,
+        cls: type[_ClientT],
         reader: Optional[BaseDataCloudReader] = None,
         writer: Optional[BaseDataCloudWriter] = None,
         spark_provider: Optional[BaseSparkSessionProvider] = None,
         spark_llm_gateway: Optional[SparkLLMGateway] = None,
         spark_einstein_predictions: Optional[SparkEinsteinPredictions] = None,
+        spark_named_credential: Optional[SparkNamedCredential] = None,
         code_type: str = "script",
-    ) -> Client:
+    ) -> _ClientT:
 
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._spark_llm_gateway = spark_llm_gateway
-            cls._instance._spark_einstein_predictions = spark_einstein_predictions
+            instance = super().__new__(cls)
+            instance._spark_llm_gateway = spark_llm_gateway
+            instance._spark_einstein_predictions = spark_einstein_predictions
+            instance._spark_named_credential = spark_named_credential
             # Initialize Readers and Writers from config
             # and/or provided reader and writer
             if reader is None or writer is None:
-                # We need a spark because we will initialize readers and writers
-                if config.spark_config is None:
-                    raise ValueError(
-                        "Spark config is required when reader/writer is not provided"
-                    )
-
-                provider: BaseSparkSessionProvider
-                if spark_provider is not None:
-                    provider = spark_provider
-                elif config.spark_provider_config is not None:
-                    provider = config.spark_provider_config.to_object()
+                # We need a spark because we will initialize readers and writers.
+                # Reuse the process-wide session if one client already built it,
+                # so a Client and a StreamingClient share a single connection.
+                if _BaseClient._shared_spark is not None:
+                    spark = _BaseClient._shared_spark
                 else:
-                    provider = DefaultSparkSessionProvider()
+                    if config.spark_config is None:
+                        raise ValueError(
+                            "Spark config is required when reader/writer is not "
+                            "provided"
+                        )
 
-                spark = provider.get_session(config.spark_config)
+                    provider: BaseSparkSessionProvider
+                    if spark_provider is not None:
+                        provider = spark_provider
+                    elif config.spark_provider_config is not None:
+                        provider = config.spark_provider_config.to_object()
+                    else:
+                        provider = DefaultSparkSessionProvider()
+
+                    spark = provider.get_session(config.spark_config)
+                    _BaseClient._shared_spark = spark
 
             if config.reader_config is None and reader is None:
                 raise ValueError(
@@ -300,66 +412,17 @@ class Client:
             else:
                 writer_init = writer
 
-            cls._instance._reader = reader_init
-            cls._instance._writer = writer_init
-            cls._instance._file = DefaultFindFilePath()
-            cls._instance._data_layer_history = {
+            instance._reader = reader_init
+            instance._writer = writer_init
+            instance._file = DefaultFindFilePath()
+            instance._data_layer_history = {
                 DataCloudObjectType.DLO: set(),
                 DataCloudObjectType.DMO: set(),
             }
-        elif (reader is not None or writer is not None) and cls._instance is not None:
+            cls._instance = instance
+        elif reader is not None or writer is not None:
             raise ValueError("Cannot set reader or writer after client is initialized")
-        return cls._instance
-
-    def read_dlo(self, name: str) -> PySparkDataFrame:
-        """Read a DLO from Data Cloud.
-
-        Args:
-            name: The name of the DLO to read.
-
-        Returns:
-            A PySpark DataFrame containing the DLO data.
-        """
-        self._record_dlo_access(name)
-        return self._reader.read_dlo(name)  # type: ignore[no-any-return]
-
-    def read_dmo(self, name: str) -> PySparkDataFrame:
-        """Read a DMO from Data Cloud.
-
-        Args:
-            name: The name of the DMO to read.
-
-        Returns:
-            A PySpark DataFrame containing the DMO data.
-        """
-        self._record_dmo_access(name)
-        return self._reader.read_dmo(name)  # type: ignore[no-any-return]
-
-    def write_to_dlo(
-        self, name: str, dataframe: PySparkDataFrame, write_mode: WriteMode, **kwargs
-    ) -> None:
-        """Write a PySpark DataFrame to a DLO in Data Cloud.
-
-        Args:
-            name: The name of the DLO to write to.
-            dataframe: The PySpark DataFrame to write.
-            write_mode: The write mode to use for writing to the DLO.
-        """
-        self._validate_data_layer_history_does_not_contain(DataCloudObjectType.DMO)
-        return self._writer.write_to_dlo(name, dataframe, write_mode, **kwargs)  # type: ignore[no-any-return]
-
-    def write_to_dmo(
-        self, name: str, dataframe: PySparkDataFrame, write_mode: WriteMode, **kwargs
-    ) -> None:
-        """Write a PySpark DataFrame to a DMO in Data Cloud.
-
-        Args:
-            name: The name of the DMO to write to.
-            dataframe: The PySpark DataFrame to write.
-            write_mode: The write mode to use for writing to the DMO.
-        """
-        self._validate_data_layer_history_does_not_contain(DataCloudObjectType.DLO)
-        return self._writer.write_to_dmo(name, dataframe, write_mode, **kwargs)  # type: ignore[no-any-return]
+        return cast(_ClientT, cls._instance)
 
     def find_file_path(self, file_name: str) -> Path:
         """Resolve a bundled file shipped in the package to an absolute path.
@@ -474,6 +537,41 @@ class Client:
             self._spark_einstein_predictions = _build_spark_einstein_predictions()
         return self._spark_einstein_predictions
 
+    def named_credential_request(
+        self,
+        request: "HTTPRequest",
+        body: Optional[str] = None,
+    ) -> "HTTPResponse":
+        """Issue a one-shot Named Credential external callout. This is the
+        scalar counterpart to :func:`named_credential_request_col`: it runs
+        **once** on the driver — not per row. Use the column helper method
+        instead when you want to fan a callout out across every row of a
+        DataFrame.
+
+        Example:
+
+            >>> from datacustomcode.named_credential.types.http_request_builder \\
+            ...     import HTTPRequestBuilder
+            >>> request = (
+            ...     HTTPRequestBuilder().set_url("callout:NC/search").build()
+            ... )
+            >>> response = Client().named_credential_request(request)
+
+        Args:
+            request: The callout request
+            body: Optional request body. Set the ``Content-Type`` header to
+                match the format; the SDK does not assume or inject one.
+
+        Returns:
+            The external service's response.
+        """
+        return self._get_spark_named_credential().request(request, body=body)
+
+    def _get_spark_named_credential(self) -> SparkNamedCredential:
+        if self._spark_named_credential is None:
+            self._spark_named_credential = _build_spark_named_credential()
+        return self._spark_named_credential
+
     def _validate_data_layer_history_does_not_contain(
         self, data_cloud_object_type: DataCloudObjectType
     ) -> None:
@@ -487,3 +585,115 @@ class Client:
 
     def _record_dmo_access(self, name: str) -> None:
         self._data_layer_history[DataCloudObjectType.DMO].add(name)
+
+
+class Client(_BaseClient):
+    """Entrypoint for batch access to Data Cloud objects.
+
+    This is the object used to read and write bounded snapshots of Data Cloud
+    DLOs and DMOs.
+    """
+
+    _instance: ClassVar[Optional[Client]] = None
+
+    def read_dlo(self, name: str) -> PySparkDataFrame:
+        """Read a DLO from Data Cloud.
+
+        Args:
+            name: The name of the DLO to read.
+
+        Returns:
+            A PySpark DataFrame containing the DLO data.
+        """
+        self._record_dlo_access(name)
+        return self._reader.read_dlo(name)  # type: ignore[no-any-return]
+
+    def read_dmo(self, name: str) -> PySparkDataFrame:
+        """Read a DMO from Data Cloud.
+
+        Args:
+            name: The name of the DMO to read.
+
+        Returns:
+            A PySpark DataFrame containing the DMO data.
+        """
+        self._record_dmo_access(name)
+        return self._reader.read_dmo(name)  # type: ignore[no-any-return]
+
+    def write_to_dlo(
+        self, name: str, dataframe: PySparkDataFrame, write_mode: WriteMode, **kwargs
+    ) -> None:
+        """Write a PySpark DataFrame to a DLO in Data Cloud.
+
+        Args:
+            name: The name of the DLO to write to.
+            dataframe: The PySpark DataFrame to write.
+            write_mode: The write mode to use for writing to the DLO.
+        """
+        self._validate_data_layer_history_does_not_contain(DataCloudObjectType.DMO)
+        return self._writer.write_to_dlo(name, dataframe, write_mode, **kwargs)  # type: ignore[no-any-return]
+
+    def write_to_dmo(
+        self, name: str, dataframe: PySparkDataFrame, write_mode: WriteMode, **kwargs
+    ) -> None:
+        """Write a PySpark DataFrame to a DMO in Data Cloud.
+
+        Args:
+            name: The name of the DMO to write to.
+            dataframe: The PySpark DataFrame to write.
+            write_mode: The write mode to use for writing to the DMO.
+        """
+        self._validate_data_layer_history_does_not_contain(DataCloudObjectType.DLO)
+        return self._writer.write_to_dmo(name, dataframe, write_mode, **kwargs)  # type: ignore[no-any-return]
+
+
+class StreamingClient(_BaseClient):
+    """Entrypoint for streaming (``DELTA_SYNC``) access to Data Cloud objects.
+
+    This is the streaming counterpart to :class:`Client`. Instead of reading and
+    writing bounded snapshots, it reads a DLO/DMO change feed as a streaming
+    DataFrame and writes the transformed stream back via a ``StreamingQuery``.
+    """
+
+    _instance: ClassVar[Optional[StreamingClient]] = None
+
+    def read_dlo_deltas(self) -> PySparkDataFrame:
+        """Read the streaming change feed (deltas) for a DLO from Data Cloud.
+
+        For use in a streaming (``DELTA_SYNC``) BYOC transform. Returns a
+        streaming DataFrame whose rows carry the change-feed metadata columns
+        (``_record_type``, ``_commit_*``) alongside the source columns.
+
+        Returns:
+            A streaming PySpark DataFrame over the DLO change feed.
+        """
+        self._record_dlo_access(_streaming_source_name())
+        return self._reader.read_dlo_deltas()  # type: ignore[no-any-return]
+
+    def read_dmo_deltas(self) -> PySparkDataFrame:
+        """Read the streaming change feed (deltas) for a DMO from Data Cloud.
+
+        Returns:
+            A streaming PySpark DataFrame over the DMO change feed.
+        """
+        self._record_dmo_access(_streaming_source_name())
+        return self._reader.read_dmo_deltas()  # type: ignore[no-any-return]
+
+    def write_dlo_deltas(
+        self, name: str, dataframe: PySparkDataFrame, **kwargs
+    ) -> StreamingQuery:
+        """Write a streaming DataFrame of deltas to a DLO in Data Cloud.
+
+        Starts a streaming query that writes each micro-batch to the
+        target DLO and returns the  ``StreamingQuery`` handle; the caller
+        typically calls ``query.awaitTermination()``.
+
+        Args:
+            name: The name of the DLO to write to.
+            dataframe: The streaming PySpark DataFrame to write.
+
+        Returns:
+            The started ``StreamingQuery``.
+        """
+        self._validate_data_layer_history_does_not_contain(DataCloudObjectType.DMO)
+        return self._writer.write_dlo_deltas(name, dataframe, **kwargs)  # type: ignore[no-any-return]

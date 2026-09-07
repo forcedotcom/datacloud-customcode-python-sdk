@@ -27,6 +27,7 @@ from typing import (
 from datacustomcode.config import config
 from datacustomcode.einstein_predictions_config import einstein_predictions_config
 from datacustomcode.llm_gateway_config import llm_gateway_config
+from datacustomcode.named_credential_config import named_credential_config
 from datacustomcode.scan import find_base_directory, get_package_type
 
 
@@ -42,6 +43,15 @@ def _set_config_option(config_obj, key: str, value: Optional[str]) -> None:
         config_obj.options[key] = value
 
 
+def _read_streaming_source(config_json: dict) -> Optional[str]:
+    """Return the streaming source name from config.json's ``streamingSource``."""
+    source = config_json.get("streamingSource")
+    if not isinstance(source, dict):
+        return None
+    name = source.get("name")
+    return str(name) if name else None
+
+
 def _update_config_options(profile: Optional[str], sf_cli_org: Optional[str]):
     if sf_cli_org:
         config_key = "sf_cli_org"
@@ -55,6 +65,9 @@ def _update_config_options(profile: Optional[str], sf_cli_org: Optional[str]):
         _set_config_option(
             llm_gateway_config.llm_gateway_config, config_key, sf_cli_org
         )
+        _set_config_option(
+            named_credential_config.named_credential_config, config_key, sf_cli_org
+        )
     elif profile != "default":
         config_key = "credentials_profile"
         _set_config_option(config.reader_config, config_key, profile)
@@ -63,6 +76,9 @@ def _update_config_options(profile: Optional[str], sf_cli_org: Optional[str]):
             einstein_predictions_config.einstein_predictions_config, config_key, profile
         )
         _set_config_option(llm_gateway_config.llm_gateway_config, config_key, profile)
+        _set_config_option(
+            named_credential_config.named_credential_config, config_key, profile
+        )
 
 
 def run_entrypoint(
@@ -124,6 +140,8 @@ def run_entrypoint(
         # Add dataspace to reader and writer config options
         _set_config_option(config.reader_config, "dataspace", dataspace)
         _set_config_option(config.writer_config, "dataspace", dataspace)
+
+        config.streaming_source = _read_streaming_source(config_json)
 
     _update_config_options(profile, sf_cli_org)
 

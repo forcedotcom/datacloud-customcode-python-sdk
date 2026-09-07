@@ -14,6 +14,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import copy
 from html import unescape
 import json
 import os
@@ -37,10 +38,14 @@ import requests
 
 from datacustomcode.cmd import cmd_output
 from datacustomcode.constants import REQUEST_TYPE_TO_FEATURE
+from datacustomcode.named_credential.direct.credentials import (
+    EXTERNAL_CALLOUT_CREDENTIAL,
+)
 from datacustomcode.scan import find_base_directory, get_package_type
 
 DATA_CUSTOM_CODE_PATH = "services/data/v63.0/ssot/data-custom-code"
 DATA_TRANSFORMS_PATH = "services/data/v63.0/ssot/data-transforms"
+DATA_CUSTOM_CODE_INVOKE_OPTIONS_PATH = "services/data/v67.0/ssot/data-custom-code"
 WAIT_FOR_DEPLOYMENT_TIMEOUT = 3000
 
 # Available compute types for Data Cloud deployments.
@@ -108,6 +113,7 @@ class CodeExtensionMetadata(BaseModel):
     computeType: str
     codeType: str
     functionInvokeOptions: Union[list[str], None] = None
+    invokeOptions: Union[list[str], None] = None
 
     def __init__(self, **data):
         name = data.get("name", "")
@@ -200,7 +206,14 @@ def create_deployment(
     access_token: AccessTokenResponse, metadata: CodeExtensionMetadata
 ) -> CreateDeploymentResponse:
     """Create a custom code deployment in the DataCloud."""
-    url = _join_strip_url(access_token.instance_url, DATA_CUSTOM_CODE_PATH)
+    # invokeOptions only binds at v67.0; route there when it is set so the
+    # option isn't silently dropped. Everything else stays on v63.0.
+    code_custom_code_path = (
+        DATA_CUSTOM_CODE_INVOKE_OPTIONS_PATH
+        if metadata.invokeOptions
+        else DATA_CUSTOM_CODE_PATH
+    )
+    url = _join_strip_url(access_token.instance_url, code_custom_code_path)
     body = dict[str, Any](
         {
             "label": metadata.name,
@@ -213,6 +226,8 @@ def create_deployment(
     )
     if metadata.functionInvokeOptions:
         body["functionInvokeOptions"] = metadata.functionInvokeOptions
+    if metadata.invokeOptions:
+        body["invokeOptions"] = metadata.invokeOptions
     logger.debug(f"Creating deployment {metadata.name}...")
     try:
         response = _make_api_call(
@@ -236,6 +251,8 @@ DEPENDENCIES_ARCHIVE_PATH = os.path.join(
 )
 PY_FILES_PATH = os.path.join("payload", "py-files")
 ZIP_FILE_NAME = "deployment.zip"
+# Local-only files that must never be packaged into the deployment zip.
+EXCLUDED_FILES = (".DS_Store", EXTERNAL_CALLOUT_CREDENTIAL)
 
 
 def prepare_dependency_archive(
@@ -388,6 +405,30 @@ class DataTransformConfig(BaseConfig):
     dataspace: str
     permissions: Permissions
     dataObjects: Optional[list[DataObject]] = None
+    streamingSource: Optional[StreamingSource] = None
+
+    @property
+    def is_streaming(self) -> bool:
+        return self.streamingSource is not None
+
+    @model_validator(mode="after")
+    def _validate_layers(self) -> "DataTransformConfig":
+        read_is_dlo = isinstance(self.permissions.read, DloPermission)
+        write_is_dlo = isinstance(self.permissions.write, DloPermission)
+        if self.is_streaming:
+            if not write_is_dlo:
+                raise ValueError(
+                    "A streaming transform must write to a DLO "
+                    "(permissions.write must be a 'dlo' entry)."
+                )
+        elif read_is_dlo != write_is_dlo:
+            raise ValueError(
+                "permissions.read and permissions.write must both reference "
+                "DLOs or both reference DMOs (got "
+                f"read={type(self.permissions.read).__name__}, "
+                f"write={type(self.permissions.write).__name__})"
+            )
+        return self
 
 
 class FunctionConfig(BaseConfig):
@@ -402,22 +443,14 @@ class DmoPermission(BaseModel):
     dmo: list[str]
 
 
+class StreamingSource(BaseModel):
+    type: str
+    name: str
+
+
 class Permissions(BaseModel):
     read: Union[DloPermission, DmoPermission]
     write: Union[DloPermission, DmoPermission]
-
-    @model_validator(mode="after")
-    def _no_mixed_layers(self) -> "Permissions":
-        read_is_dlo = isinstance(self.read, DloPermission)
-        write_is_dlo = isinstance(self.write, DloPermission)
-        if read_is_dlo != write_is_dlo:
-            raise ValueError(
-                "permissions.read and permissions.write must both reference "
-                "DLOs or both reference DMOs (got "
-                f"read={type(self.read).__name__}, "
-                f"write={type(self.write).__name__})"
-            )
-        return self
 
 
 def _permission_entries(perm: Union[DloPermission, DmoPermission]) -> list[str]:
@@ -490,7 +523,9 @@ def create_data_transform(
 ) -> dict:
     """Create a data transform in the DataCloud."""
     script_name = metadata.name
-    request_hydrated = DATA_TRANSFORM_REQUEST_TEMPLATE.copy()
+    # Deep copy: the template's nested nodes/sources/macros dicts would
+    # otherwise be shared across calls and accumulate entries between deploys.
+    request_hydrated = copy.deepcopy(DATA_TRANSFORM_REQUEST_TEMPLATE)
 
     # Add nodes for each write entry (DLO or DMO)
     for i, name in enumerate(
@@ -533,7 +568,7 @@ def create_data_transform(
         "definition": definition,
         "label": f"{metadata.name}",
         "name": f"{metadata.name}",
-        "type": "BATCH",
+        "type": "STREAMING" if data_transform_config.is_streaming else "BATCH",
         "dataSpaceName": data_transform_config.dataspace,
     }
 
@@ -598,9 +633,9 @@ def zip(
 
     with zipfile.ZipFile(ZIP_FILE_NAME, "w", zipfile.ZIP_DEFLATED) as zipf:
         for root, dirs, files in os.walk(directory):
-            # Skip .DS_Store files when adding to zip
+            # Skip .DS_Store and local credentials.
             for file in files:
-                if file != ".DS_Store":
+                if file not in EXCLUDED_FILES:
                     abs_path = os.path.join(root, file)
                     arcname = os.path.relpath(abs_path, directory)
                     zipf.write(abs_path, arcname)
@@ -616,8 +651,17 @@ def deploy_full(
     callback=None,
 ) -> AccessTokenResponse:
     """Deploy a data transform in the DataCloud."""
+    from datacustomcode.constants import SCRIPT_USE_IN_FEATURE_STREAMING
+
     # prepare payload
     config = get_config(directory)
+
+    if (
+        isinstance(config, DataTransformConfig)
+        and config.is_streaming
+        and not metadata.invokeOptions
+    ):
+        metadata.invokeOptions = [SCRIPT_USE_IN_FEATURE_STREAMING]
 
     # create deployment and upload payload
     deployment = create_deployment(access_token, metadata)
