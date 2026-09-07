@@ -658,7 +658,7 @@ class TestCreateDeployment:
             version="1.0.0",
             description="Test job",
             computeType="CPU_M",
-            functionInvokeOptions=["option1", "option2"],
+            invokeOptions=["option1", "option2"],
             codeType="function",
         )
 
@@ -809,6 +809,36 @@ class TestZip:
             "deployment.zip", "w", zipfile.ZIP_DEFLATED
         )
         assert mock_zipfile_instance.write.call_count == 3  # One call per file
+
+    @patch("datacustomcode.deploy.has_nonempty_requirements_file")
+    @patch("datacustomcode.deploy.prepare_dependency_archive")
+    @patch("zipfile.ZipFile")
+    @patch("os.walk")
+    def test_zip_excludes_ds_store_and_external_credentials(
+        self, mock_walk, mock_zipfile, mock_prepare, mock_has_requirements
+    ):
+        """Local credentials and .DS_Store must never be packaged into the zip."""
+        mock_has_requirements.return_value = False
+        mock_zipfile_instance = MagicMock()
+        mock_zipfile.return_value.__enter__.return_value = mock_zipfile_instance
+        mock_zipfile_instance.write = MagicMock()
+
+        mock_walk.return_value = [
+            (
+                "/test/dir",
+                [],
+                ["entrypoint.py", ".DS_Store", "external_callout_config.json"],
+            ),
+        ]
+
+        zip("/test/dir", "default", "script")
+
+        # Only entrypoint.py is written; excluded files are skipped.
+        assert mock_zipfile_instance.write.call_count == 1
+        written = [call.args[0] for call in mock_zipfile_instance.write.call_args_list]
+        assert written == ["/test/dir/entrypoint.py"]
+        assert not any("external_callout_config.json" in path for path in written)
+        assert not any(".DS_Store" in path for path in written)
 
 
 class TestUploadZip:

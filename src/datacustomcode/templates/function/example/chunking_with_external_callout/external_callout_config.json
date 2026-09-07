@@ -1,0 +1,11 @@
+{
+    "credentials": {
+        "callout:gemini": {
+            "auth_type": "Custom",
+            "custom_headers": {
+                "X-goog-api-key": "YOUR_API_KEY"
+            },
+            "target_url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent"
+        }
+    }
+}

@@ -38,6 +38,9 @@ import requests
 
 from datacustomcode.cmd import cmd_output
 from datacustomcode.constants import REQUEST_TYPE_TO_FEATURE
+from datacustomcode.named_credential.direct.credentials import (
+    EXTERNAL_CALLOUT_CREDENTIAL,
+)
 from datacustomcode.scan import find_base_directory, get_package_type
 
 DATA_CUSTOM_CODE_PATH = "services/data/v63.0/ssot/data-custom-code"
@@ -248,6 +251,8 @@ DEPENDENCIES_ARCHIVE_PATH = os.path.join(
 )
 PY_FILES_PATH = os.path.join("payload", "py-files")
 ZIP_FILE_NAME = "deployment.zip"
+# Local-only files that must never be packaged into the deployment zip.
+EXCLUDED_FILES = (".DS_Store", EXTERNAL_CALLOUT_CREDENTIAL)
 
 
 def prepare_dependency_archive(
@@ -628,9 +633,9 @@ def zip(
 
     with zipfile.ZipFile(ZIP_FILE_NAME, "w", zipfile.ZIP_DEFLATED) as zipf:
         for root, dirs, files in os.walk(directory):
-            # Skip .DS_Store files when adding to zip
+            # Skip .DS_Store and local credentials.
             for file in files:
-                if file != ".DS_Store":
+                if file not in EXCLUDED_FILES:
                     abs_path = os.path.join(root, file)
                     arcname = os.path.relpath(abs_path, directory)
                     zipf.write(abs_path, arcname)

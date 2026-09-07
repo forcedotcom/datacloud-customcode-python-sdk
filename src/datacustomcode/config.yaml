@@ -34,3 +34,9 @@ llm_gateway_config:
 
 spark_llm_gateway_config:
   type_config_name: DefaultSparkLLMGateway
+
+named_credential_config:
+  type_config_name: DefaultNamedCredential
+
+spark_named_credential_config:
+  type_config_name: DefaultSparkNamedCredential

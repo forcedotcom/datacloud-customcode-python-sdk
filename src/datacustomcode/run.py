@@ -27,6 +27,7 @@ from typing import (
 from datacustomcode.config import config
 from datacustomcode.einstein_predictions_config import einstein_predictions_config
 from datacustomcode.llm_gateway_config import llm_gateway_config
+from datacustomcode.named_credential_config import named_credential_config
 from datacustomcode.scan import find_base_directory, get_package_type
 
 
@@ -64,6 +65,9 @@ def _update_config_options(profile: Optional[str], sf_cli_org: Optional[str]):
         _set_config_option(
             llm_gateway_config.llm_gateway_config, config_key, sf_cli_org
         )
+        _set_config_option(
+            named_credential_config.named_credential_config, config_key, sf_cli_org
+        )
     elif profile != "default":
         config_key = "credentials_profile"
         _set_config_option(config.reader_config, config_key, profile)
@@ -72,6 +76,9 @@ def _update_config_options(profile: Optional[str], sf_cli_org: Optional[str]):
             einstein_predictions_config.einstein_predictions_config, config_key, profile
         )
         _set_config_option(llm_gateway_config.llm_gateway_config, config_key, profile)
+        _set_config_option(
+            named_credential_config.named_credential_config, config_key, profile
+        )
 
 
 def run_entrypoint(

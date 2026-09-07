@@ -16,6 +16,7 @@ from datacustomcode.client import (
     einstein_predict_col,
     get_run_mode,
     llm_gateway_generate_text_col,
+    named_credential_request_col,
 )
 from datacustomcode.config import (
     AccessLayerObjectConfig,
@@ -707,6 +708,65 @@ class TestEinsteinPredictCol:
         mock_predictions.einstein_predict_col.assert_called_once_with(
             "model1", PredictionType.REGRESSION, features, settings={"k": 1}
         )
+
+
+class TestNamedCredentialRequestCol:
+    """The module-level ``named_credential_request_col`` is a thin wrapper that
+    resolves the client-owned :class:`SparkNamedCredential` and delegates.
+    """
+
+    @patch("datacustomcode.client._build_spark_named_credential")
+    def test_delegates_to_spark_named_credential(self, mock_build, reset_client):
+        mock_nc = MagicMock()
+        sentinel_col = MagicMock(name="col")
+        mock_nc.request_col.return_value = sentinel_col
+        mock_build.return_value = mock_nc
+
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        Client(reader=reader, writer=writer)
+
+        request = MagicMock(name="request")
+        body_col = MagicMock(name="body_col")
+        result = named_credential_request_col(request, body_col)
+
+        assert result is sentinel_col
+        mock_nc.request_col.assert_called_once_with(request, body=body_col)
+
+
+class TestClientNamedCredentialRequest:
+
+    @patch("datacustomcode.client._build_spark_named_credential")
+    def test_forwards_request_and_body(self, mock_build, reset_client):
+        mock_nc = MagicMock()
+        sentinel = MagicMock(name="response")
+        mock_nc.request.return_value = sentinel
+        mock_build.return_value = mock_nc
+
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        client = Client(reader=reader, writer=writer)
+
+        request = MagicMock(name="request")
+        result = client.named_credential_request(request, '{"k": "v"}')
+
+        assert result is sentinel
+        mock_nc.request.assert_called_once_with(request, body='{"k": "v"}')
+
+    @patch("datacustomcode.client._build_spark_named_credential")
+    def test_named_credential_built_lazily_and_cached(self, mock_build, reset_client):
+        mock_build.return_value = MagicMock()
+
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        client = Client(reader=reader, writer=writer)
+
+        mock_build.assert_not_called()
+
+        client.named_credential_request(MagicMock())
+        client.named_credential_request(MagicMock())
+
+        mock_build.assert_called_once_with()
 
 
 # Add tests for DefaultSparkSessionProvider

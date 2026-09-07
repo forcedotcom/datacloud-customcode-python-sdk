@@ -32,6 +32,7 @@ from datacustomcode.einstein_predictions_config import spark_einstein_prediction
 from datacustomcode.file.path.default import DefaultFindFilePath
 from datacustomcode.io.reader.base import BaseDataCloudReader
 from datacustomcode.llm_gateway_config import spark_llm_gateway_config
+from datacustomcode.named_credential_config import spark_named_credential_config
 from datacustomcode.spark.default import DefaultSparkSessionProvider
 
 if TYPE_CHECKING:
@@ -49,6 +50,9 @@ if TYPE_CHECKING:
     from datacustomcode.io.reader.base import BaseDataCloudReader
     from datacustomcode.io.writer.base import BaseDataCloudWriter, WriteMode
     from datacustomcode.llm_gateway.spark_base import SparkLLMGateway
+    from datacustomcode.named_credential.spark_base import SparkNamedCredential
+    from datacustomcode.named_credential.types.http_request import HTTPRequest
+    from datacustomcode.named_credential.types.http_response import HTTPResponse
     from datacustomcode.spark.base import BaseSparkSessionProvider
 
 
@@ -160,6 +164,21 @@ def _build_spark_einstein_predictions() -> "SparkEinsteinPredictions":
     return cfg.to_object()
 
 
+def _build_spark_named_credential() -> "SparkNamedCredential":
+    """Instantiate the SDK-configured :class:`SparkNamedCredential`.
+
+    Raises:
+        RuntimeError: If no ``spark_named_credential_config`` has been loaded.
+    """
+    cfg = spark_named_credential_config.spark_named_credential_config
+    if cfg is None:
+        raise RuntimeError(
+            "spark_named_credential_config is not configured. Add a "
+            "'spark_named_credential_config' section to config.yaml."
+        )
+    return cfg.to_object()
+
+
 def einstein_predict_col(
     model_api_name: str,
     prediction_type: "PredictionType",
@@ -207,6 +226,40 @@ def einstein_predict_col(
     return predictions.einstein_predict_col(
         model_api_name, prediction_type, features, settings=settings
     )
+
+
+def named_credential_request_col(
+    request: "HTTPRequest",
+    body: Optional["Column"] = None,
+) -> "Column":
+    """Build a Spark Column that makes one Named Credential callout per row.
+
+    The endpoint, method, and headers are fixed for the call (taken from
+    ``request``); only ``body`` varies per row. Use this instead of
+    :meth:`Client.named_credential_request` when the callout runs across a
+    DataFrame so each row is dispatched independently rather than one-shot on
+    the driver.
+
+    The returned Column yields a struct ``{status, response, error_code,
+    error_message}`` for each row. ``response`` is itself a struct
+    ``{status_code, body, headers}``. Use ``[...]`` to pick a field, e.g.
+    ``named_credential_request_col(...)["response"]["status_code"]``. A transport
+    failure sets ``status`` to ``ERROR`` and populates ``error_message`` (a non-2xx
+    HTTP response is still ``SUCCESS`` with its code in ``response.status_code``),
+    so a single bad row does not abort the whole Spark job.
+
+    Args:
+        request: The callout template — its symbolic reference, method, and
+            headers are applied to every row.
+        body: Optional per-row ``Column`` holding the request body as a
+            string (or null for no body).
+
+    Returns:
+        A Spark ``Column`` of ``StructType`` with fields ``status``,
+        ``response``, ``error_code``, and ``error_message``.
+    """
+    named_credential = Client()._get_spark_named_credential()
+    return named_credential.request_col(request, body=body)
 
 
 class DataCloudObjectType(Enum):
@@ -266,6 +319,14 @@ class _BaseClient:
         spark_llm_gateway: Optional custom :class:`SparkLLMGateway`.
         spark_einstein_predictions: Optional custom
             :class:`SparkEinsteinPredictions`.
+        spark_named_credential: Optional custom :class:`SparkNamedCredential`.
+
+    Example:
+    >>> client = Client()
+    >>> file_path = client.find_file_path("data.csv")
+    >>> dlo = client.read_dlo("my_dlo")
+    >>> client.write_to_dmo("my_dmo", dlo)
+    >>> answer = client.llm_gateway_generate_text("Generate a greeting message")
     """
 
     # Each concrete subclass gets its own ``_instance`` slot: reads fall through
@@ -285,6 +346,7 @@ class _BaseClient:
     _file: DefaultFindFilePath
     _spark_llm_gateway: Optional[SparkLLMGateway]
     _spark_einstein_predictions: Optional[SparkEinsteinPredictions]
+    _spark_named_credential: Optional[SparkNamedCredential]
     _data_layer_history: dict[DataCloudObjectType, set[str]]
     _code_type: str
 
@@ -295,6 +357,7 @@ class _BaseClient:
         spark_provider: Optional[BaseSparkSessionProvider] = None,
         spark_llm_gateway: Optional[SparkLLMGateway] = None,
         spark_einstein_predictions: Optional[SparkEinsteinPredictions] = None,
+        spark_named_credential: Optional[SparkNamedCredential] = None,
         code_type: str = "script",
     ) -> _ClientT:
 
@@ -302,6 +365,7 @@ class _BaseClient:
             instance = super().__new__(cls)
             instance._spark_llm_gateway = spark_llm_gateway
             instance._spark_einstein_predictions = spark_einstein_predictions
+            instance._spark_named_credential = spark_named_credential
             # Initialize Readers and Writers from config
             # and/or provided reader and writer
             if reader is None or writer is None:
@@ -473,6 +537,41 @@ class _BaseClient:
         if self._spark_einstein_predictions is None:
             self._spark_einstein_predictions = _build_spark_einstein_predictions()
         return self._spark_einstein_predictions
+
+    def named_credential_request(
+        self,
+        request: "HTTPRequest",
+        body: Optional[str] = None,
+    ) -> "HTTPResponse":
+        """Issue a one-shot Named Credential external callout. This is the
+        scalar counterpart to :func:`named_credential_request_col`: it runs
+        **once** on the driver — not per row. Use the column helper method
+        instead when you want to fan a callout out across every row of a
+        DataFrame.
+
+        Example:
+
+            >>> from datacustomcode.named_credential.types.http_request_builder \\
+            ...     import HTTPRequestBuilder
+            >>> request = (
+            ...     HTTPRequestBuilder().set_url("callout:NC/search").build()
+            ... )
+            >>> response = Client().named_credential_request(request)
+
+        Args:
+            request: The callout request
+            body: Optional request body. Set the ``Content-Type`` header to
+                match the format; the SDK does not assume or inject one.
+
+        Returns:
+            The external service's response.
+        """
+        return self._get_spark_named_credential().request(request, body=body)
+
+    def _get_spark_named_credential(self) -> SparkNamedCredential:
+        if self._spark_named_credential is None:
+            self._spark_named_credential = _build_spark_named_credential()
+        return self._spark_named_credential
 
     def _validate_data_layer_history_does_not_contain(
         self, data_cloud_object_type: DataCloudObjectType
