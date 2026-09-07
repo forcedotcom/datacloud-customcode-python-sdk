@@ -40,6 +40,17 @@ Usage
     python scripts/mock_sf_server.py          # listens on port 8888
     MOCK_SF_PORT=9000 python scripts/mock_sf_server.py
     python scripts/mock_sf_server.py 9000
+
+Serves TLS (the deploy path requires an HTTPS upload URL) using a pre-generated
+cert/key pair — this script does not generate one. Set ``MOCK_SF_CERT_FILE`` /
+``MOCK_SF_KEY_FILE`` to the pair's paths; generate a throwaway one with:
+
+    openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem \\
+      -days 1 -subj "/CN=localhost" \\
+      -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+
+Point clients at the cert so they trust it: ``NODE_EXTRA_CA_CERTS`` (CLI) and
+``REQUESTS_CA_BUNDLE`` (SDK).
 """
 
 from __future__ import annotations
@@ -47,6 +58,7 @@ from __future__ import annotations
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import os
+import ssl
 import sys
 
 PORT = (
@@ -68,7 +80,7 @@ _USERINFO = {
 
 _TOKEN_RESPONSE = {
     "access_token": "00D000000000001AAA!fakeAccessTokenForCITesting",
-    "instance_url": f"http://localhost:{PORT}",
+    "instance_url": f"https://localhost:{PORT}",
     "token_type": "Bearer",
     "scope": "api",
 }
@@ -135,7 +147,9 @@ class MockSFHandler(BaseHTTPRequestHandler):
         elif path == _DATA_CUSTOM_CODE_PATH:
             # create_deployment() — return a presigned upload URL
             self._send_json(
-                {"fileUploadUrl": f"http://localhost:{PORT}/upload/fake-deployment.zip"}
+                {
+                    "fileUploadUrl": f"https://localhost:{PORT}/upload/fake-deployment.zip"
+                }
             )
         elif path == _DATA_TRANSFORMS_PATH:
             # create_data_transform() — script packages only
@@ -150,7 +164,18 @@ class MockSFHandler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    cert_path = os.environ.get("MOCK_SF_CERT_FILE")
+    key_path = os.environ.get("MOCK_SF_KEY_FILE")
+    if not cert_path or not key_path:
+        sys.exit(
+            "MOCK_SF_CERT_FILE and MOCK_SF_KEY_FILE must both be set to an "
+            "existing TLS cert/key pair — see the module docstring."
+        )
+
     server = HTTPServer(("localhost", PORT), MockSFHandler)
     server.allow_reuse_address = True
-    print(f"[MOCK SF] Listening on http://localhost:{PORT}", flush=True)
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.load_cert_chain(cert_path, key_path)
+    server.socket = ctx.wrap_socket(server.socket, server_side=True)
+    print(f"[MOCK SF] Listening on https://localhost:{PORT}", flush=True)
     server.serve_forever()

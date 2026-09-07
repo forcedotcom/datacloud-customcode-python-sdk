@@ -509,7 +509,7 @@ exploration.  Instead of running an entire script, one can run one code cell at 
 
 You can read more about Jupyter Notebooks here: https://jupyter.org/
 
-1. Within the root project of your package folder, run `./jupyterlab.sh start`
+1. Within the root project of your package folder, run `./jupyterlab.sh start`. This prints an access token and opens an already-authenticated JupyterLab session in your browser. If the browser doesn't open automatically, copy the printed `http://localhost:8888/?token=...` URL into your browser.
 1. Double-click on "account.ipynb" file, which provides a starting point for a notebook
 1. Use shift+enter to execute each cell within the notebook.  Add/edit/delete cells of code as needed for your data exploration.
 1. Don't forget to run `./jupyterlab.sh stop` to stop the docker container
@@ -600,4 +600,4 @@ If you're using OAuth Tokens authentication, the initial configure will retrieve
 ## Other docs
 
 - [Troubleshooting](./docs/troubleshooting.md)
-- [For Contributors](./FOR_CONTRIBUTORS.md)
+- [Contributing](./CONTRIBUTING.md)
