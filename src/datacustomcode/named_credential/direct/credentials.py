@@ -41,6 +41,7 @@ CREDENTIAL_FILE_ENV_VAR = "DATACUSTOMCODE_EXTERNAL_CALLOUT_CONFIG"
 class AuthType(str, Enum):
     """External Credential auth types supported by External Services."""
 
+    AWS_SIG_V4 = "AwsSv4"
     BASIC = "Basic"
     CUSTOM = "Custom"
     JWT = "Jwt"
