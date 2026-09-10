@@ -87,6 +87,142 @@ class TestDynamicAuthHandler:
             handler(_prepared_request())
 
 
+def _reference_sigv4(config, method, url, body):
+    """Independent SigV4 reference used to validate DynamicAuthHandler output."""
+    import datetime
+    import hashlib
+    import hmac
+    import urllib.parse
+
+    parsed = urllib.parse.urlsplit(url)
+    payload = body.encode("utf-8") if isinstance(body, str) else (body or b"")
+    payload_hash = hashlib.sha256(payload).hexdigest()
+    now = datetime.datetime(2024, 1, 2, 3, 4, 5, tzinfo=datetime.timezone.utc)
+    amz_date = now.strftime("%Y%m%dT%H%M%SZ")
+    datestamp = now.strftime("%Y%m%d")
+
+    signed = {
+        "host": parsed.netloc,
+        "x-amz-content-sha256": payload_hash,
+        "x-amz-date": amz_date,
+    }
+    token = config.get("aws_session_token")
+    if token:
+        signed["x-amz-security-token"] = token
+    signed_headers = ";".join(sorted(signed))
+    canonical_headers = "".join(f"{n}:{signed[n]}\n" for n in sorted(signed))
+
+    pairs = sorted(
+        (urllib.parse.quote(k, safe="-_.~"), urllib.parse.quote(v, safe="-_.~"))
+        for k, v in urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
+    )
+    canonical_query = "&".join(f"{k}={v}" for k, v in pairs)
+    canonical_uri = urllib.parse.quote(parsed.path or "/", safe="/-_.~")
+    canonical_request = "\n".join(
+        [
+            method,
+            canonical_uri,
+            canonical_query,
+            canonical_headers,
+            signed_headers,
+            payload_hash,
+        ]
+    )
+    scope = f"{datestamp}/{config['aws_region']}/{config['aws_service']}/aws4_request"
+    string_to_sign = "\n".join(
+        [
+            "AWS4-HMAC-SHA256",
+            amz_date,
+            scope,
+            hashlib.sha256(canonical_request.encode()).hexdigest(),
+        ]
+    )
+
+    def _h(key, msg):
+        return hmac.new(key, msg.encode(), hashlib.sha256).digest()
+
+    k = _h(f"AWS4{config['aws_secret_access_key']}".encode(), datestamp)
+    k = _h(k, config["aws_region"])
+    k = _h(k, config["aws_service"])
+    k = _h(k, "aws4_request")
+    signature = hmac.new(k, string_to_sign.encode(), hashlib.sha256).hexdigest()
+    return (
+        (
+            f"AWS4-HMAC-SHA256 Credential={config['aws_access_key_id']}/{scope}, "
+            f"SignedHeaders={signed_headers}, Signature={signature}"
+        ),
+        amz_date,
+        payload_hash,
+    )
+
+
+class TestAwsSigV4Auth:
+    _CONFIG: ClassVar[dict] = {
+        "auth_type": AuthType.AWS_SIG_V4.value,
+        "aws_access_key_id": "AKIDEXAMPLE",
+        "aws_secret_access_key": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
+        "aws_region": "us-east-1",
+        "aws_service": "s3",
+    }
+
+    @staticmethod
+    def _freeze_clock(monkeypatch):
+        import datetime as _dt
+
+        from datacustomcode.named_credential.direct import auth as auth_mod
+
+        frozen = _dt.datetime(2024, 1, 2, 3, 4, 5, tzinfo=_dt.timezone.utc)
+
+        class _FrozenDatetime(_dt.datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return frozen if tz is None else frozen.astimezone(tz)
+
+        monkeypatch.setattr(auth_mod.datetime, "datetime", _FrozenDatetime)
+
+    def _sign(self, monkeypatch, config, method="GET", url=None, body=None):
+        self._freeze_clock(monkeypatch)
+        url = url or "https://bucket.s3.amazonaws.com/key"
+        request = PreparedRequest()
+        request.prepare(method=method, url=url, data=body)
+        return DynamicAuthHandler(config)(request)
+
+    def test_matches_reference_signature(self, monkeypatch):
+        url = "https://bucket.s3.amazonaws.com/some/key?b=2&a=1"
+        request = self._sign(monkeypatch, self._CONFIG, "PUT", url, "payload")
+        expected, amz_date, payload_hash = _reference_sigv4(
+            self._CONFIG, "PUT", url, "payload"
+        )
+        assert request.headers["Authorization"] == expected
+        assert request.headers["x-amz-date"] == amz_date
+        assert request.headers["x-amz-content-sha256"] == payload_hash
+        assert "x-amz-security-token" not in request.headers
+
+    def test_empty_body_hashes_empty_string(self, monkeypatch):
+        request = self._sign(monkeypatch, self._CONFIG)
+        assert (
+            request.headers["x-amz-content-sha256"]
+            == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        )
+
+    def test_session_token_is_signed(self, monkeypatch):
+        config = {**self._CONFIG, "aws_session_token": "SESSIONTOKEN"}
+        request = self._sign(monkeypatch, config)
+        assert request.headers["x-amz-security-token"] == "SESSIONTOKEN"
+        assert "x-amz-security-token" in request.headers["Authorization"]
+        expected, _, _ = _reference_sigv4(config, "GET", request.url, None)
+        assert request.headers["Authorization"] == expected
+
+    @pytest.mark.parametrize(
+        "missing",
+        ["aws_access_key_id", "aws_secret_access_key", "aws_region", "aws_service"],
+    )
+    def test_missing_field_raises(self, monkeypatch, missing):
+        config = {k: v for k, v in self._CONFIG.items() if k != missing}
+        with pytest.raises(ValueError, match=missing):
+            self._sign(monkeypatch, config)
+
+
 class TestCredentialStore:
     def test_get_returns_config(self, tmp_path, monkeypatch):
         cred_file = tmp_path / "external_callout_config.json"

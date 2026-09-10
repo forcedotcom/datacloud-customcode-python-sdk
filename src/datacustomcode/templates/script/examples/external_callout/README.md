@@ -122,7 +122,7 @@ matching entries in `config.json`) to point at your own DLOs.
 `auth_type` selects how auth is injected for local testing. It should mirror the
 External Credential your Named Credential uses in the org, so local and deployed
 runs behave the same. This example uses `Custom` (Gemini's `X-goog-api-key`);
-all four supported types:
+all supported types:
 
 | `auth_type` | Fields read | Header sent |
 | ----------- | ------------------------------- | --------------------------------------- |
@@ -130,7 +130,11 @@ all four supported types:
 | `Custom`    | `custom_headers` (sent verbatim)| the headers you list                    |
 | `OAuth`     | `access_token` or `token`       | `Authorization: Bearer <token>`         |
 | `Jwt`       | `access_token` or `token`       | `Authorization: Bearer <token>`         |
+| `AwsSv4`    | `aws_access_key_id`, `aws_secret_access_key`, `aws_region`, `aws_service`, optional `aws_session_token` | `Authorization: AWS4-HMAC-SHA256 ...` plus `x-amz-date` / `x-amz-content-sha256` (and `x-amz-security-token` when a session token is set) |
 
 `OAuth`/`Jwt` take a token you supply for the local run — the SDK does not fetch
 or refresh it. In the Data Cloud runtime the Named Credential handles token
 acquisition; this local config only stands in for that during testing.
+
+`AwsSv4` signs the request with AWS Signature Version 4 using the keys you
+supply, mirroring an AWS Signature Version 4 External Credential in the org.
