@@ -1403,7 +1403,7 @@ class TestCreateDataTransform:
     def test_create_data_transform_dlo_omits_output_data_objects(
         self, mock_make_api_call, mock_get_config
     ):
-        """DLO transforms without dataObjects omit outputDataObjects from the payload."""
+        """DLO transforms without dataObjects omit outputDataObjects from the payload"""
         access_token = AccessTokenResponse(
             access_token="test_token", instance_url="https://instance.example.com"
         )
