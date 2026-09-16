@@ -516,15 +516,13 @@ def create_data_transform(
         "version": "56.0",
     }
 
-    # outputDataObjects is only set for DMO-backed transforms. The server requires
-    # the schema of any DMO created/updated by the transform; DLO transforms use
-    # an existing materialized table and must not include this field.
-    if isinstance(data_transform_config.permissions.write, DmoPermission):
-        if not data_transform_config.dataObjects:
+    if not data_transform_config.dataObjects:
+        if isinstance(data_transform_config.permissions.write, DmoPermission):
             raise ValueError(
                 "DMO transforms require 'dataObjects' in config.json describing "
                 "the schema of each output DMO."
             )
+    else:
         definition["outputDataObjects"] = [
             _data_object_to_output(obj) for obj in data_transform_config.dataObjects
         ]

@@ -1018,6 +1018,37 @@ class TestDataTransformConfig:
         assert obj.fields[0].dataType == "text"
         assert obj.fields[0].keyQualifierFieldName == "KQ_Id1__c"
 
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data=(
+            '{"sdkVersion": "0.1.14", "entryPoint": "entrypoint.py", '
+            '"dataspace": "default", '
+            '"permissions": {"read": {"dlo": ["input_dlo"]}, '
+            '"write": {"dlo": ["output_dlo"]}}, '
+            '"dataObjects": [{'
+            '"name": "output_dlo", '
+            '"label": "Output DLO", '
+            '"type": "dataLakeObject", '
+            '"category": "profile", '
+            '"fields": [{"name": "Id__c", "label": "Id", '
+            '"dataType": "text", "isPrimaryKey": true, '
+            '"keyQualifierFieldName": "KQ_Id1__c"}]'
+            "}]}"
+        ),
+    )
+    def test_get_config_dlo_with_data_objects(self, mock_file):
+        """config.json parses the optional dataObjects schema for DLO writes."""
+        result = get_config("/test/dir")
+        assert isinstance(result, DataTransformConfig)
+        assert result.dataObjects is not None
+        assert len(result.dataObjects) == 1
+        obj = result.dataObjects[0]
+        assert obj.name == "output_dlo"
+        assert obj.category == "profile"
+        assert obj.fields[0].dataType == "text"
+        assert obj.fields[0].keyQualifierFieldName == "KQ_Id1__c"
+
 
 class TestCreateDataTransform:
     @patch("datacustomcode.deploy.get_config")
@@ -1288,10 +1319,91 @@ class TestCreateDataTransform:
 
     @patch("datacustomcode.deploy.get_config")
     @patch("datacustomcode.deploy._make_api_call")
+    def test_create_data_transform_dlo_emits_output_data_objects(
+        self, mock_make_api_call, mock_get_config
+    ):
+        """DLO transforms include outputDataObjects with transformed field names."""
+        access_token = AccessTokenResponse(
+            access_token="test_token", instance_url="https://instance.example.com"
+        )
+        metadata = CodeExtensionMetadata(
+            name="test_package",
+            version="1.0.0",
+            description="DLO with schema",
+            computeType="CPU_M",
+            codeType="script",
+        )
+
+        data_transform_config = DataTransformConfig(
+            sdkVersion="0.1.14",
+            entryPoint="entrypoint.py",
+            dataspace="default",
+            permissions=Permissions(
+                read=DloPermission(dlo=["input_dlo"]),
+                write=DloPermission(dlo=["output_dlo"]),
+            ),
+            dataObjects=[
+                DataObject(
+                    name="output_dlo",
+                    label="Output DLO",
+                    type="dataLakeObject",
+                    category="profile",
+                    fields=[
+                        DataObjectField(
+                            name="Id__c",
+                            label="Id",
+                            dataType="text",
+                            isPrimaryKey=True,
+                            keyQualifierFieldName="KQ_Id1__c",
+                        ),
+                        DataObjectField(
+                            name="KQ_Id1__c",
+                            label="Key Qualifier Id",
+                            dataType="text",
+                            isPrimaryKey=False,
+                            keyQualifierFieldName=None,
+                        ),
+                    ],
+                )
+            ],
+        )
+        mock_make_api_call.return_value = {"id": "transform_id"}
+
+        create_data_transform(
+            "/test/dir", access_token, metadata, data_transform_config
+        )
+
+        request_body = mock_make_api_call.call_args[1]["json"]
+        assert request_body["definition"]["outputDataObjects"] == [
+            {
+                "category": "profile",
+                "fields": [
+                    {
+                        "isPrimaryKey": True,
+                        "keyQualifierField": "KQ_Id1__c",
+                        "label": "Id",
+                        "name": "Id__c",
+                        "type": "text",
+                    },
+                    {
+                        "isPrimaryKey": False,
+                        "label": "Key Qualifier Id",
+                        "name": "KQ_Id1__c",
+                        "type": "text",
+                    },
+                ],
+                "label": "Output DLO",
+                "name": "output_dlo",
+                "type": "dataLakeObject",
+            }
+        ]
+
+    @patch("datacustomcode.deploy.get_config")
+    @patch("datacustomcode.deploy._make_api_call")
     def test_create_data_transform_dlo_omits_output_data_objects(
         self, mock_make_api_call, mock_get_config
     ):
-        """DLO transforms must not include outputDataObjects in the payload."""
+        """DLO transforms without dataObjects omit outputDataObjects from the payload"""
         access_token = AccessTokenResponse(
             access_token="test_token", instance_url="https://instance.example.com"
         )
