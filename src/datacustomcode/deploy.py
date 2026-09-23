@@ -251,11 +251,8 @@ def prepare_dependency_archive(
         cmd = docker_build_cmd(docker_network)
         cmd_output(cmd, env=docker_env)
 
-    # ignore_cleanup_errors=True: on Windows, Docker creates files inside the
-    # mounted volume whose permissions prevent the host from deleting them.
-    # The archive has already been copied out, so silently skipping leftover
-    # files is safe and avoids a fatal error on context-manager exit.
-    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+    temp_dir = tempfile.mkdtemp()
+    try:
         logger.info(
             f"Building dependencies archive with docker network: {docker_network}"
         )
@@ -285,6 +282,14 @@ def prepare_dependency_archive(
             os.makedirs(os.path.dirname(DEPENDENCIES_ARCHIVE_PATH), exist_ok=True)
             shutil.copy(archives_temp_path, DEPENDENCIES_ARCHIVE_PATH)
             logger.info(f"Dependencies archived to {DEPENDENCIES_ARCHIVE_PATH}")
+    finally:
+        try:
+            shutil.rmtree(temp_dir)
+        except PermissionError:
+            logger.debug(
+                f"Could not fully remove temp dir {temp_dir}; "
+                "root-owned files from Docker may remain until next reboot."
+            )
 
 
 def docker_build_cmd(network: str) -> str:
