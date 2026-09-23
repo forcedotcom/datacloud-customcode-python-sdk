@@ -1,0 +1,13 @@
+{
+  "sdkVersion": "6.0.4",
+  "entryPoint": "entrypoint.py",
+  "dataspace": "default",
+  "permissions": {
+    "read": {
+      "dlo": ["User_Sessions__dll"]
+    },
+    "write": {
+      "dlo": ["User_Events__dll"]
+    }
+  }
+}
