@@ -1,16 +1,19 @@
 import itertools
+from pathlib import Path
 import tempfile
 import zipfile
-from pathlib import Path
 
 import joblib
 import pandas as pd
 from pyspark.sql import Row
-from pyspark.sql.functions import coalesce, col, lit
+from pyspark.sql.functions import (
+    coalesce,
+    col,
+    lit,
+)
 
 from datacustomcode.client import Client
 from datacustomcode.io.writer.base import WriteMode
-
 
 UNKNOWN = "__unknown__"
 MODEL_ARCHIVE = "lead_scorer.zip"

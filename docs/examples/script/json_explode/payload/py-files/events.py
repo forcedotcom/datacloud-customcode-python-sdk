@@ -1,16 +1,25 @@
-from pyspark.sql.functions import col, explode_outer, from_json, to_timestamp
+from pyspark.sql.functions import (
+    col,
+    explode_outer,
+    from_json,
+    to_timestamp,
+)
 from pyspark.sql.types import (
-    ArrayType, StringType, StructField, StructType,
+    ArrayType,
+    StringType,
+    StructField,
+    StructType,
 )
 
-
-EVENT_SCHEMA = StructType([
-    StructField("event_id", StringType(), True),
-    StructField("event_type", StringType(), True),
-    StructField("ts", StringType(), True),
-    StructField("path", StringType(), True),
-    StructField("value", StringType(), True),
-])
+EVENT_SCHEMA = StructType(
+    [
+        StructField("event_id", StringType(), True),
+        StructField("event_type", StringType(), True),
+        StructField("ts", StringType(), True),
+        StructField("path", StringType(), True),
+        StructField("value", StringType(), True),
+    ]
+)
 EVENT_ARRAY_SCHEMA = ArrayType(EVENT_SCHEMA, True)
 
 

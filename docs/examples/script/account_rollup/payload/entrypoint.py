@@ -1,4 +1,9 @@
-from pyspark.sql.functions import col, sum as _sum, coalesce, lit
+from pyspark.sql.functions import (
+    coalesce,
+    col,
+    lit,
+    sum as _sum,
+)
 
 from datacustomcode.client import Client
 from datacustomcode.io.writer.base import WriteMode

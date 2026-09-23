@@ -1,8 +1,8 @@
+from events import parse_events
 from pyspark.sql.functions import col
 
 from datacustomcode.client import Client
 from datacustomcode.io.writer.base import WriteMode
-from events import parse_events
 
 
 def main():

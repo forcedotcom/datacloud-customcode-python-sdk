@@ -15,32 +15,61 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 
-
 INDUSTRIES = [
-    "retail", "healthcare", "finance", "tech", "manufacturing",
-    "education", "government", "media", "hospitality", "transportation",
-    "energy", "real_estate", "telecom", "agriculture", "other",
+    "retail",
+    "healthcare",
+    "finance",
+    "tech",
+    "manufacturing",
+    "education",
+    "government",
+    "media",
+    "hospitality",
+    "transportation",
+    "energy",
+    "real_estate",
+    "telecom",
+    "agriculture",
+    "other",
 ]
 EMPLOYEE_BANDS = ["1-10", "11-50", "51-200", "201-1000", "1001-5000", "5001+"]
 REGIONS = ["NA", "EMEA", "APAC", "LATAM", "ANZ"]
 SOURCES = [
-    "webform", "event", "referral", "partner",
-    "cold_outreach", "marketing_campaign",
+    "webform",
+    "event",
+    "referral",
+    "partner",
+    "cold_outreach",
+    "marketing_campaign",
 ]
 
 FEATURE_COLS = ["industry__c", "employee_band__c", "region__c", "source__c"]
 
 BAND_SIGNAL = {b: i for i, b in enumerate(EMPLOYEE_BANDS)}
 SOURCE_SIGNAL = {
-    "referral": 2.0, "partner": 1.2, "event": 0.8,
-    "marketing_campaign": 0.3, "webform": 0.0, "cold_outreach": -1.0,
+    "referral": 2.0,
+    "partner": 1.2,
+    "event": 0.8,
+    "marketing_campaign": 0.3,
+    "webform": 0.0,
+    "cold_outreach": -1.0,
 }
 INDUSTRY_SIGNAL = {
-    "tech": 1.2, "finance": 1.0, "healthcare": 0.7,
-    "telecom": 0.5, "energy": 0.4, "manufacturing": 0.2,
-    "retail": 0.0, "media": 0.0, "real_estate": -0.2,
-    "education": -0.3, "government": -0.4, "hospitality": -0.5,
-    "transportation": -0.5, "agriculture": -0.7, "other": -0.5,
+    "tech": 1.2,
+    "finance": 1.0,
+    "healthcare": 0.7,
+    "telecom": 0.5,
+    "energy": 0.4,
+    "manufacturing": 0.2,
+    "retail": 0.0,
+    "media": 0.0,
+    "real_estate": -0.2,
+    "education": -0.3,
+    "government": -0.4,
+    "hospitality": -0.5,
+    "transportation": -0.5,
+    "agriculture": -0.7,
+    "other": -0.5,
 }
 REGION_SIGNAL = {"NA": 0.6, "EMEA": 0.4, "APAC": 0.3, "ANZ": 0.2, "LATAM": 0.0}
 
@@ -87,7 +116,9 @@ def main() -> None:
     prevalence = float(y.mean())
 
     grid_rows = list(itertools.product(INDUSTRIES, EMPLOYEE_BANDS, REGIONS, SOURCES))
-    print(f"train AUC: {auc:.3f} | prevalence: {prevalence:.3f} | grid: {len(grid_rows)}")
+    print(
+        f"train AUC: {auc:.3f} | prevalence: {prevalence:.3f} | grid: {len(grid_rows)}"
+    )
 
     payload = {
         "pipeline": pipe,
@@ -100,7 +131,9 @@ def main() -> None:
         },
     }
 
-    out_joblib = pathlib.Path(__file__).parent / "payload" / "files" / "lead_scorer.joblib"
+    out_joblib = (
+        pathlib.Path(__file__).parent / "payload" / "files" / "lead_scorer.joblib"
+    )
     out_joblib.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(payload, out_joblib, compress=3)
     print(f"wrote {out_joblib} ({out_joblib.stat().st_size} bytes)")
