@@ -36,10 +36,18 @@ FEATURE_TEMPLATE_MAPPING = {
 # Feature name to Connect API name mapping
 USE_IN_FEATURE_MAPPING_FOR_CONNECT_API = {
     "SearchIndexChunking": "UnstructuredChunking",
+    "QueryServiceUdf": "QueryServiceUdf",
 }
 
 # Pydantic request/response type names to feature names
 REQUEST_TYPE_TO_FEATURE = {
     "SearchIndexChunkingV1Request": "SearchIndexChunking",
     "SearchIndexChunkingV1Response": "SearchIndexChunking",
+    "QueryServiceUdfV1Request": "QueryServiceUdf",
+    "QueryServiceUdfV1Response": "QueryServiceUdf",
 }
+
+# NOTE: no FEATURE_TEMPLATE_MAPPING entry for QueryServiceUdf yet — that
+# requires a full `templates/function/query_service_udf/` scaffold
+# (Dockerfile, entrypoint, requirements) which is out of scope for this
+# enum-plumbing pass. See ADD-INVOKE-OPTION-QueryServiceUdf.md Known Gaps.
