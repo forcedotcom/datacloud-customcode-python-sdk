@@ -52,6 +52,27 @@ def _read_streaming_source(config_json: dict) -> Optional[str]:
     return str(name) if name else None
 
 
+def _project_config_yaml(entrypoint: str) -> Optional[str]:
+    """Locate a project-local ``config.yaml`` next to ``payload/``.
+
+    A streaming project scaffolded by
+    ``datacustomcode init --use-in-feature StreamingTransform`` has
+    ``config.yaml`` at the project root.
+
+    Layout::
+
+        <project_root>/
+            config.yaml            <-- this file (streaming profile)
+            payload/
+                entrypoint.py      <-- passed as `entrypoint`
+                config.json
+    """
+    entrypoint_dir = os.path.dirname(os.path.abspath(entrypoint))
+    project_root = os.path.dirname(entrypoint_dir)
+    candidate = os.path.join(project_root, "config.yaml")
+    return candidate if os.path.exists(candidate) else None
+
+
 def _update_config_options(profile: Optional[str], sf_cli_org: Optional[str]):
     if sf_cli_org:
         config_key = "sf_cli_org"
@@ -133,9 +154,16 @@ def run_entrypoint(
                 f"Please ensure config.json contains a 'dataspace' field."
             )
 
-        # Load config file first
+        # Load config file first. Precedence:
+        #   1. Explicit --config-file argument (highest)
+        #   2. Project-local <project_root>/config.yaml
+        #   3. SDK-shipped default
         if config_file:
             config.load(config_file)
+        else:
+            project_config = _project_config_yaml(entrypoint)
+            if project_config:
+                config.load(project_config)
 
         # Add dataspace to reader and writer config options
         _set_config_option(config.reader_config, "dataspace", dataspace)
