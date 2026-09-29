@@ -52,9 +52,15 @@ class MockWriter(BaseDataCloudWriter):
     ) -> None:  # type: ignore[override]
         raise NotImplementedError
 
+    def auto_write_to_dlo(self, name: str, dataframe: PySparkDataFrame) -> None:
+        raise NotImplementedError
+
     def write_to_dmo(
         self, name: str, dataframe: PySparkDataFrame, write_mode: WriteMode
     ) -> None:  # type: ignore[override]
+        raise NotImplementedError
+
+    def auto_write_to_dmo(self, name: str, dataframe: PySparkDataFrame) -> None:
         raise NotImplementedError
 
 

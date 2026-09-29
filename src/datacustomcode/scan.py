@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import ast
+import copy
 import json
 import os
 import sys
@@ -32,11 +33,27 @@ import pydantic
 from datacustomcode.version import get_version
 
 DATA_ACCESS_METHODS = ["read_dlo", "read_dmo", "write_to_dlo", "write_to_dmo"]
+STREAMING_READ_METHODS = ["read_dlo_deltas", "read_dmo_deltas"]
+STREAMING_WRITE_METHODS = ["write_dlo_deltas"]
 
 DATA_TRANSFORM_CONFIG_TEMPLATE = {
     "sdkVersion": get_version(),
     "entryPoint": "",
     "dataspace": "default",
+    "permissions": {
+        "read": {},
+        "write": {},
+    },
+}
+
+STREAMING_TRANSFORM_CONFIG_TEMPLATE = {
+    "sdkVersion": get_version(),
+    "entryPoint": "",
+    "dataspace": "default",
+    "streamingSource": {
+        "type": "dlo",
+        "name": "",
+    },
     "permissions": {
         "read": {},
         "write": {},
@@ -160,6 +177,35 @@ class DataAccessLayerCalls(pydantic.BaseModel):
         return next(iter(self.write_to_dmo))
 
 
+class StreamingDataAccessLayerCalls(pydantic.BaseModel):
+    read_dlo_deltas: bool
+    read_dmo_deltas: bool
+    write_dlo_deltas: frozenset[str]
+
+    @pydantic.model_validator(mode="after")
+    def validate_access_layer(self) -> StreamingDataAccessLayerCalls:
+        if self.read_dlo_deltas and self.read_dmo_deltas:
+            raise ValueError(
+                "Cannot read DLO and DMO deltas in the same streaming transform."
+            )
+        if not self.read_dlo_deltas and not self.read_dmo_deltas:
+            raise ValueError(
+                "A streaming transform must read from at least one DLO or DMO "
+                "delta stream (read_dlo_deltas / read_dmo_deltas)."
+            )
+        if not self.write_dlo_deltas:
+            raise ValueError(
+                "A streaming transform must write to at least one DLO via "
+                "write_dlo_deltas."
+            )
+        return self
+
+    @property
+    def read_layer(self) -> str:
+        """Return the read source layer, ``"dlo"`` or ``"dmo"``."""
+        return "dlo" if self.read_dlo_deltas else "dmo"
+
+
 class ClientMethodVisitor(ast.NodeVisitor):
     """AST Visitor that finds all instances of Client read/write method calls."""
 
@@ -168,6 +214,9 @@ class ClientMethodVisitor(ast.NodeVisitor):
         self._read_dmo_instances: set[str] = set()
         self._write_to_dlo_instances: set[str] = set()
         self._write_to_dmo_instances: set[str] = set()
+        self._read_dlo_deltas: bool = False
+        self._read_dmo_deltas: bool = False
+        self._write_dlo_deltas_instances: set[str] = set()
         self.variable_values: Dict[str, Union[str, None]] = {}
 
     def visit_Assign(self, node: ast.Assign) -> None:
@@ -189,14 +238,15 @@ class ClientMethodVisitor(ast.NodeVisitor):
             node.func.value, ast.Name
         ):
             method_name = node.func.attr
+
+            if method_name == "read_dlo_deltas":
+                self._read_dlo_deltas = True
+            elif method_name == "read_dmo_deltas":
+                self._read_dmo_deltas = True
+
             if method_name in DATA_ACCESS_METHODS and node.args:
                 arg = node.args[0]
-                name = None
-
-                if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
-                    name = arg.value
-                elif isinstance(arg, ast.Name) and arg.id in self.variable_values:
-                    name = self.variable_values[arg.id]
+                name = self._resolve_name_arg(arg)
 
                 if name:
                     if method_name == "read_dlo":
@@ -207,7 +257,28 @@ class ClientMethodVisitor(ast.NodeVisitor):
                         self._write_to_dlo_instances.add(name)
                     elif method_name == "write_to_dmo":
                         self._write_to_dmo_instances.add(name)
+            elif method_name in STREAMING_WRITE_METHODS and node.args:
+                name = self._resolve_name_arg(node.args[0])
+                if name and method_name == "write_dlo_deltas":
+                    self._write_dlo_deltas_instances.add(name)
         self.generic_visit(node)
+
+    def _resolve_name_arg(self, arg: ast.expr) -> Union[str, None]:
+        """Resolve a string-literal or tracked-variable first argument."""
+        if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+            return arg.value
+        if isinstance(arg, ast.Name) and arg.id in self.variable_values:
+            return self.variable_values[arg.id]
+        return None
+
+    @property
+    def is_streaming(self) -> bool:
+        """Whether any streaming (delta) access method was found."""
+        return (
+            self._read_dlo_deltas
+            or self._read_dmo_deltas
+            or bool(self._write_dlo_deltas_instances)
+        )
 
     def found(self) -> DataAccessLayerCalls:
         return DataAccessLayerCalls(
@@ -215,6 +286,13 @@ class ClientMethodVisitor(ast.NodeVisitor):
             read_dmo=frozenset(self._read_dmo_instances),
             write_to_dlo=frozenset(self._write_to_dlo_instances),
             write_to_dmo=frozenset(self._write_to_dmo_instances),
+        )
+
+    def found_streaming(self) -> StreamingDataAccessLayerCalls:
+        return StreamingDataAccessLayerCalls(
+            read_dlo_deltas=self._read_dlo_deltas,
+            read_dmo_deltas=self._read_dmo_deltas,
+            write_dlo_deltas=frozenset(self._write_dlo_deltas_instances),
         )
 
 
@@ -301,23 +379,51 @@ def write_requirements_file(file_path: str) -> str:
     return requirements_path
 
 
-def scan_file(file_path: str) -> DataAccessLayerCalls:
-    """Scan a single Python file for Client read/write method calls."""
+def _visit_file(file_path: str) -> ClientMethodVisitor:
+    """Parse a Python file and return the populated method visitor."""
     with open(file_path, "r") as f:
-        code = f.read()
-        tree = ast.parse(code)
-        visitor = ClientMethodVisitor()
-        visitor.visit(tree)
-        return visitor.found()
+        tree = ast.parse(f.read())
+    visitor = ClientMethodVisitor()
+    visitor.visit(tree)
+    return visitor
 
 
-def dc_config_json_from_file(file_path: str, type: str) -> dict[str, Any]:
-    """Create a Data Cloud Custom Code config JSON from a script."""
+def scan_file(file_path: str) -> DataAccessLayerCalls:
+    """Scan a single Python file for batch Client read/write method calls."""
+    return _visit_file(file_path).found()
+
+
+def scan_file_streaming(file_path: str) -> StreamingDataAccessLayerCalls:
+    """Scan a single Python file for StreamingClient delta method calls."""
+    return _visit_file(file_path).found_streaming()
+
+
+def file_is_streaming(file_path: str) -> bool:
+    """Return whether the entrypoint uses streaming (delta) access methods."""
+    return _visit_file(file_path).is_streaming
+
+
+def dc_config_json_from_file(
+    file_path: str, type: str, streaming: bool = False
+) -> dict[str, Any]:
+    """Create a Data Cloud Custom Code config JSON from a script.
+
+    Args:
+        file_path: Path to the entrypoint.
+        type: Package type, ``"script"`` or ``"function"``.
+        streaming: For scripts, a streaming
+            (``streamingSource``) config instead of a batch one.
+    """
     config: dict[str, Any]
     if type == "script":
-        config = DATA_TRANSFORM_CONFIG_TEMPLATE.copy()
+        template = (
+            STREAMING_TRANSFORM_CONFIG_TEMPLATE
+            if streaming
+            else DATA_TRANSFORM_CONFIG_TEMPLATE
+        )
+        config = copy.deepcopy(template)
     elif type == "function":
-        config = FUNCTION_CONFIG_TEMPLATE.copy()
+        config = copy.deepcopy(FUNCTION_CONFIG_TEMPLATE)
     config["entryPoint"] = os.path.basename(file_path)
     return config
 
@@ -372,20 +478,49 @@ def update_config(file_path: str) -> dict[str, Any]:
 
     if package_type == "script":
         existing_config["dataspace"] = get_dataspace(existing_config)
-        output = scan_file(file_path)
-        read: dict[str, list[str]] = {}
-        if output.read_dlo:
-            read["dlo"] = list(output.read_dlo)
+        if file_is_streaming(file_path):
+            _update_streaming_config(existing_config, file_path)
         else:
-            read["dmo"] = list(output.read_dmo)
-        write: dict[str, list[str]] = {}
-        if output.write_to_dlo:
-            write["dlo"] = list(output.write_to_dlo)
-        else:
-            write["dmo"] = list(output.write_to_dmo)
+            existing_config.pop("streamingSource", None)
+            output = scan_file(file_path)
+            read: dict[str, list[str]] = {}
+            if output.read_dlo:
+                read["dlo"] = list(output.read_dlo)
+            else:
+                read["dmo"] = list(output.read_dmo)
+            write: dict[str, list[str]] = {}
+            if output.write_to_dlo:
+                write["dlo"] = list(output.write_to_dlo)
+            else:
+                write["dmo"] = list(output.write_to_dmo)
 
-        existing_config["permissions"] = {"read": read, "write": write}
+            existing_config["permissions"] = {"read": read, "write": write}
     return existing_config
+
+
+def _update_streaming_config(existing_config: dict[str, Any], file_path: str) -> None:
+    output = scan_file_streaming(file_path)
+    read_layer = output.read_layer
+
+    source = existing_config.get("streamingSource")
+    if not isinstance(source, dict):
+        source = {}
+    source_name = source.get("name", "")
+    existing_config["streamingSource"] = {"type": read_layer, "name": source_name}
+
+    if not source_name:
+        logger.warning(
+            "streamingSource.name is empty in config.json. A streaming "
+            "transform must declare its read source; set streamingSource.name "
+            "to the DLO/DMO the transform reads from."
+        )
+
+    read_names = [source_name] if source_name else []
+    write_names = list(output.write_dlo_deltas)
+    existing_config["permissions"] = {
+        "read": {read_layer: read_names},
+        "write": {"dlo": write_names},
+    }
 
 
 def get_dataspace(existing_config: dict[str, str]) -> str:

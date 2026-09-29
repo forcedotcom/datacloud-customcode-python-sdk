@@ -36,6 +36,10 @@ class CSVDataCloudWriter(BaseDataCloudWriter):
             name = f"{name}{SUFFIX}"
         dataframe.write.csv(name, mode=write_mode)
 
+    def auto_write_to_dlo(self, name: str, dataframe: PySparkDataFrame) -> None:
+        # use overwrite since this is a local only writer
+        self.write_to_dlo(name, dataframe, WriteMode.OVERWRITE)
+
     def write_to_dmo(
         self, name: str, dataframe: PySparkDataFrame, write_mode: WriteMode
     ) -> None:
@@ -43,3 +47,7 @@ class CSVDataCloudWriter(BaseDataCloudWriter):
         if not name.lower().endswith(SUFFIX):
             name = f"{name}{SUFFIX}"
         dataframe.write.csv(name, mode=write_mode)
+
+    def auto_write_to_dmo(self, name: str, dataframe: PySparkDataFrame) -> None:
+        # use overwrite since this is a local only writer
+        self.write_to_dmo(name, dataframe, WriteMode.OVERWRITE)

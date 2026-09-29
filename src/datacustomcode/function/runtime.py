@@ -23,6 +23,8 @@ from datacustomcode.file.path.default import DefaultFindFilePath
 from datacustomcode.function.base import BaseRuntime
 from datacustomcode.llm_gateway.base import LLMGateway
 from datacustomcode.llm_gateway_config import llm_gateway_config
+from datacustomcode.named_credential.base import NamedCredential
+from datacustomcode.named_credential_config import named_credential_config
 
 
 class Runtime(BaseRuntime):
@@ -69,6 +71,7 @@ class Runtime(BaseRuntime):
         self._llm_gateway: Optional[LLMGateway] = None
         self._file = DefaultFindFilePath()
         self._einstein_predictions: Optional[EinsteinPredictions] = None
+        self._named_credential: Optional[NamedCredential] = None
 
     @property
     def llm_gateway(self) -> LLMGateway:
@@ -98,3 +101,16 @@ class Runtime(BaseRuntime):
                 einstein_predictions_config.einstein_predictions_config.to_object()
             )
         return self._einstein_predictions
+
+    @property
+    def named_credential(self) -> NamedCredential:
+        if self._named_credential is None:
+            if named_credential_config.named_credential_config is None:
+                raise RuntimeError(
+                    "Named Credential is not configured. Add "
+                    "'named_credential_config' section to config.yaml"
+                )
+            self._named_credential = (
+                named_credential_config.named_credential_config.to_object()
+            )
+        return self._named_credential

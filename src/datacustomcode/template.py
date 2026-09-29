@@ -23,8 +23,12 @@ from datacustomcode.constants import FEATURE_TEMPLATE_MAPPING
 script_template_dir = os.path.join(os.path.dirname(__file__), "templates", "script")
 function_template_dir = os.path.join(os.path.dirname(__file__), "templates", "function")
 
+STREAMING_EXAMPLE_ENTRYPOINT = os.path.join(
+    script_template_dir, "examples", "streaming_deltas", "entrypoint.py"
+)
 
-def copy_script_template(target_dir: str) -> None:
+
+def copy_script_template(target_dir: str, streaming: bool = False) -> None:
     """Copy the template to the target directory."""
     os.makedirs(target_dir, exist_ok=True)
 
@@ -38,6 +42,14 @@ def copy_script_template(target_dir: str) -> None:
         else:
             logger.debug(f"Copying file {source} to {destination}...")
             shutil.copy2(source, destination)
+
+    if streaming:
+        destination = os.path.join(target_dir, "payload", "entrypoint.py")
+        logger.debug(
+            f"Copying streaming example {STREAMING_EXAMPLE_ENTRYPOINT} to "
+            f"{destination}..."
+        )
+        shutil.copy2(STREAMING_EXAMPLE_ENTRYPOINT, destination)
 
 
 def copy_function_template(target_dir: str, use_in_feature: Optional[str]) -> None:

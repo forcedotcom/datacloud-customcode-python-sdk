@@ -89,6 +89,9 @@ class ClientConfig(BaseConfig):
     spark_provider_config: Union[
         SparkProviderConfig[BaseSparkSessionProvider], None
     ] = None
+    # Source object name for a streaming (DELTA_SYNC) transform, populated by
+    # ``run_entrypoint`` from config.json's ``streamingSource`` field
+    streaming_source: Union[str, None] = None
 
     def update(self, other: ClientConfig) -> ClientConfig:
         """Merge this ClientConfig with another, respecting force flags.
@@ -116,6 +119,8 @@ class ClientConfig(BaseConfig):
         self.spark_provider_config = merge(
             self.spark_provider_config, other.spark_provider_config
         )
+        if other.streaming_source is not None:
+            self.streaming_source = other.streaming_source
         return self
 
 

@@ -283,10 +283,19 @@ def deploy(
 )
 @click.option(
     "--use-in-feature",
-    default="SearchIndexChunking",
-    help="Feature where this function will be used (only applicable for function).",
+    "-u",
+    default=None,
+    help=(
+        "Invoke option for this package. For scripts: 'BatchTransform' "
+        "(default) or 'StreamingTransform'. For functions: 'SearchIndexChunking'."
+    ),
 )
 def init(directory: str, code_type: str, use_in_feature: Optional[str]):
+    from datacustomcode.constants import (
+        SCRIPT_USE_IN_FEATURE_BATCH,
+        SCRIPT_USE_IN_FEATURE_OPTIONS,
+        SCRIPT_USE_IN_FEATURE_STREAMING,
+    )
     from datacustomcode.scan import (
         dc_config_json_from_file,
         update_config,
@@ -294,9 +303,23 @@ def init(directory: str, code_type: str, use_in_feature: Optional[str]):
     )
     from datacustomcode.template import copy_function_template, copy_script_template
 
+    streaming = False
+    if code_type == "script":
+        use_in_feature = use_in_feature or SCRIPT_USE_IN_FEATURE_BATCH
+        if use_in_feature not in SCRIPT_USE_IN_FEATURE_OPTIONS:
+            click.secho(
+                f"Error: Invalid --use-in-feature '{use_in_feature}' for a "
+                f"script. Valid options: {', '.join(SCRIPT_USE_IN_FEATURE_OPTIONS)}.",
+                fg="red",
+            )
+            raise click.Abort()
+        streaming = use_in_feature == SCRIPT_USE_IN_FEATURE_STREAMING
+    else:
+        use_in_feature = use_in_feature or "SearchIndexChunking"
+
     click.echo("Copying template to " + click.style(directory, fg="blue", bold=True))
     if code_type == "script":
-        copy_script_template(directory)
+        copy_script_template(directory, streaming=streaming)
     elif code_type == "function":
         copy_function_template(directory, use_in_feature)
     entrypoint_path = os.path.join(directory, PAYLOAD_DIR, ENTRYPOINT_FILE)
@@ -306,7 +329,9 @@ def init(directory: str, code_type: str, use_in_feature: Optional[str]):
     sdk_config = {"type": code_type}
     write_sdk_config(directory, sdk_config)
 
-    config_json = dc_config_json_from_file(entrypoint_path, code_type)
+    config_json = dc_config_json_from_file(
+        entrypoint_path, code_type, streaming=streaming
+    )
     with open(config_location, "w") as f:
         json.dump(config_json, f, indent=2)
 

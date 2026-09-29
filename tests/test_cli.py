@@ -46,11 +46,14 @@ class TestInit:
             result = runner.invoke(init, ["test_dir", "--code-type", "script"])
 
             assert result.exit_code == 0
-            mock_copy.assert_called_once_with("test_dir")
+            # A script with no --use-in-feature defaults to batch (streaming=False).
+            mock_copy.assert_called_once_with("test_dir", streaming=False)
             # Verify SDK config was written
             mock_write_sdk.assert_called_once_with("test_dir", {"type": "script"})
             mock_scan.assert_called_once_with(
-                os.path.join("test_dir", "payload", "entrypoint.py"), "script"
+                os.path.join("test_dir", "payload", "entrypoint.py"),
+                "script",
+                streaming=False,
             )
             mock_update.assert_called_once_with(
                 os.path.join("test_dir", "payload", "entrypoint.py")
@@ -68,6 +71,96 @@ class TestInit:
             # The last write should be the updated config
             expected_content = json.dumps(mock_update.return_value, indent=2)
             assert expected_content in written_content
+
+    @patch("datacustomcode.template.copy_script_template")
+    @patch("datacustomcode.scan.update_config")
+    @patch("datacustomcode.scan.dc_config_json_from_file")
+    @patch("datacustomcode.scan.write_sdk_config")
+    @patch("builtins.open", new_callable=mock_open)
+    def test_init_command_streaming(
+        self, mock_file, mock_write_sdk, mock_scan, mock_update, mock_copy
+    ):
+        """Test init command with --use-in-feature StreamingTransform."""
+        mock_scan.return_value = {"streamingSource": {"type": "dlo", "name": ""}}
+        mock_update.return_value = {"streamingSource": {"type": "dlo", "name": ""}}
+
+        runner = CliRunner()
+        with runner.isolated_filesystem():
+            os.makedirs(os.path.join("test_dir", "payload"), exist_ok=True)
+
+            result = runner.invoke(
+                init,
+                [
+                    "test_dir",
+                    "--code-type",
+                    "script",
+                    "--use-in-feature",
+                    "StreamingTransform",
+                ],
+            )
+
+            assert result.exit_code == 0
+            mock_copy.assert_called_once_with("test_dir", streaming=True)
+            mock_scan.assert_called_once_with(
+                os.path.join("test_dir", "payload", "entrypoint.py"),
+                "script",
+                streaming=True,
+            )
+
+    @patch("datacustomcode.template.copy_script_template")
+    @patch("datacustomcode.scan.update_config")
+    @patch("datacustomcode.scan.dc_config_json_from_file")
+    @patch("datacustomcode.scan.write_sdk_config")
+    @patch("builtins.open", new_callable=mock_open)
+    def test_init_command_batch_explicit(
+        self, mock_file, mock_write_sdk, mock_scan, mock_update, mock_copy
+    ):
+        """Test init command with explicit --use-in-feature BatchTransform."""
+        mock_scan.return_value = {"permissions": {"read": {}, "write": {}}}
+        mock_update.return_value = {"permissions": {"read": {}, "write": {}}}
+
+        runner = CliRunner()
+        with runner.isolated_filesystem():
+            os.makedirs(os.path.join("test_dir", "payload"), exist_ok=True)
+
+            result = runner.invoke(
+                init,
+                [
+                    "test_dir",
+                    "--code-type",
+                    "script",
+                    "-u",
+                    "BatchTransform",
+                ],
+            )
+
+            assert result.exit_code == 0
+            mock_copy.assert_called_once_with("test_dir", streaming=False)
+            mock_scan.assert_called_once_with(
+                os.path.join("test_dir", "payload", "entrypoint.py"),
+                "script",
+                streaming=False,
+            )
+
+    def test_init_command_invalid_use_in_feature(self):
+        """A bad --use-in-feature value for a script aborts with an error."""
+        runner = CliRunner()
+        with runner.isolated_filesystem():
+            os.makedirs(os.path.join("test_dir", "payload"), exist_ok=True)
+
+            result = runner.invoke(
+                init,
+                [
+                    "test_dir",
+                    "--code-type",
+                    "script",
+                    "--use-in-feature",
+                    "NotARealOption",
+                ],
+            )
+
+            assert result.exit_code != 0
+            assert "Invalid --use-in-feature" in result.output
 
 
 class TestDeploy:
