@@ -1,0 +1,13 @@
+{
+  "sdkVersion": "6.0.4",
+  "entryPoint": "entrypoint.py",
+  "dataspace": "default",
+  "permissions": {
+    "read": {
+      "dlo": ["Lead__dll"]
+    },
+    "write": {
+      "dlo": ["Lead_Scored__dll"]
+    }
+  }
+}

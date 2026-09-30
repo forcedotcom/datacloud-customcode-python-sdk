@@ -1,0 +1,6 @@
+session_id,user_id,events
+S1,U1,"[{""event_id"":""E1"",""event_type"":""page_view"",""ts"":""2026-09-22T14:00:00Z"",""path"":""/home"",""value"":null},{""event_id"":""E2"",""event_type"":""page_view"",""ts"":""2026-09-22T14:00:15Z"",""path"":""/pricing"",""value"":null},{""event_id"":""E3"",""event_type"":""click"",""ts"":""2026-09-22T14:00:42Z"",""path"":""/pricing"",""value"":""cta_upgrade""}]"
+S2,U2,"[{""event_id"":""E4"",""event_type"":""page_view"",""ts"":""2026-09-22T14:05:00Z"",""path"":""/blog/announcing-x"",""value"":null},{""event_id"":""E5"",""event_type"":""scroll_50"",""ts"":""2026-09-22T14:05:22Z"",""path"":""/blog/announcing-x"",""value"":""50""}]"
+S3,U1,"[{""event_id"":""E6"",""event_type"":""page_view"",""ts"":""2026-09-22T15:00:00Z"",""path"":""/dashboard"",""value"":null},{""event_id"":""E7"",""event_type"":""form_submit"",""ts"":""2026-09-22T15:01:11Z"",""path"":""/dashboard"",""value"":""support_request""},{""event_id"":""E8"",""event_type"":""page_view"",""ts"":""2026-09-22T15:01:20Z"",""path"":""/support/thanks"",""value"":null}]"
+S4,U3,"[]"
+S5,U4,"[{""event_id"":""E9"",""event_type"":""page_view"",""ts"":""2026-09-22T16:10:00Z"",""path"":""/home"",""value"":null}]"
