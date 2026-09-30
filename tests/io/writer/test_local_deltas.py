@@ -49,13 +49,13 @@ def test_preview_drops_cdf_metadata_columns(writer):
     annotated_after_with.drop.return_value = annotated_after_drop
     batch_df = MagicMock()
     batch_df.withColumn.return_value = annotated_after_with
+    batch_df.select.return_value.limit.return_value.collect.return_value = []
 
-    # pyspark.sql.functions.{col,when,lit} need a live SparkContext to
-    # produce real Columns; stub them out for the pure-Python paths.
     with (
         patch("pyspark.sql.functions.col", MagicMock()),
         patch("pyspark.sql.functions.when", MagicMock()),
         patch("pyspark.sql.functions.lit", MagicMock()),
+        patch("pyspark.sql.functions.input_file_name", MagicMock()),
     ):
         callback(batch_df, 0)
 
