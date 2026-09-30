@@ -28,7 +28,14 @@ error that was already going to be raised, and only for a pure casing mismatch.
 """
 from __future__ import annotations
 
+import importlib.abc
 import logging
+import sys
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from importlib.machinery import ModuleSpec
+    from types import ModuleType
 
 logger = logging.getLogger(__name__)
 
@@ -125,9 +132,63 @@ def _install_getattr_hook() -> None:
 
 
 def install_column_casing_hints() -> None:
+    """Arrange for the column-casing hint hooks to be installed.
+
+    Never imports pyspark directly. If pyspark is already loaded, the hooks
+    are installed immediately; otherwise, installation is deferred until
+    ``pyspark.sql`` is actually imported by someone. Idempotent; never raises.
+    """
+    if "pyspark.sql" in sys.modules:
+        _install_hooks_now()
+        return
+    if any(isinstance(finder, _PySparkImportHook) for finder in sys.meta_path):
+        return
+    try:
+        sys.meta_path.insert(0, _PySparkImportHook())
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.debug(f"Could not defer column-casing hint installation: {exc}")
+
+
+def _install_hooks_now() -> None:
     """Install the column-casing hint hooks. Idempotent; never raises."""
     try:
         _install_analysis_exception_hook()
         _install_getattr_hook()
     except Exception as exc:  # pragma: no cover - defensive
         logger.debug(f"Could not install column-casing hint hooks: {exc}")
+
+
+class _PySparkImportHook(importlib.abc.MetaPathFinder):
+    """Installs the hint hooks right after ``pyspark.sql`` finishes loading.
+
+    ``install_column_casing_hints`` must not import pyspark itself: this
+    package is also used in the pyspark-free Function code path that must
+    not pull pyspark in as a side effect of importing ``datacustomcode``.
+    Wrapping the real loader lets us defer the pyspark import until whoever
+    actually needs it (the SDK's own lazy accessors, or user code) imports
+    ``pyspark.sql`` on their own.
+    """
+
+    def find_spec(
+        self, fullname: str, path: object, target: ModuleType | None = None
+    ) -> ModuleSpec | None:
+        if fullname != "pyspark.sql":
+            return None
+
+        for finder in sys.meta_path:
+            if finder is self:
+                continue
+            find_spec = getattr(finder, "find_spec", None)
+            if find_spec is None:
+                continue
+            spec = find_spec(fullname, path, target)
+            if spec is not None and spec.loader is not None:
+                original_exec_module = spec.loader.exec_module
+
+                def exec_module(module: ModuleType, _orig=original_exec_module) -> None:
+                    _orig(module)
+                    _install_hooks_now()
+
+                spec.loader.exec_module = exec_module  # type: ignore[method-assign]
+                return spec  # type: ignore[no-any-return]
+        return None
