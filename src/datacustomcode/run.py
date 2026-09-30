@@ -154,10 +154,7 @@ def run_entrypoint(
                 f"Please ensure config.json contains a 'dataspace' field."
             )
 
-        # Load config file first. Precedence:
-        #   1. Explicit --config-file argument (highest)
-        #   2. Project-local <project_root>/config.yaml
-        #   3. SDK-shipped default
+        # Load config file first
         if config_file:
             config.load(config_file)
         else:

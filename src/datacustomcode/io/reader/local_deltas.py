@@ -49,8 +49,6 @@ class LocalDeltasReader(BaseDataCloudReader):
     ) -> None:
         super().__init__(spark)
         self._fixtures_root = Path(fixtures_root)
-        # Credentials captured here and forwarded to StreamingSourceSeeder
-        # on the first `run` against a source (see _try_seed).
         self._credentials_profile = credentials_profile
         self._dataspace = dataspace
         self._sf_cli_org = sf_cli_org
@@ -62,8 +60,6 @@ class LocalDeltasReader(BaseDataCloudReader):
             sf_cli_org=sf_cli_org,
             default_row_limit=default_row_limit,
         )
-        # Which delta method was called; the seeder's LIMIT 1 probe
-        # needs to target the right layer.
         self._current_layer = "dlo"
 
     def read_dlo(
@@ -93,8 +89,7 @@ class LocalDeltasReader(BaseDataCloudReader):
         if not source:
             raise RuntimeError(
                 "No streaming source configured. Set streamingSource.name in "
-                "config.json, or run `datacustomcode init --use-in-feature "
-                "StreamingTransform` to get started."
+                "config.json."
             )
         return source
 
@@ -153,19 +148,7 @@ class LocalDeltasReader(BaseDataCloudReader):
         return StructType.fromJson(json.loads(schema_file.read_text()))
 
     def _try_seed(self, name: str) -> bool:
-        """Fetch schema + snapshot from the tenant for this source.
-
-        Called by _open_stream when _schema.json is missing (first run
-        against `name`, or the customer deleted the cache to force a
-        fresh seed). The `_` prefix is a Hadoop hidden-file convention;
-        Spark's FileStreamSource skips it so the schema cache doesn't
-        get delivered as a micro-batch alongside 000_seed.json.
-
-        Returns True when fixtures were written, False when the source
-        is empty (caller sys.exit(0)s with a friendly message). Query
-        API errors propagate as RuntimeError.
-        """
-        # Deferred import: batch-only runs never load the seeder module.
+        """Creates source schema and sample change file."""
         from datacustomcode.io.reader.streaming_seeder import (
             StreamingSourceSeeder,
         )
@@ -176,9 +159,6 @@ class LocalDeltasReader(BaseDataCloudReader):
             dataspace=self._dataspace,
             sf_cli_org=self._sf_cli_org,
         )
-        # self._current_layer was set by read_dlo_deltas / read_dmo_deltas
-        # right before _open_stream — pass it through so the seeder's
-        # LIMIT 1 probe targets the correct read method.
         return seeder.seed_source(
             name, self._current_layer, str(self._fixtures_root)
         )

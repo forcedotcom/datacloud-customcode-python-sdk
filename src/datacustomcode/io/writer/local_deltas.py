@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 _HEADER_WARNING = (
     "  NOTE: Once this code extension is deployed, Data Cloud will persist "
-    "  only the final state per primary key.\n"
+    "only the final state per primary key.\n"
     "  This local preview shows every emitted row uncollapsed."
 )
 
