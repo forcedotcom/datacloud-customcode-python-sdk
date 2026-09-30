@@ -15,16 +15,21 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import json
 import math
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, TYPE_CHECKING, Optional
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Optional,
+)
 
 from datacustomcode.io import cdf
 from datacustomcode.io.reader.query_api import QueryAPIDataCloudReader
 
 if TYPE_CHECKING:
+    import pandas as pd
     from pyspark.sql import SparkSession
 
 SEED_LIMIT = 10
@@ -55,9 +60,7 @@ class StreamingSourceSeeder:
             sf_cli_org=sf_cli_org,
         )
 
-    def seed_source(
-        self, name: str, layer: str, fixtures_root: str
-    ) -> bool:
+    def seed_source(self, name: str, layer: str, fixtures_root: str) -> bool:
         """Seed streaming fixtures and source schema.
 
         Returns:
@@ -71,9 +74,7 @@ class StreamingSourceSeeder:
         try:
             head_df = read_fn(name).limit(1)
         except Exception as exc:
-            raise RuntimeError(
-                f"Failed to read {layer}='{name}': {exc}."
-            ) from exc
+            raise RuntimeError(f"Failed to read {layer}='{name}': {exc}.") from exc
 
         head_pandas = head_df.toPandas()
         if len(head_pandas) == 0:
@@ -90,23 +91,23 @@ class StreamingSourceSeeder:
         )
 
         # Mix UPSERT and DELETE in the seed so the customer sees both
-        # operation types in the starter fixture
-        snapshot = read_fn(name).limit(SEED_LIMIT).toPandas()
+        # operation types in the starter fixture. Annotated because
+        # pyspark's ``.toPandas()`` return type is ``PandasDataFrameLike``,
+        # which mypy doesn't recognize as having ``to_dict``.
+        snapshot: pd.DataFrame = read_fn(name).limit(SEED_LIMIT).toPandas()
         seed_rows = []
         for i, record in enumerate(snapshot.to_dict("records")):
-            op = (
-                cdf.MergeRecordType.DELETE
-                if i % 2
-                else cdf.MergeRecordType.UPSERT
-            )
+            op = cdf.MergeRecordType.DELETE if i % 2 else cdf.MergeRecordType.UPSERT
 
             cleaned = {k: _clean_for_json(v) for k, v in record.items()}
-            seed_rows.append({
-                **cleaned,
-                cdf.COMMIT_VERSION: i + 1,
-                cdf.COMMIT_TIMESTAMP: datetime.now(timezone.utc).isoformat(),
-                cdf.MERGE_RECORD_TYPE: op.value,
-            })
+            seed_rows.append(
+                {
+                    **cleaned,
+                    cdf.COMMIT_VERSION: i + 1,
+                    cdf.COMMIT_TIMESTAMP: datetime.now(timezone.utc).isoformat(),
+                    cdf.MERGE_RECORD_TYPE: op.value,
+                }
+            )
         (out_dir / "000_seed.json").write_text(
             "\n".join(json.dumps(r, default=str) for r in seed_rows)
         )

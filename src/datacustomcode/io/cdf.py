@@ -17,10 +17,7 @@ from __future__ import annotations
 
 from typing import Final
 
-from datacustomcode.io.writer.base import (
-    MERGE_RECORD_TYPE_COLUMN,
-    MergeRecordType,
-)
+from datacustomcode.io.writer.base import MERGE_RECORD_TYPE_COLUMN, MergeRecordType
 
 COMMIT_VERSION: Final = "_commit_version"
 COMMIT_TIMESTAMP: Final = "_commit_timestamp"

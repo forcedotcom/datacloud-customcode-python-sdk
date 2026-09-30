@@ -52,9 +52,11 @@ def test_preview_drops_cdf_metadata_columns(writer):
 
     # pyspark.sql.functions.{col,when,lit} need a live SparkContext to
     # produce real Columns; stub them out for the pure-Python paths.
-    with patch("pyspark.sql.functions.col", MagicMock()), \
-         patch("pyspark.sql.functions.when", MagicMock()), \
-         patch("pyspark.sql.functions.lit", MagicMock()):
+    with (
+        patch("pyspark.sql.functions.col", MagicMock()),
+        patch("pyspark.sql.functions.when", MagicMock()),
+        patch("pyspark.sql.functions.lit", MagicMock()),
+    ):
         callback(batch_df, 0)
 
     # drop() removed all three CDF metadata columns.
@@ -74,6 +76,4 @@ def test_batch_writes_delegate_to_print_writer(writer):
     writer._batch_writer.write_to_dlo.assert_called_once_with(
         "Foo__dll", df, WriteMode.APPEND
     )
-    writer._batch_writer.auto_write_to_dlo.assert_called_once_with(
-        "Foo__dll", df
-    )
+    writer._batch_writer.auto_write_to_dlo.assert_called_once_with("Foo__dll", df)

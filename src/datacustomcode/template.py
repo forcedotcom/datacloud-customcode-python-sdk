@@ -27,9 +27,7 @@ STREAMING_EXAMPLE_ENTRYPOINT = os.path.join(
     script_template_dir, "examples", "streaming_deltas", "entrypoint.py"
 )
 
-_SDK_CONFIG_YAML = os.path.join(
-    os.path.dirname(__file__), "config.yaml"
-)
+_SDK_CONFIG_YAML = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
 def copy_script_template(target_dir: str, streaming: bool = False) -> None:

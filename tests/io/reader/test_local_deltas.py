@@ -3,17 +3,16 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock, patch
 
-import pytest
 from pyspark.sql.types import (
     LongType,
     StringType,
     StructField,
     StructType,
 )
+import pytest
 
 from datacustomcode.io import cdf
 from datacustomcode.io.reader.local_deltas import LocalDeltasReader
-
 
 SOURCE_SCHEMA = StructType(
     [
@@ -21,6 +20,7 @@ SOURCE_SCHEMA = StructType(
         StructField("age__c", LongType(), True),
     ]
 )
+
 
 @pytest.fixture
 def reader(tmp_path):

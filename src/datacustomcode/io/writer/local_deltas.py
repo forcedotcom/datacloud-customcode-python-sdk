@@ -47,6 +47,7 @@ class LocalDeltasWriter(BaseDataCloudWriter):
         super().__init__(spark)
 
         from datacustomcode.io.writer.print import PrintDataCloudWriter
+
         self._batch_writer = PrintDataCloudWriter(
             spark=spark,
             credentials_profile=credentials_profile,
@@ -64,14 +65,10 @@ class LocalDeltasWriter(BaseDataCloudWriter):
     ) -> None:
         return self._batch_writer.write_to_dmo(name, dataframe, write_mode)
 
-    def auto_write_to_dlo(
-        self, name: str, dataframe: PySparkDataFrame
-    ) -> None:
+    def auto_write_to_dlo(self, name: str, dataframe: PySparkDataFrame) -> None:
         return self._batch_writer.auto_write_to_dlo(name, dataframe)
 
-    def auto_write_to_dmo(
-        self, name: str, dataframe: PySparkDataFrame
-    ) -> None:
+    def auto_write_to_dmo(self, name: str, dataframe: PySparkDataFrame) -> None:
         return self._batch_writer.auto_write_to_dmo(name, dataframe)
 
     def write_dlo_deltas(
@@ -86,8 +83,7 @@ class LocalDeltasWriter(BaseDataCloudWriter):
             output_batch = batch_df.withColumn(
                 "_operation",
                 F.when(
-                    F.col(cdf.MERGE_RECORD_TYPE)
-                    == cdf.MergeRecordType.DELETE.value,
+                    F.col(cdf.MERGE_RECORD_TYPE) == cdf.MergeRecordType.DELETE.value,
                     F.lit("DELETE"),
                 ).otherwise(F.lit("UPSERT")),
             ).drop(
@@ -97,22 +93,18 @@ class LocalDeltasWriter(BaseDataCloudWriter):
             )
 
             row_count = output_batch.count()
-            print(
-                f"\nTarget={name} batch_id={batch_id} "
-                f"rows={row_count}"
-            )
+            print(f"\nTarget={name} batch_id={batch_id} rows={row_count}")
             print(_HEADER_WARNING)
             output_batch.show(truncate=False)
 
         checkpoint_dir = tempfile.mkdtemp(prefix=f"local-deltas-ckpt-{name}-")
         return (
-            dataframe.writeStream
-                .foreachBatch(_preview)
-                .option("checkpointLocation", checkpoint_dir)
-                # AvailableNow: drain every fixture file then
-                # terminate. The user's `query.awaitTermination()`
-                # returns without needing a timeout, so
-                # `datacustomcode run` exits deterministically.
-                .trigger(availableNow=True)
-                .start()
+            dataframe.writeStream.foreachBatch(_preview)
+            .option("checkpointLocation", checkpoint_dir)
+            # AvailableNow: drain every fixture file then
+            # terminate. The user's `query.awaitTermination()`
+            # returns without needing a timeout, so
+            # `datacustomcode run` exits deterministically.
+            .trigger(availableNow=True)
+            .start()
         )

@@ -4,17 +4,16 @@ import json
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
-import pytest
 from pyspark.sql.types import (
     LongType,
     StringType,
     StructField,
     StructType,
 )
+import pytest
 
 from datacustomcode.io import cdf
 from datacustomcode.io.reader.streaming_seeder import StreamingSourceSeeder
-
 
 SOURCE_SCHEMA = StructType(
     [
@@ -46,9 +45,7 @@ def seeder():
 
 def test_non_empty_source_writes_schema_and_seed(seeder, tmp_path):
     seeder.reader.read_dlo.return_value = _stub_read_result(
-        pd.DataFrame(
-            [{"id__c": str(i), "age__c": i} for i in range(4)]
-        )
+        pd.DataFrame([{"id__c": str(i), "age__c": i} for i in range(4)])
     )
 
     wrote = seeder.seed_source("Foo__dll", "dlo", str(tmp_path))

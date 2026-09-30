@@ -17,9 +17,13 @@ from __future__ import annotations
 
 import json
 import logging
-import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, Union
+import sys
+from typing import (
+    TYPE_CHECKING,
+    Optional,
+    Union,
+)
 
 from datacustomcode.config import config
 from datacustomcode.io import cdf
@@ -100,27 +104,27 @@ class LocalDeltasReader(BaseDataCloudReader):
             seeded = self._try_seed(name)
             if not seeded:
                 print(
-                f"\nStreaming source {self._current_layer}='{name}' is empty.\n"
-                f"  Populate the stream source with at least one row in Data Cloud, "
-                f"then re-run `datacustomcode run`.\n"
+                    f"\nStreaming source {self._current_layer}='{name}' is "
+                    f"empty.\n"
+                    f"  Populate the stream source with at least one row in "
+                    f"Data Cloud, then re-run `datacustomcode run`.\n"
                 )
                 sys.exit(0)
 
             print(
                 f"\nWrote sample streaming fixture in: {drop_dir} "
                 f"based on the contents of the streaming source {name}.\n"
-                f"  You may add more JSON files alongside it to simulate additional "
-                f"changes.\n"
+                f"  You may add more JSON files alongside it to simulate "
+                f"additional changes.\n"
             )
 
         schema = self._build_stream_schema(name)
         return (
-            self.spark.readStream
-                .format("json")
-                .schema(schema)
-                .option("maxFilesPerTrigger", 1) # one file = one batch
-                .option("latestFirst", "false")  # oldest mtime first
-                .load(str(drop_dir))
+            self.spark.readStream.format("json")
+            .schema(schema)
+            .option("maxFilesPerTrigger", 1)  # one file = one batch
+            .option("latestFirst", "false")  # oldest mtime first
+            .load(str(drop_dir))
         )
 
     def _build_stream_schema(self, name: str) -> "StructType":
@@ -149,9 +153,7 @@ class LocalDeltasReader(BaseDataCloudReader):
 
     def _try_seed(self, name: str) -> bool:
         """Creates source schema and sample change file."""
-        from datacustomcode.io.reader.streaming_seeder import (
-            StreamingSourceSeeder,
-        )
+        from datacustomcode.io.reader.streaming_seeder import StreamingSourceSeeder
 
         seeder = StreamingSourceSeeder(
             spark=self.spark,
@@ -159,6 +161,4 @@ class LocalDeltasReader(BaseDataCloudReader):
             dataspace=self._dataspace,
             sf_cli_org=self._sf_cli_org,
         )
-        return seeder.seed_source(
-            name, self._current_layer, str(self._fixtures_root)
-        )
+        return seeder.seed_source(name, self._current_layer, str(self._fixtures_root))
