@@ -24,6 +24,8 @@ __all__ = [
     "Credentials",
     "DefaultSparkEinsteinPredictions",
     "DefaultSparkLLMGateway",
+    "LocalDeltasReader",
+    "LocalDeltasWriter",
     "PrintDataCloudWriter",
     "QueryAPIDataCloudReader",
     "SparkEinsteinPredictions",
@@ -60,6 +62,14 @@ def __getattr__(name: str):
         from datacustomcode.io.reader.query_api import QueryAPIDataCloudReader
 
         return QueryAPIDataCloudReader
+    elif name == "LocalDeltasReader":
+        from datacustomcode.io.reader.local_deltas import LocalDeltasReader
+
+        return LocalDeltasReader
+    elif name == "LocalDeltasWriter":
+        from datacustomcode.io.writer.local_deltas import LocalDeltasWriter
+
+        return LocalDeltasWriter
     elif name == "SparkLLMGateway":
         from datacustomcode.llm_gateway import SparkLLMGateway
 

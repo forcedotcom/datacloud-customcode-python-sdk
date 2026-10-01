@@ -27,6 +27,8 @@ STREAMING_EXAMPLE_ENTRYPOINT = os.path.join(
     script_template_dir, "examples", "streaming_deltas", "entrypoint.py"
 )
 
+_SDK_CONFIG_YAML = os.path.join(os.path.dirname(__file__), "config.yaml")
+
 
 def copy_script_template(target_dir: str, streaming: bool = False) -> None:
     """Copy the template to the target directory."""
@@ -50,6 +52,24 @@ def copy_script_template(target_dir: str, streaming: bool = False) -> None:
             f"{destination}..."
         )
         shutil.copy2(STREAMING_EXAMPLE_ENTRYPOINT, destination)
+
+        _write_streaming_config_yaml(target_dir)
+
+
+def _write_streaming_config_yaml(target_dir: str) -> None:
+    """Writes the sdk config file with Streaming overrdies"""
+    import yaml
+
+    with open(_SDK_CONFIG_YAML) as f:
+        config_data = yaml.safe_load(f)
+
+    config_data["reader_config"]["type_config_name"] = "LocalDeltasReader"
+    config_data["writer_config"]["type_config_name"] = "LocalDeltasWriter"
+
+    destination = os.path.join(target_dir, "config.yaml")
+    logger.debug(f"Writing streaming config.yaml to {destination}...")
+    with open(destination, "w") as f:
+        yaml.safe_dump(config_data, f, sort_keys=False)
 
 
 def copy_function_template(target_dir: str, use_in_feature: Optional[str]) -> None:

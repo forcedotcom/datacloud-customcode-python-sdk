@@ -114,3 +114,28 @@ class TestTemplate:
         template_items = os.listdir(script_template_dir)
         for item in template_items:
             assert os.path.exists(os.path.join(temp_dir, item))
+
+    # --- streaming=True behavior ---
+
+    def test_copy_template_streaming_writes_config_yaml(self, temp_dir):
+        """Design: streaming init drops a config.yaml at the project root
+        that wires LocalDeltasReader + LocalDeltasWriter, so
+        `datacustomcode run` picks the streaming reader/writer via
+        run.py's auto-discovery.
+        """
+        copy_script_template(temp_dir, streaming=True)
+
+        config_yaml = os.path.join(temp_dir, "config.yaml")
+        assert os.path.isfile(config_yaml)
+        content = open(config_yaml).read()
+        assert "LocalDeltasReader" in content
+        assert "LocalDeltasWriter" in content
+
+    def test_copy_template_default_batch_omits_streaming_config(self, temp_dir):
+        """Design: batch init MUST NOT write config.yaml — batch projects
+        keep using the SDK-shipped default (QueryAPIDataCloudReader +
+        PrintDataCloudWriter). Regression guard: dropping a project-local
+        config.yaml would silently override the batch profile.
+        """
+        copy_script_template(temp_dir)
+        assert not os.path.exists(os.path.join(temp_dir, "config.yaml"))
