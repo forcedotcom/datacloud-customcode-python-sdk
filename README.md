@@ -91,16 +91,16 @@ After modifying the `entrypoint.py` as needed, using any dependencies you add in
 ```zsh
 cd my_package
 datacustomcode scan ./payload/entrypoint.py
-datacustomcode deploy --path ./payload --name my_custom_script --cpu-size CPU_L --sf-cli-org myorg
+datacustomcode deploy --path ./payload --name my_custom_script --cpu-size Standard_2XL --sf-cli-org myorg
 ```
 
 > [!TIP]
 > The `deploy` process can take several minutes.  If you'd like more feedback on the underlying process, you can add `--debug` to the command like `datacustomcode --debug deploy --path ./payload --name my_custom_script`
 
 > [!NOTE]
-> **CPU Size**: Choose the appropriate CPU/Compute Size based on your workload requirements:
-> - **CPU_L / CPU_XL / CPU_2XL / CPU_4XL**: Large, X-Large, 2X-Large and 4X-Large CPU instances for data processing
-> - Default is `CPU_2XL` which provides a good balance of performance and cost for most use cases
+> **Compute Size**: Choose the appropriate Compute Size based on your workload requirements:
+> - **Standard_L / Standard_XL / Standard_2XL / Standard_4XL**: Large, X-Large, 2X-Large and 4X-Large instances for data processing
+> - Default is `Standard_2XL` which provides a good balance of performance and cost for most use cases
 
 You can now use the Salesforce Data Cloud UI to find the created Data Transform and use the `Run Now` button to run it.
 Once the Data Transform run is successful, check the DLO your script is writing to and verify the correct records were added.
@@ -356,7 +356,7 @@ Options:
 - `--version TEXT`: Version of the transformation job (default: "0.0.1")
 - `--description TEXT`: Description of the transformation job (default: "")
 - `--network TEXT`: docker network (default: "default")
-- `--cpu-size TEXT`: CPU size for the deployment (default: `CPU_2XL`). Available options: CPU_L(Large), CPU_XL(Extra Large), CPU_2XL(2X Large), CPU_4XL(4X Large)
+- `--cpu-size TEXT`: Compute size for the deployment (default: `Standard_2XL`). Available options: Standard_L(Large), Standard_XL(Extra Large), Standard_2XL(2X Large), Standard_4XL(4X Large)
 - `--sf-cli-org TEXT`: Salesforce CLI org alias or username (e.g. `myorg`). Fetches credentials via `sf org display` — no `datacustomcode configure` step needed. Takes precedence over `--profile` if both are supplied.
 - `--function-invoke-opt TEXT`: Currently we support only `UnstructuredChunking` for functions.
 

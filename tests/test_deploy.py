@@ -609,7 +609,7 @@ class TestCreateDeployment:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 
@@ -633,7 +633,7 @@ class TestCreateDeployment:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 
@@ -657,7 +657,7 @@ class TestCreateDeployment:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             invokeOptions=["option1", "option2"],
             codeType="function",
         )
@@ -682,7 +682,7 @@ class TestCreateDeployment:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
         mock_make_api_call.return_value = {
@@ -705,7 +705,7 @@ class TestCreateDeployment:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
             invokeOptions=["StreamingTransform"],
         )
@@ -889,7 +889,7 @@ class TestGetDeployments:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 
@@ -917,7 +917,7 @@ class TestWaitForDeployment:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
         callback = MagicMock()
@@ -948,7 +948,7 @@ class TestWaitForDeployment:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 
@@ -1141,7 +1141,7 @@ class TestCreateDataTransform:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 
@@ -1190,7 +1190,7 @@ class TestCreateDataTransform:
             name="dmo_job",
             version="1.0.0",
             description="DMO job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 
@@ -1252,7 +1252,7 @@ class TestCreateDataTransform:
             name="dmo_multi",
             version="1.0.0",
             description="DMO multi",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 
@@ -1315,7 +1315,7 @@ class TestCreateDataTransform:
             name="test_package",
             version="1.0.0",
             description="DMO with schema",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 
@@ -1409,7 +1409,7 @@ class TestCreateDataTransform:
             name="test_package",
             version="1.0.0",
             description="DLO with schema",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 
@@ -1490,7 +1490,7 @@ class TestCreateDataTransform:
             name="dlo_job",
             version="1.0.0",
             description="DLO job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 
@@ -1525,7 +1525,7 @@ class TestCreateDataTransform:
             name="dmo_no_schema",
             version="1.0.0",
             description="DMO no schema",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 
@@ -1557,7 +1557,7 @@ class TestCreateDataTransform:
             name="batch_job",
             version="1.0.0",
             description="Batch job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
         data_transform_config = DataTransformConfig(
@@ -1591,7 +1591,7 @@ class TestCreateDataTransform:
             name="streaming_job",
             version="1.0.0",
             description="Streaming job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
         data_transform_config = DataTransformConfig(
@@ -1721,7 +1721,7 @@ class TestDeployFull:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
         callback = MagicMock()
@@ -1778,7 +1778,7 @@ class TestDeployFull:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
         callback = MagicMock()
@@ -1834,7 +1834,7 @@ class TestDeployFull:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
         access_token = AccessTokenResponse(
@@ -1878,7 +1878,7 @@ class TestDeployFull:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
         access_token = AccessTokenResponse(
@@ -1904,7 +1904,7 @@ class TestRunDataTransform:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 
@@ -1939,7 +1939,7 @@ class TestDeployFullWithDockerIntegration:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
         callback = MagicMock()
@@ -2006,7 +2006,7 @@ class TestDeployFullWithAccessTokenResponse:
             name="test",
             version="1.0.0",
             description="desc",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
         mock_get_config.return_value = MagicMock(spec=[])  # not DataTransformConfig
@@ -2058,7 +2058,7 @@ class TestCodeExtensionMetadataValidation:
             name=name,
             version="1.0.0",
             description="test",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 

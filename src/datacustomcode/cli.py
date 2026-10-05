@@ -182,14 +182,14 @@ def zip(path: str, network: str):
 @click.option("--network", default="default")
 @click.option(
     "--cpu-size",
-    default="CPU_2XL",
-    help="""CPU size for deployment. Available options:
+    default="Standard_2XL",
+    help="""Compute size for deployment. Available options:
 
     \b
-    CPU_L     - Large CPU instance
-    CPU_XL    - X-Large CPU instance
-    CPU_2XL   - 2X-Large CPU instance [DEFAULT]
-    CPU_4XL   - 4X-Large CPU instance
+    Standard_L    - Large instance
+    Standard_XL   - X-Large instance
+    Standard_2XL  - 2X-Large instance [DEFAULT]
+    Standard_4XL  - 4X-Large instance
 
     Choose based on your workload requirements.""",
 )
@@ -224,22 +224,22 @@ def deploy(
 
     logger.debug("Deploying project")
 
-    if cpu_size not in COMPUTE_TYPES.keys():
+    if cpu_size not in COMPUTE_TYPES:
         click.secho(
-            f"Error: Invalid CPU size '{cpu_size}'. "
-            f"Available options: {', '.join(COMPUTE_TYPES.keys())}",
+            f"Error: Invalid compute size '{cpu_size}'. "
+            f"Available options: {', '.join(COMPUTE_TYPES)}",
             fg="red",
         )
         raise click.Abort()
 
-    logger.debug(f"Deploying with CPU size: {cpu_size}")
+    logger.debug(f"Deploying with compute size: {cpu_size}")
     base_directory = find_base_directory(path)
     package_type = get_package_type(base_directory)
     metadata = CodeExtensionMetadata(
         name=name,
         version=version,
         description=description,
-        computeType=COMPUTE_TYPES[cpu_size],
+        computeType=cpu_size,
         codeType=package_type,
     )
 

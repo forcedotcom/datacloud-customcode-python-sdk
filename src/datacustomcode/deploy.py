@@ -48,15 +48,12 @@ DATA_TRANSFORMS_PATH = "services/data/v63.0/ssot/data-transforms"
 DATA_CUSTOM_CODE_INVOKE_OPTIONS_PATH = "services/data/v67.0/ssot/data-custom-code"
 WAIT_FOR_DEPLOYMENT_TIMEOUT = 3000
 
-# Available compute types for Data Cloud deployments.
-# Nomenclature used by COMPUTE_TYPES keys align with
-# compute instances provisioned by Data Cloud.
-COMPUTE_TYPES = {
-    "CPU_L": "CPU_XS",  # Large CPU instance
-    "CPU_XL": "CPU_S",  # X-Large CPU instance
-    "CPU_2XL": "CPU_M",  # 2X-Large CPU instance (default)
-    "CPU_4XL": "CPU_L",  # 4X-Large CPU instance
-}
+COMPUTE_TYPES = (
+    "Standard_L",
+    "Standard_XL",
+    "Standard_2XL",
+    "Standard_4XL",
+)
 
 
 def _sanitize_api_name(name: str) -> str:
