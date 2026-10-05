@@ -672,54 +672,6 @@ class TestCreateDeployment:
         assert isinstance(result, CreateDeploymentResponse)
         assert result.fileUploadUrl == "https://upload.example.com"
 
-    @patch("datacustomcode.deploy._make_api_call")
-    def test_create_deployment_default_path_no_invoke_options(self, mock_make_api_call):
-        """Without invokeOptions, the deployment uses the default v63.0 path."""
-        access_token = AccessTokenResponse(
-            access_token="test_token", instance_url="https://instance.example.com"
-        )
-        metadata = CodeExtensionMetadata(
-            name="test_job",
-            version="1.0.0",
-            description="Test job",
-            computeType="Standard_2XL",
-            codeType="script",
-        )
-        mock_make_api_call.return_value = {
-            "fileUploadUrl": "https://upload.example.com"
-        }
-
-        create_deployment(access_token, metadata)
-
-        url = mock_make_api_call.call_args[0][0]
-        assert "v63.0" in url
-        body = mock_make_api_call.call_args[1]["json"]
-        assert "invokeOptions" not in body
-
-    @patch("datacustomcode.deploy._make_api_call")
-    def test_create_deployment_invoke_options_routes_to_v67(self, mock_make_api_call):
-        access_token = AccessTokenResponse(
-            access_token="test_token", instance_url="https://instance.example.com"
-        )
-        metadata = CodeExtensionMetadata(
-            name="test_job",
-            version="1.0.0",
-            description="Test job",
-            computeType="Standard_2XL",
-            codeType="script",
-            invokeOptions=["StreamingTransform"],
-        )
-        mock_make_api_call.return_value = {
-            "fileUploadUrl": "https://upload.example.com"
-        }
-
-        create_deployment(access_token, metadata)
-
-        url = mock_make_api_call.call_args[0][0]
-        assert "v67.0" in url
-        body = mock_make_api_call.call_args[1]["json"]
-        assert body["invokeOptions"] == ["StreamingTransform"]
-
 
 class TestZip:
     @patch("datacustomcode.deploy.has_nonempty_requirements_file")
@@ -1863,7 +1815,7 @@ class TestDeployFull:
         mock_create_transform,
         mock_get_config,
     ):
-        """A batch config must not set invokeOptions (stays on the v63.0 path)."""
+        """A batch config must not set invokeOptions."""
         data_transform_config = DataTransformConfig(
             sdkVersion="1.0.0",
             entryPoint="entrypoint.py",
