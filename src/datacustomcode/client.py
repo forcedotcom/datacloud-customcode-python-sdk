@@ -231,11 +231,12 @@ def einstein_predict_col(
 def named_credential_request_col(
     request: "HTTPRequest",
     body: Optional["Column"] = None,
+    url: Optional["Column"] = None,
 ) -> "Column":
     """Build a Spark Column that makes one Named Credential callout per row.
 
-    The endpoint, method, and headers are fixed for the call (taken from
-    ``request``); only ``body`` varies per row. Use this instead of
+    The method and headers are fixed for the call (taken from ``request``);
+    ``body`` and, optionally, ``url`` vary per row. Use this instead of
     :meth:`Client.named_credential_request` when the callout runs across a
     DataFrame so each row is dispatched independently rather than one-shot on
     the driver.
@@ -253,13 +254,19 @@ def named_credential_request_col(
             headers are applied to every row.
         body: Optional per-row ``Column`` holding the request body as a
             string (or null for no body).
+        url: Optional per-row ``Column`` holding the full callout url, e.g.
+            ``concat(lit("callout:MyNC/geocode?address="), col("address"))``.
+            A null row value falls back to ``request.url``; when omitted,
+            ``request.url`` is used for every row.
 
     Returns:
         A Spark ``Column`` of ``StructType`` with fields ``status``,
         ``response``, ``error_code``, and ``error_message``.
     """
     named_credential = Client()._get_spark_named_credential()
-    return named_credential.request_col(request, body=body)
+    if url is None:
+        return named_credential.request_col(request, body=body)
+    return named_credential.request_col(request, body=body, url=url)
 
 
 class DataCloudObjectType(Enum):

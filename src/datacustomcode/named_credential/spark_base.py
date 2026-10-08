@@ -66,11 +66,12 @@ class SparkNamedCredential(ABC, UserExtendableNamedConfigMixin):
         self,
         request: HTTPRequest,
         body: Optional["Column"] = None,
+        url: Optional["Column"] = None,
     ) -> "Column":
         """Build a Spark ``Column`` that makes one external callout per row.
 
-        The endpoint, method, and headers are fixed for the call (taken from
-        ``request``); only ``body`` varies per row. Use this instead of
+        The method and headers are fixed for the call (taken from ``request``);
+        ``body`` and, optionally, ``url`` vary per row. Use this instead of
         :meth:`request` when the callout runs across a DataFrame so each row is
         dispatched independently rather than one-shot on the driver.
 
@@ -78,6 +79,10 @@ class SparkNamedCredential(ABC, UserExtendableNamedConfigMixin):
             request: The callout template
             body: Optional per-row ``Column`` holding the request body as a
                 string, sent verbatim (or null for no body).
+            url: Optional per-row ``Column`` holding the full callout url
+                (``callout:<NamedCredential>/<path>?<query>``). A null row value
+                falls back to ``request.url``; when omitted, ``request.url`` is
+                used for every row.
 
         Returns:
             A ``Column`` yielding a struct
