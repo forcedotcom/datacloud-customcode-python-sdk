@@ -79,6 +79,7 @@ class DefaultSparkNamedCredential(SparkNamedCredential):
         self,
         request: "HTTPRequest",
         body: Optional["Column"] = None,
+        url: Optional["Column"] = None,
     ) -> "Column":
         """Per-row callout via a client-side Spark UDF.
 
@@ -114,11 +115,31 @@ class DefaultSparkNamedCredential(SparkNamedCredential):
             ]
         )
 
-        def _callout(body_str: Optional[str]) -> Dict[str, Any]:
-            return _invoke_callout_as_struct(self._named_credential, request, body_str)
-
         body_col = body if body is not None else lit(None).cast(StringType())
-        return udf(_callout, result_schema)(body_col)
+
+        if url is None:
+
+            def _callout(body_str: Optional[str]) -> Dict[str, Any]:
+                return _invoke_callout_as_struct(
+                    self._named_credential, request, body_str
+                )
+
+            return udf(_callout, result_schema)(body_col)
+
+        def _callout_with_url(
+            body_str: Optional[str], url_str: Optional[str]
+        ) -> Dict[str, Any]:
+            # A null row url falls back to the template's url.
+            row_request = (
+                request
+                if url_str is None
+                else request.model_copy(update={"url": url_str})
+            )
+            return _invoke_callout_as_struct(
+                self._named_credential, row_request, body_str
+            )
+
+        return udf(_callout_with_url, result_schema)(body_col, url)
 
 
 def _invoke_callout_as_struct(

@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **Per-row url for `named_credential_request_col`.**
+
+  `named_credential_request_col` accepts an optional `url` Column so each row can call a different endpoint (e.g. per-entity REST `GET` lookups or geocoding) instead of only varying the body. A null row value falls back to `request.url`; omitting `url` keeps the previous behavior.
+
+  ```python
+  from pyspark.sql.functions import col, concat, lit
+  from datacustomcode.client import named_credential_request_col
+
+  url = concat(lit("callout:GeoApi/geocode?address="), col("address__c"))
+  df = df.withColumn("geo", named_credential_request_col(request, url=url))
+  ```
+
+  Custom `SparkNamedCredential` subclasses that override `request_col` should accept the new `url` keyword argument.
+
 ## 6.1.0
 
 ### Added

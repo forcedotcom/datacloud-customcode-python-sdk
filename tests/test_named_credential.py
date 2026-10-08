@@ -403,6 +403,96 @@ class TestDefaultSparkNamedCredentialRequestCol:
         # With no body column, a typed null string column is applied instead.
         sentinel_udf.assert_called_once_with(null_col)
 
+    @patch("pyspark.sql.functions.udf")
+    @patch("pyspark.sql.functions.lit")
+    def test_per_row_url_column_overrides_request_url(self, mock_lit, mock_udf):
+        from datacustomcode.named_credential.spark_default import (
+            DefaultSparkNamedCredential,
+        )
+
+        sentinel_udf = MagicMock(name="udf")
+        mock_udf.return_value = sentinel_udf
+
+        underlying = MagicMock()
+        underlying.request.return_value = HTTPResponse(
+            status_code=200, headers={}, body="{}"
+        )
+        spark_nc = DefaultSparkNamedCredential(named_credential=underlying)
+
+        request = (
+            HTTPRequestBuilder()
+            .set_url("callout:NC/geocode")
+            .set_method("GET")
+            .set_headers({"Accept": "application/json"})
+            .build()
+        )
+        body_col = MagicMock(name="body_col")
+        url_col = MagicMock(name="url_col")
+        spark_nc.request_col(request, body_col, url=url_col)
+
+        # The UDF is applied over both the body and the per-row url columns.
+        sentinel_udf.assert_called_once_with(body_col, url_col)
+
+        udf_fn = mock_udf.call_args.args[0]
+        out = udf_fn(None, "callout:NC/geocode?address=1%20Market%20St")
+
+        assert out["status"] == "SUCCESS"
+        sent_request, sent_body = underlying.request.call_args.args
+        # The row's url replaces the template url; method/headers are kept.
+        assert sent_request.url == "callout:NC/geocode?address=1%20Market%20St"
+        assert sent_request.method == "GET"
+        assert sent_request.headers == {"Accept": "application/json"}
+        assert sent_body is None
+        # The caller's template request is left untouched.
+        assert request.url == "callout:NC/geocode"
+
+    @patch("pyspark.sql.functions.udf")
+    @patch("pyspark.sql.functions.lit")
+    def test_null_row_url_falls_back_to_request_url(self, mock_lit, mock_udf):
+        from datacustomcode.named_credential.spark_default import (
+            DefaultSparkNamedCredential,
+        )
+
+        mock_udf.return_value = MagicMock(name="udf")
+
+        underlying = MagicMock()
+        underlying.request.return_value = HTTPResponse(
+            status_code=200, headers={}, body=""
+        )
+        spark_nc = DefaultSparkNamedCredential(named_credential=underlying)
+
+        request = HTTPRequestBuilder().set_url("callout:NC/default").build()
+        spark_nc.request_col(request, url=MagicMock(name="url_col"))
+
+        udf_fn = mock_udf.call_args.args[0]
+        udf_fn('{"a": 1}', None)
+
+        sent_request, sent_body = underlying.request.call_args.args
+        assert sent_request is request
+        assert sent_body == '{"a": 1}'
+
+    @patch("pyspark.sql.functions.udf")
+    @patch("pyspark.sql.functions.lit")
+    def test_url_without_body_applies_typed_null_body(self, mock_lit, mock_udf):
+        from datacustomcode.named_credential.spark_default import (
+            DefaultSparkNamedCredential,
+        )
+
+        null_col = MagicMock(name="null_col")
+        lit_none = MagicMock(name="lit_none")
+        lit_none.cast.return_value = null_col
+        mock_lit.return_value = lit_none
+
+        sentinel_udf = MagicMock(name="udf")
+        mock_udf.return_value = sentinel_udf
+
+        spark_nc = DefaultSparkNamedCredential(named_credential=MagicMock())
+        request = HTTPRequestBuilder().set_url("callout:NC/status").build()
+        url_col = MagicMock(name="url_col")
+        spark_nc.request_col(request, url=url_col)
+
+        sentinel_udf.assert_called_once_with(null_col, url_col)
+
 
 class TestInvokeCalloutAsStruct:
     """The callout-to-struct shaping shared by every row."""
