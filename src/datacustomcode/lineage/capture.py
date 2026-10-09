@@ -14,12 +14,14 @@
 # limitations under the License.
 """Readers and writers that record lineage instead of writing data.
 
-While :func:`capture_lineage` is active, the global reader/writer config is
-replaced (with ``force=True``) by :class:`LineageCaptureReader` and
-:class:`LineageCaptureWriter`. They wrap the reader/writer the config had
-already resolved, so the customer's reader choice and credentials still apply:
-reads go through the delegate and are registered as lineage sources, writes are
-validated through the delegate (when it supports it), traced, and never written.
+While :func:`capture_lineage` is active, the reader and writer of every client
+(already existing or created inside the block) are wrapped in place by
+:class:`LineageCaptureReader` and :class:`LineageCaptureWriter`. The wrappers
+delegate to the reader/writer the client actually resolved, whether from config
+or passed to ``Client(reader=..., writer=...)``, so the customer's reader choice
+and credentials still apply: reads go through the delegate and are registered as
+lineage sources, writes are validated through the delegate (when it supports
+it), traced, and never written.
 """
 
 from __future__ import annotations
@@ -36,7 +38,6 @@ from typing import (
     Union,
 )
 
-from datacustomcode.config import AccessLayerObjectConfig, config
 from datacustomcode.io.reader.base import BaseDataCloudReader
 from datacustomcode.io.writer.base import (
     MERGE_RECORD_TYPE_COLUMN,
@@ -46,8 +47,10 @@ from datacustomcode.io.writer.base import (
 from datacustomcode.lineage.tracer import SourceRegistry, TraceResult
 
 if TYPE_CHECKING:
-    from pyspark.sql import DataFrame as PySparkDataFrame, SparkSession
+    from pyspark.sql import DataFrame as PySparkDataFrame
     from pyspark.sql.types import AtomicType, StructType
+
+    from datacustomcode.client import _BaseClient
 
 
 @dataclass
@@ -130,27 +133,6 @@ class LineageCollector:
         return result
 
 
-@dataclass
-class _CaptureSession:
-    collector: LineageCollector
-    reader_config: AccessLayerObjectConfig
-    writer_config: AccessLayerObjectConfig
-
-
-# The capture in progress, read by the capture classes when Client builds them
-_active: Dict[str, Optional[_CaptureSession]] = {"session": None}
-
-
-def _active_session() -> _CaptureSession:
-    session = _active["session"]
-    if session is None:
-        raise RuntimeError(
-            "Lineage capture readers and writers can only be created inside "
-            "capture_lineage()"
-        )
-    return session
-
-
 class _Delegating:
     """Falls back to the delegate for attributes the capture class lacks."""
 
@@ -163,53 +145,51 @@ class _Delegating:
 
 
 class LineageCaptureReader(_Delegating, BaseDataCloudReader):
-    """Reads through the configured reader and registers lineage sources."""
+    """Reads through a client's reader and registers lineage sources."""
 
-    CONFIG_NAME = "LineageCaptureReader"
-
-    def __init__(self, spark: SparkSession) -> None:
-        super().__init__(spark)
-        session = _active_session()
-        self._collector = session.collector
-        self._delegate = session.reader_config.to_object(spark)
+    def __init__(
+        self, delegate: BaseDataCloudReader, collector: LineageCollector
+    ) -> None:
+        super().__init__(getattr(delegate, "spark", None))  # type: ignore[arg-type]
+        self._delegate = delegate
+        self._collector = collector
 
     def read_dlo(
         self,
         name: str,
         schema: Union[AtomicType, StructType, str, None] = None,
     ) -> PySparkDataFrame:
-        dataframe = (
+        dataframe: PySparkDataFrame = (
             self._delegate.read_dlo(name)
             if schema is None
             else self._delegate.read_dlo(name, schema)
         )
         self._collector.record_read(name, dataframe)
-        return dataframe  # type: ignore[no-any-return]
+        return dataframe
 
     def read_dmo(
         self,
         name: str,
         schema: Union[AtomicType, StructType, str, None] = None,
     ) -> PySparkDataFrame:
-        dataframe = (
+        dataframe: PySparkDataFrame = (
             self._delegate.read_dmo(name)
             if schema is None
             else self._delegate.read_dmo(name, schema)
         )
         self._collector.record_read(name, dataframe)
-        return dataframe  # type: ignore[no-any-return]
+        return dataframe
 
 
 class LineageCaptureWriter(_Delegating, BaseDataCloudWriter):
     """Traces DataFrames handed to the writer; never writes or shows them."""
 
-    CONFIG_NAME = "LineageCaptureWriter"
-
-    def __init__(self, spark: SparkSession) -> None:
-        super().__init__(spark)
-        session = _active_session()
-        self._collector = session.collector
-        self._delegate = session.writer_config.to_object(spark)
+    def __init__(
+        self, delegate: BaseDataCloudWriter, collector: LineageCollector
+    ) -> None:
+        super().__init__(getattr(delegate, "spark", None))  # type: ignore[arg-type]
+        self._delegate = delegate
+        self._collector = collector
 
     def _validate_dlo(self, name: str, dataframe: PySparkDataFrame) -> None:
         # Same column check `run` does, so lineage never names a missing field
@@ -245,36 +225,76 @@ class LineageCaptureWriter(_Delegating, BaseDataCloudWriter):
         self._collector.record_write(name, dataframe)
 
 
+@dataclass
+class _WrappedClient:
+    client: _BaseClient
+    reader: BaseDataCloudReader
+    writer: BaseDataCloudWriter
+
+
+class _CaptureSession:
+    def __init__(self, collector: LineageCollector) -> None:
+        self.collector = collector
+        self._wrapped: Dict[int, _WrappedClient] = {}
+
+    def wrap(self, client: _BaseClient) -> None:
+        """Route a client's reads and writes through capture (idempotent)."""
+        if id(client) in self._wrapped:
+            return
+        reader, writer = client._reader, client._writer
+        self._wrapped[id(client)] = _WrappedClient(client, reader, writer)
+        client._reader = LineageCaptureReader(reader, self.collector)
+        client._writer = LineageCaptureWriter(writer, self.collector)
+
+    def restore(self) -> None:
+        for wrapped in self._wrapped.values():
+            wrapped.client._reader = wrapped.reader
+            wrapped.client._writer = wrapped.writer
+        self._wrapped.clear()
+
+
+# The capture in progress; guards against nested captures
+_active: Dict[str, Optional[_CaptureSession]] = {"session": None}
+
+
 @contextmanager
 def capture_lineage(collector: LineageCollector) -> Iterator[LineageCollector]:
-    """Route every ``Client`` created inside the block through lineage capture.
+    """Capture lineage from every ``Client`` used inside the block.
 
-    The global reader/writer config is swapped for forced capture configs that
-    wrap the currently configured reader/writer, and any existing ``Client``
-    singleton is set aside so the entrypoint's ``Client()`` picks them up. Both
-    are restored on exit.
+    Clients that already exist (including ones a dependency created and kept a
+    reference to) are wrapped on entry, and ``Client.__new__`` is hooked so
+    clients created inside the block are wrapped as they are built, however
+    their reader and writer were supplied. Clients are unwrapped, the hook is
+    removed, and the ``Client`` singletons are restored on exit.
     """
-    from datacustomcode.client import Client, StreamingClient
+    from datacustomcode.client import (
+        Client,
+        StreamingClient,
+        _BaseClient,
+    )
 
-    if config.reader_config is None or config.writer_config is None:
-        raise ValueError("A reader and writer must be configured to capture lineage")
     if _active["session"] is not None:
         raise RuntimeError("Lineage capture is already active")
 
-    saved_reader, saved_writer = config.reader_config, config.writer_config
+    session = _CaptureSession(collector)
     saved_clients = Client._instance, StreamingClient._instance
-    _active["session"] = _CaptureSession(collector, saved_reader, saved_writer)
-    config.reader_config = AccessLayerObjectConfig(
-        type_config_name=LineageCaptureReader.CONFIG_NAME, force=True
-    )
-    config.writer_config = AccessLayerObjectConfig(
-        type_config_name=LineageCaptureWriter.CONFIG_NAME, force=True
-    )
-    Client._instance = None
-    StreamingClient._instance = None
+    original_new = _BaseClient.__dict__["__new__"]
+    build = original_new.__func__
+
+    def capturing_new(cls: type, *args: Any, **kwargs: Any) -> _BaseClient:
+        client = build(cls, *args, **kwargs)
+        session.wrap(client)
+        return client  # type: ignore[no-any-return]
+
+    _active["session"] = session
     try:
+        for client in saved_clients:
+            if client is not None:
+                session.wrap(client)
+        _BaseClient.__new__ = staticmethod(capturing_new)  # type: ignore[assignment]
         yield collector
     finally:
-        config.reader_config, config.writer_config = saved_reader, saved_writer
+        _BaseClient.__new__ = original_new  # type: ignore[method-assign]
+        session.restore()
         Client._instance, StreamingClient._instance = saved_clients
         _active["session"] = None

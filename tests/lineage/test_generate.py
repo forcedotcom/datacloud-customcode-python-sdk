@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 import textwrap
 
 import pandas as pd
@@ -16,12 +17,14 @@ from datacustomcode.client import (
 )
 from datacustomcode.config import config
 from datacustomcode.io.reader.base import BaseDataCloudReader
-from datacustomcode.io.writer.base import BaseDataCloudWriter
+from datacustomcode.io.writer.base import BaseDataCloudWriter, WriteMode
 from datacustomcode.lineage import capture_lineage, generate_lineage
 from datacustomcode.lineage.capture import LineageCollector
 from datacustomcode.scan import SDK_CONFIG_DIR, SDK_CONFIG_FILE
 
 pytestmark = pytest.mark.spark
+
+ORIGINAL_NEW = _BaseClient.__dict__["__new__"]
 
 TABLES = {
     "orders__dll": pd.DataFrame(
@@ -203,28 +206,92 @@ def test_rejects_streaming_scripts(tmp_path, config_file):
 
 
 def test_script_error_propagates_and_restores_state(tmp_path, config_file):
+    config.load(config_file)
+    outside = Client()
+    reader, writer = outside._reader, outside._writer
     entrypoint = make_package(tmp_path, "raise RuntimeError('boom')\n")
-    sentinel = object.__new__(Client)
-    Client._instance = sentinel
 
     with pytest.raises(RuntimeError, match="boom"):
         generate_lineage(entrypoint, config_file)
 
     assert config.reader_config.type_config_name == InMemoryReader.CONFIG_NAME
     assert config.writer_config.type_config_name == RefusingWriter.CONFIG_NAME
-    assert Client._instance is sentinel
+    assert Client._instance is outside
+    assert (outside._reader, outside._writer) == (reader, writer)
+    assert "__new__" not in vars(Client)
+    assert _BaseClient.__dict__["__new__"] is ORIGINAL_NEW
 
 
-def test_existing_client_is_not_reused_inside_capture(spark, config_file):
+def test_existing_client_is_captured_and_restored(spark, config_file):
     config.load(config_file)
     outside = Client()
+    writer = outside._writer
 
     with capture_lineage(LineageCollector()):
-        inside = Client()
-        assert inside is not outside
-        assert type(inside._writer).__name__ == "LineageCaptureWriter"
+        assert Client() is outside
+        assert type(outside._writer).__name__ == "LineageCaptureWriter"
+        assert outside._writer._delegate is writer
 
+    assert outside._writer is writer
     assert Client() is outside
+
+
+def test_retained_client_from_dependency_is_captured(
+    tmp_path, config_file, monkeypatch
+):
+    # A dependency that builds its Client at import time keeps it in a module
+    # global; its writes must still be captured, never reach the real writer
+    (tmp_path / "lineage_dep_helpers.py").write_text(
+        "from datacustomcode.client import Client\n"
+        "from datacustomcode.io.writer.base import WriteMode\n"
+        "client = Client()\n"
+        "def save(df):\n"
+        "    client.write_to_dlo('out__dll', df, WriteMode.APPEND)\n"
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.delitem(sys.modules, "lineage_dep_helpers", raising=False)
+    entrypoint = make_package(
+        tmp_path,
+        """
+        import lineage_dep_helpers
+        lineage_dep_helpers.save(
+            client.read_dlo("orders__dll").select(F.col("id").alias("id__c"))
+        )
+        """,
+    )
+
+    result = generate_lineage(
+        entrypoint, config_file, dependencies=["lineage_dep_helpers"]
+    )
+
+    assert result.data_lineage == {"out__dll.id__c": ["orders__dll.id"]}
+    assert VALIDATED == [("out__dll", ["id__c"])]
+
+
+def test_client_built_with_reader_and_writer_is_captured(spark, config_file):
+    config.load(config_file)
+    reader, writer = InMemoryReader(spark), RefusingWriter(spark)
+    collector = LineageCollector()
+
+    with capture_lineage(collector):
+        client = Client(reader=reader, writer=writer)
+        assert client._reader._delegate is reader
+        assert client._writer._delegate is writer
+        client.write_to_dlo(
+            "out__dll",
+            client.read_dlo("orders__dll").select("id"),
+            WriteMode.APPEND,
+        )
+
+    assert collector.result().data_lineage == {"out__dll.id": ["orders__dll.id"]}
+    assert (client._reader, client._writer) == (reader, writer)
+
+
+def test_nested_capture_is_rejected(config_file):
+    with capture_lineage(LineageCollector()):
+        with pytest.raises(RuntimeError, match="already active"):
+            with capture_lineage(LineageCollector()):
+                pass
 
 
 def test_capture_falls_through_to_delegate_attributes(config_file):

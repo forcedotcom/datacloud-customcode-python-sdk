@@ -10,6 +10,7 @@ from pyspark.sql.types import StringType
 import pytest
 
 from datacustomcode.lineage.tracer import (
+    AMBIGUOUS_SOURCE,
     UNTRACEABLE_SOURCE,
     LineageTraceError,
     SourceRegistry,
@@ -223,3 +224,82 @@ def test_spark_connect_dataframe_rejected(registry):
 
     with pytest.raises(LineageTraceError, match="Spark Connect"):
         registry.trace(ConnectLike())  # type: ignore[arg-type]
+
+
+def test_derived_reader_column_does_not_rename_its_source(spark, registry):
+    # A reader that exposes both a column and a value computed from it: the
+    # computed column must not take over the source column's field identity
+    base = spark.createDataFrame(pd.DataFrame({"name": ["a", "b"]}))
+    source = base.select("name", F.upper("name").alias("normalized"))
+    registry.register(source, "source__dll")
+
+    results = registry.trace(
+        source.select(
+            F.col("name").alias("name__c"), F.col("normalized").alias("norm__c")
+        )
+    )
+
+    assert sources(results) == {
+        "name__c": {"source__dll.name"},
+        "norm__c": {"source__dll.name"},
+    }
+
+
+def test_renamed_reader_column_names_the_field(spark, registry):
+    base = spark.createDataFrame(pd.DataFrame({"raw": ["a"]}))
+    registry.register(base.select(F.col("raw").alias("name")), "source__dll")
+
+    traced = registry.trace(base.select(F.col("raw").alias("name__c")))
+
+    assert sources(traced) == {"name__c": {"source__dll.name"}}
+
+
+def test_two_objects_over_one_relation_are_ambiguous(spark, registry):
+    base = spark.createDataFrame(pd.DataFrame({"id": [1], "other": [2]}))
+    registry.register(base, "first__dll")
+    registry.register(base, "second__dll")
+
+    results = registry.trace(base.select("id"))
+
+    assert results["id"].reason == AMBIGUOUS_SOURCE
+    assert results["id"].unresolved
+
+
+def test_one_leaf_under_two_names_is_ambiguous(spark, registry):
+    base = spark.createDataFrame(pd.DataFrame({"id": [1]}))
+    registry.register(base.select("id", F.col("id").alias("id_copy")), "src__dll")
+
+    assert registry.trace(base.select("id"))["id"].reason == AMBIGUOUS_SOURCE
+
+
+def test_stack_outputs_trace_positionally(registry, orders):
+    stacked = orders.selectExpr("stack(1, first, last) AS (x, y)")
+    assert sources(registry.trace(stacked)) == {
+        "x": {"orders__dll.first"},
+        "y": {"orders__dll.last"},
+    }
+
+
+def test_stack_with_several_rows(registry, orders):
+    stacked = orders.selectExpr(
+        "stack(2, first, amount, last, CAST(id AS DOUBLE)) AS (name, n)"
+    )
+    assert sources(registry.trace(stacked)) == {
+        "name": {"orders__dll.first", "orders__dll.last"},
+        "n": {"orders__dll.id", "orders__dll.amount"},
+    }
+
+
+def test_multi_output_generator_over_several_inputs_is_unresolved(registry, orders):
+    inlined = orders.selectExpr("inline(array(struct(first, last))) AS (x, y)")
+    results = registry.trace(inlined)
+    assert results["x"].unresolved and results["y"].unresolved
+    assert "Inline" in results["x"].reason
+
+
+def test_posexplode_outputs_share_their_single_input(registry, orders):
+    exploded = orders.select(F.posexplode("tags").alias("pos", "tag"))
+    assert sources(registry.trace(exploded)) == {
+        "pos": {"orders__dll.tags"},
+        "tag": {"orders__dll.tags"},
+    }

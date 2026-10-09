@@ -39,6 +39,7 @@ from typing import (
     Iterator,
     List,
     Optional,
+    Set,
     Tuple,
 )
 
@@ -49,6 +50,7 @@ LeafColumn = Tuple[Hashable, int]
 """``(leaf relation identity, column position)``."""
 
 UNTRACEABLE_SOURCE = "untraceable source"
+AMBIGUOUS_SOURCE = "ambiguous source"
 
 _OUTPUT_SEPARATOR = "\u0001"
 
@@ -72,19 +74,24 @@ class ColumnTrace:
         leaves: Leaf columns the value is computed from. Empty for literals.
         opaque_reason: Set when the plan hides this column's inputs (e.g. a
             ``mapInPandas`` or subquery); ``leaves`` is then incomplete.
+        direct: The column is its single leaf column passed through unchanged
+            (possibly renamed), not computed from it.
     """
 
     name: str
     leaves: FrozenSet[LeafColumn] = field(default_factory=frozenset)
     opaque_reason: Optional[str] = None
+    direct: bool = False
 
 
 @dataclass(frozen=True)
 class _AttrTrace:
     leaves: FrozenSet[LeafColumn]
     opaque_reason: Optional[str] = None
+    direct: bool = False
 
     def merge(self, other: _AttrTrace) -> _AttrTrace:
+        # A merge combines inputs, so the result is never a direct pass-through
         return _AttrTrace(
             self.leaves | other.leaves, self.opaque_reason or other.opaque_reason
         )
@@ -112,17 +119,28 @@ class TraceResult:
 
 
 class SourceRegistry:
-    """Maps leaf columns of DataFrames read from Data Cloud to their fields."""
+    """Maps leaf columns of DataFrames read from Data Cloud to their fields.
+
+    Only direct columns name a field: a column a reader computes (e.g.
+    ``upper(name).alias("normalized")``) does not claim the leaf it reads. A leaf
+    claimed by two different fields (two direct columns over it, or two objects
+    read from the same relation) is ambiguous, and so is anything traced to it.
+    """
 
     def __init__(self) -> None:
         self._fields: Dict[LeafColumn, str] = {}
+        self._ambiguous: Set[LeafColumn] = set()
         self.objects: List[str] = []
 
     def register(self, df: PySparkDataFrame, object_name: str) -> None:
-        """Record that the columns of ``df`` are the fields of ``object_name``."""
+        """Record that the direct columns of ``df`` are fields of ``object_name``."""
         for column in trace_columns(df):
-            for leaf in column.leaves:
-                self._fields[leaf] = f"{object_name}.{column.name}"
+            if not column.direct:
+                continue
+            (leaf,) = column.leaves
+            field_name = f"{object_name}.{column.name}"
+            if self._fields.setdefault(leaf, field_name) != field_name:
+                self._ambiguous.add(leaf)
         if object_name not in self.objects:
             self.objects.append(object_name)
 
@@ -132,6 +150,8 @@ class SourceRegistry:
         for column in trace_columns(df):
             if column.opaque_reason is not None:
                 results[column.name] = TraceResult(reason=column.opaque_reason)
+            elif any(leaf in self._ambiguous for leaf in column.leaves):
+                results[column.name] = TraceResult(reason=AMBIGUOUS_SOURCE)
             elif any(leaf not in self._fields for leaf in column.leaves):
                 results[column.name] = TraceResult(reason=UNTRACEABLE_SOURCE)
             else:
@@ -190,14 +210,13 @@ def trace_columns(df: PySparkDataFrame) -> List[ColumnTrace]:
             f"Plan output has {len(root_ids)} columns but the DataFrame has "
             f"{len(df.columns)}"
         )
-    return [
-        ColumnTrace(
-            name=name,
-            leaves=traces.get(expr_id, _EMPTY).leaves,
-            opaque_reason=traces.get(expr_id, _EMPTY).opaque_reason,
+    columns = []
+    for name, expr_id in zip(df.columns, root_ids, strict=False):
+        trace = traces.get(expr_id, _EMPTY)
+        columns.append(
+            ColumnTrace(name, trace.leaves, trace.opaque_reason, trace.direct)
         )
-        for name, expr_id in zip(df.columns, root_ids, strict=False)
-    ]
+    return columns
 
 
 def _trace_node(
@@ -213,7 +232,7 @@ def _trace_node(
     if not child_outputs:
         key = _leaf_key(jnode, node_class, jvm)
         for position, expr_id in enumerate(output):
-            traces[expr_id] = _AttrTrace(frozenset({(key, position)}))
+            traces[expr_id] = _AttrTrace(frozenset({(key, position)}), direct=True)
         return
 
     if node_class == "Union":
@@ -234,10 +253,14 @@ def _trace_node(
                     )
             traces[expr_id] = merged
     elif node_class == "Generate":
-        generator = _trace_expression(node.get("generator", []), traces)
-        for attr_list in node.get("generatorOutput", []):
-            for attr in attr_list:
-                traces[_expr_id(attr)] = generator
+        generated = [
+            _expr_id(attr)
+            for attr_list in node.get("generatorOutput", [])
+            for attr in attr_list
+        ]
+        per_output = _trace_generator(node.get("generator", []), len(generated), traces)
+        for expr_id, trace in zip(generated, per_output, strict=True):
+            traces[expr_id] = trace
     else:
         for expression in _expression_trees(node):
             _trace_aliases(expression, traces)
@@ -253,10 +276,51 @@ def _trace_aliases(expression: List[dict], traces: Dict[int, _AttrTrace]) -> Non
     """Record every Alias in a flattened expression tree as a new attribute."""
     for index, expr_node in enumerate(expression):
         if expr_node["class"].endswith(".Alias"):
-            end = _subtree_end(expression, index)
-            traces[_expr_id(expr_node)] = _trace_expression(
-                expression[index + 1 : end], traces
-            )
+            child = expression[index + 1 : _subtree_end(expression, index)]
+            if (
+                len(child) == 1
+                and child[0]["class"].endswith(".AttributeReference")
+                and _expr_id(child[0]) in traces
+            ):
+                # A rename keeps the column a direct pass-through
+                traces[_expr_id(expr_node)] = traces[_expr_id(child[0])]
+            else:
+                traces[_expr_id(expr_node)] = _trace_expression(child, traces)
+
+
+def _trace_generator(
+    generator: List[dict], output_count: int, traces: Dict[int, _AttrTrace]
+) -> List[_AttrTrace]:
+    """Trace each output of a Generate node's generator expression."""
+    whole = _trace_expression(generator, traces)
+    if output_count <= 1 or whole.opaque_reason is not None:
+        return [whole] * output_count
+    generator_class = generator[0]["class"].rsplit(".", 1)[-1]
+    if generator_class == "Stack":
+        # stack(n, e0, e1, ...) puts e_j in output j % output_count
+        per_output = [_EMPTY] * output_count
+        for position, arg in enumerate(_child_subtrees(generator)[1:]):
+            slot = position % output_count
+            per_output[slot] = per_output[slot].merge(_trace_expression(arg, traces))
+        return per_output
+    if len(whole.leaves) > 1:
+        # e.g. inline(array(struct(a, b))): which output reads which input is
+        # not recoverable without modelling the generator
+        reason = f"columns produced by {generator_class} cannot be traced"
+        return [_AttrTrace(frozenset(), reason)] * output_count
+    # One input feeds every output (explode, posexplode, json_tuple, ...)
+    return [whole] * output_count
+
+
+def _child_subtrees(expression: List[dict]) -> List[List[dict]]:
+    """The flattened subtrees of the root's children, in order."""
+    children = []
+    index = 1
+    for _ in range(expression[0]["num-children"]):
+        end = _subtree_end(expression, index)
+        children.append(expression[index:end])
+        index = end
+    return children
 
 
 def _trace_expression(

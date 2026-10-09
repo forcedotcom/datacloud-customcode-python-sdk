@@ -144,10 +144,10 @@ def prepare_run(
 ) -> RunContext:
     """Resolve config and import dependencies for an entrypoint, without running it.
 
-    This is the setup half of :func:`run_entrypoint`. Callers that need to adjust
-    the resolved global ``config`` before the entrypoint runs (e.g. lineage
-    generation swapping in capturing readers/writers) call this, make their
-    changes, then call :func:`execute_entrypoint`.
+    This is the setup half of :func:`run_entrypoint`. Callers that need to act
+    between setup and running (e.g. lineage generation starting its capture) call
+    this, then :func:`execute_entrypoint`. Such callers can pass no dependencies
+    here and call :func:`import_dependencies` themselves at the right moment.
 
     Args:
         entrypoint: The entrypoint script to run.
@@ -207,7 +207,17 @@ def prepare_run(
         config.streaming_source = _read_streaming_source(config_json)
 
     _update_config_options(profile, sf_cli_org)
+    import_dependencies(dependencies)
 
+    return RunContext(package_type=package_type, config_json=config_json)
+
+
+def import_dependencies(dependencies: List[str]) -> None:
+    """Import each dependency module (or ``module.attribute``), as ``run`` does.
+
+    Args:
+        dependencies: The dependencies to import.
+    """
     for dependency in dependencies:
         try:
             importlib.import_module(dependency)
@@ -221,8 +231,6 @@ def prepare_run(
                     raise exc
             except (ModuleNotFoundError, AttributeError) as inner_exc:
                 raise inner_exc from exc
-
-    return RunContext(package_type=package_type, config_json=config_json)
 
 
 def execute_entrypoint(

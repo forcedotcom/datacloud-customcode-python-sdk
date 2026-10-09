@@ -63,11 +63,15 @@ def generate_lineage(
     Raises:
         ValueError: If the package is not a batch script.
     """
-    from datacustomcode.run import execute_entrypoint, prepare_run
-
-    context = prepare_run(
-        entrypoint, config_file, list(dependencies), profile, sf_cli_org
+    from datacustomcode.run import (
+        execute_entrypoint,
+        import_dependencies,
+        prepare_run,
     )
+
+    # Dependencies are imported inside the capture, so a Client they create at
+    # import time is captured too
+    context = prepare_run(entrypoint, config_file, [], profile, sf_cli_org)
     if context.package_type != "script":
         raise ValueError(
             f"Lineage can only be generated for script packages, not "
@@ -78,5 +82,6 @@ def generate_lineage(
 
     collector = LineageCollector()
     with capture_lineage(collector):
+        import_dependencies(list(dependencies))
         execute_entrypoint(entrypoint, context)
     return collector.result()
