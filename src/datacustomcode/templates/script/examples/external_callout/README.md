@@ -37,13 +37,42 @@ if response.is_success:
 
 ## Per-row path — fan out across the DataFrame
 
-`named_credential_request_col` dispatches one callout per row; only the body
-Column varies.
+`named_credential_request_col` dispatches one callout per row. The body Column
+varies per row, and so can the optional `path` Column.
 
 ```python
 # One callout per row; body is a Column built from the row's data.
 df = df.withColumn("_callout", named_credential_request_col(request, body=body_col))
 ```
+
+### Optional per-row `path`
+
+Pass `path` to call a different endpoint of the **same** Named Credential per
+row. It is appended to the template's URL, e.g. to pick a model per row when the
+Named Credential's URL stops at `.../v1beta/models`:
+
+```python
+from pyspark.sql.functions import col, concat, lit, url_encode, when
+
+# callout:gemini/gemini-2.5-pro:generateContent or .../gemini-2.5-flash:generateContent
+path = when(col("priority__c") == "high", lit("/gemini-2.5-pro:generateContent")).otherwise(
+    lit("/gemini-2.5-flash:generateContent")
+)
+df = df.withColumn(
+    "_callout", named_credential_request_col(request, body=body_col, path=path)
+)
+
+# Query-string lookups work too: callout:geo?address=1+Market+St
+geo_path = concat(lit("?address="), url_encode(col("address__c")))
+```
+
+- A path starting with `/` or `?` is appended as is; any other path is joined
+  with `/` (`2/v1` → `callout:gemini/2/v1`), so a row can never switch to a
+  different Named Credential.
+- A null or empty `path` uses the template's URL unchanged; omitting `path`
+  behaves exactly as before.
+- Keep the template URL free of a query string when using `path` — put
+  per-row query parameters in `path` instead.
 
 It returns a struct Column:
 
