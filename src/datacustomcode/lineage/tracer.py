@@ -291,25 +291,96 @@ def _trace_aliases(expression: List[dict], traces: Dict[int, _AttrTrace]) -> Non
 def _trace_generator(
     generator: List[dict], output_count: int, traces: Dict[int, _AttrTrace]
 ) -> List[_AttrTrace]:
-    """Trace each output of a Generate node's generator expression."""
+    """Trace each output of a Generate node's generator expression.
+
+    Outputs are traced individually where the generator's shape says which
+    input feeds which output. Otherwise they share the input's trace only when
+    that input is a source column passed through unchanged: a computed input
+    (e.g. ``map('key', name)``) can mix literals and columns, and the shared
+    trace would attribute the literal outputs to the columns.
+    """
     whole = _trace_expression(generator, traces)
-    if output_count <= 1 or whole.opaque_reason is not None:
+    if output_count <= 1 or whole.opaque_reason is not None or not whole.leaves:
         return [whole] * output_count
-    generator_class = generator[0]["class"].rsplit(".", 1)[-1]
+    generator_class = _class_name(generator[0])
+    children = _child_subtrees(generator)
+    per_output: Optional[List[_AttrTrace]] = None
     if generator_class == "Stack":
         # stack(n, e0, e1, ...) puts e_j in output j % output_count
         per_output = [_EMPTY] * output_count
-        for position, arg in enumerate(_child_subtrees(generator)[1:]):
+        for position, arg in enumerate(children[1:]):
             slot = position % output_count
             per_output[slot] = per_output[slot].merge(_trace_expression(arg, traces))
-        return per_output
-    if len(whole.leaves) > 1:
-        # e.g. inline(array(struct(a, b))): which output reads which input is
-        # not recoverable without modelling the generator
+    elif generator_class == "JsonTuple":
+        # Every output is a value extracted from the one JSON input
+        per_output = [whole] * output_count
+    elif generator_class in ("Explode", "PosExplode", "Inline"):
+        with_position = generator_class == "PosExplode"
+        fields = _trace_collection(
+            children[0],
+            output_count - with_position,
+            generator_class == "Inline",
+            traces,
+        )
+        if fields is not None:
+            per_output = [whole] * with_position + fields
+    if per_output is None:
         reason = f"columns produced by {generator_class} cannot be traced"
         return [_AttrTrace(frozenset(), reason)] * output_count
-    # One input feeds every output (explode, posexplode, json_tuple, ...)
-    return [whole] * output_count
+    return per_output
+
+
+def _trace_collection(
+    collection: List[dict],
+    field_count: int,
+    of_structs: bool,
+    traces: Dict[int, _AttrTrace],
+) -> Optional[List[_AttrTrace]]:
+    """Trace the fields a generator unpacks from each element of a collection.
+
+    The fields are a map's key and value, or a struct's fields (``of_structs``).
+    Returns ``None`` when it is not known which input feeds which field.
+    """
+    if _is_direct(collection, traces):
+        return [_trace_expression(collection, traces)] * field_count
+    root = _class_name(collection[0])
+    if root == "CreateMap" and not of_structs and field_count == 2:
+        # map(k0, v0, k1, v1, ...)
+        fields = [_EMPTY, _EMPTY]
+        for position, entry in enumerate(_child_subtrees(collection)):
+            fields[position % 2] = fields[position % 2].merge(
+                _trace_expression(entry, traces)
+            )
+        return fields
+    if root == "CreateArray" and of_structs:
+        fields = [_EMPTY] * field_count
+        for element in _child_subtrees(collection):
+            if _is_direct(element, traces):
+                element_fields = [_trace_expression(element, traces)] * field_count
+            elif _class_name(element[0]) == "CreateNamedStruct":
+                # named_struct(name0, value0, name1, value1, ...)
+                element_fields = [
+                    _trace_expression(value, traces)
+                    for value in _child_subtrees(element)[1::2]
+                ]
+            else:
+                return None
+            fields = [f.merge(e) for f, e in zip(fields, element_fields, strict=True)]
+        return fields
+    return None
+
+
+def _is_direct(expression: List[dict], traces: Dict[int, _AttrTrace]) -> bool:
+    """Whether a flattened expression is a source column passed through as-is."""
+    return (
+        len(expression) == 1
+        and _class_name(expression[0]) == "AttributeReference"
+        and traces.get(_expr_id(expression[0]), _EMPTY).direct
+    )
+
+
+def _class_name(expr_node: dict) -> str:
+    return str(expr_node["class"]).rsplit(".", 1)[-1]
 
 
 def _child_subtrees(expression: List[dict]) -> List[List[dict]]:

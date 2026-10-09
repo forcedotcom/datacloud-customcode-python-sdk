@@ -290,11 +290,72 @@ def test_stack_with_several_rows(registry, orders):
     }
 
 
-def test_multi_output_generator_over_several_inputs_is_unresolved(registry, orders):
-    inlined = orders.selectExpr("inline(array(struct(first, last))) AS (x, y)")
-    results = registry.trace(inlined)
-    assert results["x"].unresolved and results["y"].unresolved
-    assert "Inline" in results["x"].reason
+def test_inline_over_built_structs_traces_each_field(registry, orders):
+    inlined = orders.selectExpr(
+        "inline(array(named_struct('a', first, 'b', last), "
+        "named_struct('a', last, 'b', 'constant'))) AS (x, y)"
+    )
+    assert sources(registry.trace(inlined)) == {
+        "x": {"orders__dll.first", "orders__dll.last"},
+        "y": {"orders__dll.last"},
+    }
+
+
+def test_inline_literal_field_has_no_sources(spark, registry):
+    df = spark.createDataFrame(pd.DataFrame({"name": ["a"]}))
+    registry.register(df, "src__dll")
+    inlined = df.selectExpr("inline(array(struct(name, 'constant'))) AS (x, y)")
+    assert sources(registry.trace(inlined)) == {"x": {"src__dll.name"}, "y": set()}
+
+
+def test_explode_of_built_map_traces_key_and_value(spark, registry):
+    df = spark.createDataFrame(pd.DataFrame({"name": ["a"]}))
+    registry.register(df, "src__dll")
+    assert sources(registry.trace(df.selectExpr("explode(map('key', name))"))) == {
+        "key": set(),
+        "value": {"src__dll.name"},
+    }
+    exploded = df.selectExpr("posexplode(map('key', name)) AS (p, k, v)")
+    assert sources(registry.trace(exploded)) == {
+        "p": {"src__dll.name"},
+        "k": set(),
+        "v": {"src__dll.name"},
+    }
+
+
+def test_inline_over_source_struct_column_shares_its_trace(spark, registry):
+    df = spark.createDataFrame([([("a", 1)],)], "items array<struct<s:string,n:int>>")
+    registry.register(df, "src__dll")
+    assert sources(registry.trace(df.selectExpr("inline(items)"))) == {
+        "s": {"src__dll.items"},
+        "n": {"src__dll.items"},
+    }
+
+
+@pytest.mark.parametrize(
+    "build, generate",
+    [
+        # The struct is built in an earlier projection, hidden behind a column
+        (
+            "array(struct(name, 'constant')) AS items",
+            "inline(items) AS (x, y)",
+        ),
+        # The struct is built inline but wrapped in another function
+        (
+            "name",
+            "inline(filter(array(struct(name, 'constant')), s -> true)) AS (x, y)",
+        ),
+        ("map('key', name) AS m", "explode(m) AS (k, v)"),
+    ],
+)
+def test_generator_over_computed_collection_is_unresolved(
+    spark, registry, build, generate
+):
+    df = spark.createDataFrame(pd.DataFrame({"name": ["a"]}))
+    registry.register(df, "src__dll")
+    results = registry.trace(df.selectExpr(build).selectExpr(generate))
+    assert all(r.unresolved for r in results.values()), results
+    assert "cannot be traced" in next(iter(results.values())).reason
 
 
 def test_posexplode_outputs_share_their_single_input(registry, orders):

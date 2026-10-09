@@ -26,6 +26,7 @@ from typing import (
     Union,
     cast,
 )
+import weakref
 
 from datacustomcode.config import config
 from datacustomcode.einstein_predictions_config import spark_einstein_predictions_config
@@ -349,6 +350,10 @@ class _BaseClient:
     # — and therefore one underlying connection — instead of opening two
     # containing differing state
     _shared_spark: ClassVar[Optional[SparkSession]] = None
+    # Every client built in this process, including ones no longer the
+    # singleton that a module still holds a reference to (lineage capture must
+    # reach those too)
+    _live_instances: ClassVar[weakref.WeakSet[_BaseClient]] = weakref.WeakSet()
     _reader: BaseDataCloudReader
     _writer: BaseDataCloudWriter
     _file: DefaultFindFilePath
@@ -429,6 +434,7 @@ class _BaseClient:
                 DataCloudObjectType.DMO: set(),
             }
             cls._instance = instance
+            _BaseClient._live_instances.add(instance)
         elif reader is not None or writer is not None:
             raise ValueError("Cannot set reader or writer after client is initialized")
         return cast(_ClientT, cls._instance)

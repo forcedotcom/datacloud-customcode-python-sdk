@@ -268,6 +268,38 @@ def test_retained_client_from_dependency_is_captured(
     assert VALIDATED == [("out__dll", ["id__c"])]
 
 
+def test_repeated_generation_captures_retained_client(
+    tmp_path, config_file, monkeypatch
+):
+    # The helper module stays imported after the first run, keeping the client
+    # it built then; the second run must capture that client too
+    (tmp_path / "lineage_cached_helpers.py").write_text(
+        "from datacustomcode.client import Client\n"
+        "from datacustomcode.io.writer.base import WriteMode\n"
+        "client = Client()\n"
+        "def save(df):\n"
+        "    client.write_to_dlo('out__dll', df, WriteMode.APPEND)\n"
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.delitem(sys.modules, "lineage_cached_helpers", raising=False)
+    entrypoint = make_package(
+        tmp_path,
+        """
+        import lineage_cached_helpers
+        lineage_cached_helpers.save(
+            client.read_dlo("orders__dll").select(F.col("id").alias("id__c"))
+        )
+        """,
+    )
+
+    for _ in range(2):
+        result = generate_lineage(
+            entrypoint, config_file, dependencies=["lineage_cached_helpers"]
+        )
+        assert result.data_lineage == {"out__dll.id__c": ["orders__dll.id"]}
+    assert sys.modules["lineage_cached_helpers"].client is not Client._instance
+
+
 def test_client_built_with_reader_and_writer_is_captured(spark, config_file):
     config.load(config_file)
     reader, writer = InMemoryReader(spark), RefusingWriter(spark)

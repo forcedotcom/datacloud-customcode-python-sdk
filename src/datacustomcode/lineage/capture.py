@@ -261,8 +261,9 @@ _active: Dict[str, Optional[_CaptureSession]] = {"session": None}
 def capture_lineage(collector: LineageCollector) -> Iterator[LineageCollector]:
     """Capture lineage from every ``Client`` used inside the block.
 
-    Clients that already exist (including ones a dependency created and kept a
-    reference to) are wrapped on entry, and ``Client.__new__`` is hooked so
+    Every live client is wrapped on entry, including ones a module kept a
+    reference to after they stopped being the singleton (e.g. a dependency
+    imported by an earlier run), and ``Client.__new__`` is hooked so
     clients created inside the block are wrapped as they are built, however
     their reader and writer were supplied. Clients are unwrapped, the hook is
     removed, and the ``Client`` singletons are restored on exit.
@@ -288,7 +289,7 @@ def capture_lineage(collector: LineageCollector) -> Iterator[LineageCollector]:
 
     _active["session"] = session
     try:
-        for client in saved_clients:
+        for client in (*saved_clients, *_BaseClient._live_instances):
             if client is not None:
                 session.wrap(client)
         _BaseClient.__new__ = staticmethod(capturing_new)  # type: ignore[assignment]
