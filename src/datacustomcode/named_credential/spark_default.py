@@ -79,7 +79,7 @@ class DefaultSparkNamedCredential(SparkNamedCredential):
         self,
         request: "HTTPRequest",
         body: Optional["Column"] = None,
-        url: Optional["Column"] = None,
+        path: Optional["Column"] = None,
     ) -> "Column":
         """Per-row callout via a client-side Spark UDF.
 
@@ -117,7 +117,7 @@ class DefaultSparkNamedCredential(SparkNamedCredential):
 
         body_col = body if body is not None else lit(None).cast(StringType())
 
-        if url is None:
+        if path is None:
 
             def _callout(body_str: Optional[str]) -> Dict[str, Any]:
                 return _invoke_callout_as_struct(
@@ -126,20 +126,35 @@ class DefaultSparkNamedCredential(SparkNamedCredential):
 
             return udf(_callout, result_schema)(body_col)
 
-        def _callout_with_url(
-            body_str: Optional[str], url_str: Optional[str]
+        def _callout_with_path(
+            body_str: Optional[str], path_str: Optional[str]
         ) -> Dict[str, Any]:
-            # A null row url falls back to the template's url.
             row_request = (
-                request
-                if url_str is None
-                else request.model_copy(update={"url": url_str})
+                request.model_copy(
+                    update={"url": join_callout_path(request.url, path_str)}
+                )
+                if path_str
+                else request
             )
             return _invoke_callout_as_struct(
                 self._named_credential, row_request, body_str
             )
 
-        return udf(_callout_with_url, result_schema)(body_col, url)
+        return udf(_callout_with_path, result_schema)(body_col, path)
+
+
+def join_callout_path(base_url: str, path: Optional[str]) -> str:
+    """Append a per-row ``path`` to the template ``base_url``.
+
+    A path not starting with ``/`` or ``?`` is joined with ``/`` so the row can
+    never extend the Named Credential name (``callout:NC`` + ``2/x`` must not
+    become ``callout:NC2/x``). A null or empty path returns ``base_url``.
+    """
+    if not path:
+        return base_url
+    if path.startswith(("/", "?")):
+        return base_url + path
+    return f"{base_url}/{path}"
 
 
 def _invoke_callout_as_struct(
