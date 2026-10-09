@@ -405,7 +405,7 @@ class TestDefaultSparkNamedCredentialRequestCol:
 
     @patch("pyspark.sql.functions.udf")
     @patch("pyspark.sql.functions.lit")
-    def test_per_row_url_column_overrides_request_url(self, mock_lit, mock_udf):
+    def test_per_row_path_is_appended_to_request_url(self, mock_lit, mock_udf):
         from datacustomcode.named_credential.spark_default import (
             DefaultSparkNamedCredential,
         )
@@ -421,34 +421,76 @@ class TestDefaultSparkNamedCredentialRequestCol:
 
         request = (
             HTTPRequestBuilder()
-            .set_url("callout:NC/geocode")
-            .set_method("GET")
+            .set_url("callout:gemini")
+            .set_method("POST")
             .set_headers({"Accept": "application/json"})
             .build()
         )
         body_col = MagicMock(name="body_col")
-        url_col = MagicMock(name="url_col")
-        spark_nc.request_col(request, body_col, url=url_col)
+        path_col = MagicMock(name="path_col")
+        spark_nc.request_col(request, body_col, path=path_col)
 
-        # The UDF is applied over both the body and the per-row url columns.
-        sentinel_udf.assert_called_once_with(body_col, url_col)
+        # The UDF is applied over both the body and the per-row path columns.
+        sentinel_udf.assert_called_once_with(body_col, path_col)
 
         udf_fn = mock_udf.call_args.args[0]
-        out = udf_fn(None, "callout:NC/geocode?address=1%20Market%20St")
+        out = udf_fn('{"q": 1}', "/gemini-2.5-pro")
 
         assert out["status"] == "SUCCESS"
         sent_request, sent_body = underlying.request.call_args.args
-        # The row's url replaces the template url; method/headers are kept.
-        assert sent_request.url == "callout:NC/geocode?address=1%20Market%20St"
-        assert sent_request.method == "GET"
+        # The row's path is joined onto the template url; method/headers kept.
+        assert sent_request.url == "callout:gemini/gemini-2.5-pro"
+        assert sent_request.method == "POST"
         assert sent_request.headers == {"Accept": "application/json"}
-        assert sent_body is None
+        assert sent_body == '{"q": 1}'
         # The caller's template request is left untouched.
-        assert request.url == "callout:NC/geocode"
+        assert request.url == "callout:gemini"
 
+    @pytest.mark.parametrize(
+        "base, path, expected",
+        [
+            ("callout:gemini", "/v1/models", "callout:gemini/v1/models"),
+            ("callout:gemini", "?key=a", "callout:gemini?key=a"),
+            (
+                "callout:Geo/geocode",
+                "?address=1+Main",
+                "callout:Geo/geocode?address=1+Main",
+            ),
+            ("callout:Geo/v1", "/places/42", "callout:Geo/v1/places/42"),
+            # Without a leading separator a "/" is inserted, so the row can never
+            # extend the Named Credential name (callout:gemini2/...).
+            ("callout:gemini", "2/v1", "callout:gemini/2/v1"),
+            ("callout:gemini", "@evil.example.com", "callout:gemini/@evil.example.com"),
+        ],
+    )
     @patch("pyspark.sql.functions.udf")
     @patch("pyspark.sql.functions.lit")
-    def test_null_row_url_falls_back_to_request_url(self, mock_lit, mock_udf):
+    def test_path_join_keeps_named_credential_fixed(
+        self, mock_lit, mock_udf, base, path, expected
+    ):
+        from datacustomcode.named_credential.spark_default import (
+            DefaultSparkNamedCredential,
+        )
+
+        mock_udf.return_value = MagicMock(name="udf")
+        underlying = MagicMock()
+        underlying.request.return_value = HTTPResponse(
+            status_code=200, headers={}, body=""
+        )
+        spark_nc = DefaultSparkNamedCredential(named_credential=underlying)
+
+        request = HTTPRequestBuilder().set_url(base).build()
+        spark_nc.request_col(request, path=MagicMock(name="path_col"))
+
+        udf_fn = mock_udf.call_args.args[0]
+        udf_fn(None, path)
+
+        assert underlying.request.call_args.args[0].url == expected
+
+    @pytest.mark.parametrize("path", [None, ""])
+    @patch("pyspark.sql.functions.udf")
+    @patch("pyspark.sql.functions.lit")
+    def test_null_or_empty_row_path_uses_request_url(self, mock_lit, mock_udf, path):
         from datacustomcode.named_credential.spark_default import (
             DefaultSparkNamedCredential,
         )
@@ -462,10 +504,10 @@ class TestDefaultSparkNamedCredentialRequestCol:
         spark_nc = DefaultSparkNamedCredential(named_credential=underlying)
 
         request = HTTPRequestBuilder().set_url("callout:NC/default").build()
-        spark_nc.request_col(request, url=MagicMock(name="url_col"))
+        spark_nc.request_col(request, path=MagicMock(name="path_col"))
 
         udf_fn = mock_udf.call_args.args[0]
-        udf_fn('{"a": 1}', None)
+        udf_fn('{"a": 1}', path)
 
         sent_request, sent_body = underlying.request.call_args.args
         assert sent_request is request
@@ -473,7 +515,7 @@ class TestDefaultSparkNamedCredentialRequestCol:
 
     @patch("pyspark.sql.functions.udf")
     @patch("pyspark.sql.functions.lit")
-    def test_url_without_body_applies_typed_null_body(self, mock_lit, mock_udf):
+    def test_path_without_body_applies_typed_null_body(self, mock_lit, mock_udf):
         from datacustomcode.named_credential.spark_default import (
             DefaultSparkNamedCredential,
         )
@@ -488,10 +530,10 @@ class TestDefaultSparkNamedCredentialRequestCol:
 
         spark_nc = DefaultSparkNamedCredential(named_credential=MagicMock())
         request = HTTPRequestBuilder().set_url("callout:NC/status").build()
-        url_col = MagicMock(name="url_col")
-        spark_nc.request_col(request, url=url_col)
+        path_col = MagicMock(name="path_col")
+        spark_nc.request_col(request, path=path_col)
 
-        sentinel_udf.assert_called_once_with(null_col, url_col)
+        sentinel_udf.assert_called_once_with(null_col, path_col)
 
 
 class TestInvokeCalloutAsStruct:
