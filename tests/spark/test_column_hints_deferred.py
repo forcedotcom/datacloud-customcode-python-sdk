@@ -38,7 +38,8 @@ def _run(script: str) -> None:
         [sys.executable, "-c", textwrap.dedent(script)],
         capture_output=True,
         text=True,
-        timeout=60, check=False,
+        timeout=60,
+        check=False,
     )
     if result.returncode != 0:
         pytest.fail(

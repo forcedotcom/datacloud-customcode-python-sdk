@@ -733,6 +733,27 @@ class TestNamedCredentialRequestCol:
         assert result is sentinel_col
         mock_nc.request_col.assert_called_once_with(request, body=body_col)
 
+    @patch("datacustomcode.client._build_spark_named_credential")
+    def test_forwards_per_row_path_column(self, mock_build, reset_client):
+        mock_nc = MagicMock()
+        sentinel_col = MagicMock(name="col")
+        mock_nc.request_col.return_value = sentinel_col
+        mock_build.return_value = mock_nc
+
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        Client(reader=reader, writer=writer)
+
+        request = MagicMock(name="request")
+        body_col = MagicMock(name="body_col")
+        path_col = MagicMock(name="path_col")
+        result = named_credential_request_col(request, body_col, path=path_col)
+
+        assert result is sentinel_col
+        mock_nc.request_col.assert_called_once_with(
+            request, body=body_col, path=path_col
+        )
+
 
 class TestClientNamedCredentialRequest:
 

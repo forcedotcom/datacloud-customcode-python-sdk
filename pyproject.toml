@@ -87,10 +87,10 @@ warn_unused_configs = true
 
 [tool.poetry]
 include = [
-  {path = "src/datacustomcode/templates/**/*"},
-  {path = "src/datacustomcode/config.yaml"}
+  { path = "src/datacustomcode/templates/**/*" },
+  { path = "src/datacustomcode/config.yaml" }
 ]
-packages = [{include = "datacustomcode", from = "src"}]
+packages = [{ include = "datacustomcode", from = "src" }]
 version = "0.0.0"
 
 [tool.poetry.build]
@@ -115,7 +115,7 @@ coverage = ">=7.0.0,<8.0.0"
 ipykernel = "^6.29.5"
 mypy = "*"
 pipreqs = "*"
-poetry-dynamic-versioning = {extras = ["plugin"], version = "^1.8.2"}
+poetry-dynamic-versioning = { extras = ["plugin"], version = "^1.8.2" }
 pre-commit = "*"
 pytest = "*"
 pytest-cov = "*"
@@ -127,7 +127,7 @@ types-requests = "*"
 [tool.poetry.plugins."poetry.plugin"]
 
 [tool.poetry.requires-plugins]
-poetry-dynamic-versioning = {version = ">=1.0.0,<2.0.0", extras = ["plugin"]}
+poetry-dynamic-versioning = { version = ">=1.0.0,<2.0.0", extras = ["plugin"] }
 
 [tool.poetry.scripts]
 datacustomcode = "datacustomcode.cli:cli"
@@ -152,7 +152,6 @@ testpaths = ["tests"]
 [tool.ruff]
 fix = true
 line-length = 88
-target-version = 'py310'
 lint.ignore = [
   # do not assign a lambda expression, use a def
   'E731',
@@ -211,6 +210,7 @@ lint.select = [
   'RUF',
   'S102'
 ]
+target-version = 'py310'
 
 [tool.setuptools.package_data]
 datacustomcode = ["templates/**/*", "config.yaml"]
