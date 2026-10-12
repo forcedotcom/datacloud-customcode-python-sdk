@@ -3,76 +3,48 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import sys
 import textwrap
 
-import pandas as pd
 import pytest
 import yaml
 
-from datacustomcode.client import (
-    Client,
-    StreamingClient,
-    _BaseClient,
-)
-from datacustomcode.config import config
-from datacustomcode.io.reader.base import BaseDataCloudReader
-from datacustomcode.io.writer.base import BaseDataCloudWriter, WriteMode
-from datacustomcode.lineage import capture_lineage, generate_lineage
-from datacustomcode.lineage.capture import LineageCollector
+from datacustomcode.config import AccessLayerObjectConfig
+from datacustomcode.lineage import LineageResult, generate_lineage
+from datacustomcode.lineage.capture import LineageCaptureWriter, LineageCollector
 from datacustomcode.scan import SDK_CONFIG_DIR, SDK_CONFIG_FILE
+
+# generate_lineage passes sys.path to its worker, so the worker can import this too
+sys.path.insert(0, str(Path(__file__).parent))
+from lineage_test_io import (
+    VALIDATED_FILE_ENV,
+    InMemoryReader,
+    RefusingWriter,
+)
 
 pytestmark = pytest.mark.spark
 
-ORIGINAL_NEW = _BaseClient.__dict__["__new__"]
-
-TABLES = {
-    "orders__dll": pd.DataFrame(
-        {"id": [1, 2], "first": ["a", "b"], "last": ["x", "y"], "amount": [1.0, 2.0]}
-    ),
-    "customers__dlm": pd.DataFrame({"id": [1, 2], "region": ["us", "eu"]}),
-}
-VALIDATED: list[tuple[str, list[str]]] = []
-
-
-class InMemoryReader(BaseDataCloudReader):
-    CONFIG_NAME = "LineageTestInMemoryReader"
-
-    def __init__(self, spark, dataspace=None):
-        super().__init__(spark)
-
-    def read_dlo(self, name, schema=None):
-        return self.spark.createDataFrame(TABLES[name])
-
-    read_dmo = read_dlo
-
-
-class RefusingWriter(BaseDataCloudWriter):
-    CONFIG_NAME = "LineageTestRefusingWriter"
-
-    def __init__(self, spark, dataspace=None):
-        super().__init__(spark)
-
-    def validate_dataframe_columns_against_dlo(self, dataframe, dlo_name):
-        VALIDATED.append((dlo_name, list(dataframe.columns)))
-
-    def write_to_dlo(self, name, dataframe, write_mode):
-        raise AssertionError("lineage generation must never write")
-
-    write_to_dmo = write_to_dlo
+PREAMBLE = (
+    "from pyspark.sql import functions as F\n"
+    "import lineage_test_io\n"
+    "from datacustomcode.client import Client\n"
+    "from datacustomcode.io.writer.base import WriteMode\n"
+)
 
 
 @pytest.fixture(autouse=True)
-def isolated_client(spark):
-    saved = (config.reader_config, config.writer_config, config.spark_config)
-    saved_spark = _BaseClient._shared_spark
-    Client._instance = StreamingClient._instance = None
-    _BaseClient._shared_spark = spark
-    VALIDATED.clear()
-    yield
-    config.reader_config, config.writer_config, config.spark_config = saved
-    Client._instance = StreamingClient._instance = None
-    _BaseClient._shared_spark = saved_spark
+def validated(tmp_path, monkeypatch):
+    """Reads back the (dlo, columns) validations the worker's writer recorded."""
+    path = tmp_path / "validated.jsonl"
+    monkeypatch.setenv(VALIDATED_FILE_ENV, str(path))
+
+    def read():
+        if not path.exists():
+            return []
+        return [tuple(json.loads(line)) for line in path.read_text().splitlines()]
+
+    return read
 
 
 @pytest.fixture
@@ -89,16 +61,14 @@ def config_file(tmp_path):
     return str(path)
 
 
-def make_package(tmp_path, body: str, config_json=None, package_type=None) -> str:
+def make_package(
+    tmp_path, body: str, config_json=None, package_type=None, with_client=True
+) -> str:
     payload = tmp_path / "payload"
     payload.mkdir()
     entrypoint = payload / "entrypoint.py"
-    entrypoint.write_text(
-        "from pyspark.sql import functions as F\n"
-        "from datacustomcode.client import Client\n"
-        "from datacustomcode.io.writer.base import WriteMode\n"
-        "client = Client()\n" + textwrap.dedent(body)
-    )
+    preamble = PREAMBLE + ("client = Client()\n" if with_client else "")
+    entrypoint.write_text(preamble + textwrap.dedent(body))
     (payload / "config.json").write_text(
         json.dumps(config_json or {"dataspace": "default"})
     )
@@ -109,7 +79,7 @@ def make_package(tmp_path, body: str, config_json=None, package_type=None) -> st
     return str(entrypoint)
 
 
-def test_generate_lineage_end_to_end(tmp_path, config_file):
+def test_generate_lineage_end_to_end(tmp_path, config_file, validated):
     entrypoint = make_package(
         tmp_path,
         """
@@ -143,7 +113,9 @@ def test_generate_lineage_end_to_end(tmp_path, config_file):
         "sources": ["orders__dll"],
         "pairCount": 3,
     }
-    assert VALIDATED == [("out__dll", ["id__c", "name__c", "const__c", "lookup_id__c"])]
+    assert validated() == [
+        ("out__dll", ["id__c", "name__c", "const__c", "lookup_id__c"])
+    ]
 
 
 def test_repeat_writes_union_sources(tmp_path, config_file):
@@ -170,7 +142,7 @@ def test_repeat_writes_union_sources(tmp_path, config_file):
     ]
 
 
-def test_dmo_read_and_write(tmp_path, config_file):
+def test_dmo_read_and_write(tmp_path, config_file, validated):
     entrypoint = make_package(
         tmp_path,
         """
@@ -184,7 +156,7 @@ def test_dmo_read_and_write(tmp_path, config_file):
     result = generate_lineage(entrypoint, config_file)
 
     assert result.data_lineage == {"out__dlm.region__c": ["customers__dlm.region"]}
-    assert VALIDATED == []
+    assert validated() == []
 
 
 def test_rejects_function_packages(tmp_path, config_file):
@@ -205,43 +177,41 @@ def test_rejects_streaming_scripts(tmp_path, config_file):
         generate_lineage(entrypoint, config_file)
 
 
-def test_script_error_propagates_and_restores_state(tmp_path, config_file):
-    config.load(config_file)
-    outside = Client()
-    reader, writer = outside._reader, outside._writer
+def test_script_error_propagates(tmp_path, config_file):
     entrypoint = make_package(tmp_path, "raise RuntimeError('boom')\n")
 
     with pytest.raises(RuntimeError, match="boom"):
         generate_lineage(entrypoint, config_file)
 
-    assert config.reader_config.type_config_name == InMemoryReader.CONFIG_NAME
-    assert config.writer_config.type_config_name == RefusingWriter.CONFIG_NAME
-    assert Client._instance is outside
-    assert (outside._reader, outside._writer) == (reader, writer)
-    assert "__new__" not in vars(Client)
-    assert _BaseClient.__dict__["__new__"] is ORIGINAL_NEW
+
+def test_non_builtin_error_is_reported_by_name(tmp_path, config_file):
+    entrypoint = make_package(
+        tmp_path,
+        """
+        class CustomerError(Exception):
+            pass
+        raise CustomerError("bad row")
+        """,
+    )
+
+    with pytest.raises(RuntimeError, match="CustomerError: bad row"):
+        generate_lineage(entrypoint, config_file)
 
 
-def test_existing_client_is_captured_and_restored(spark, config_file):
-    config.load(config_file)
-    outside = Client()
-    writer = outside._writer
+def test_worker_exit_without_response_is_reported(tmp_path, config_file):
+    entrypoint = make_package(tmp_path, "import os\nos._exit(3)\n")
 
-    with capture_lineage(LineageCollector()):
-        assert Client() is outside
-        assert type(outside._writer).__name__ == "LineageCaptureWriter"
-        assert outside._writer._delegate is writer
-
-    assert outside._writer is writer
-    assert Client() is outside
+    with pytest.raises(RuntimeError, match="exited with code 3"):
+        generate_lineage(entrypoint, config_file)
 
 
 def test_retained_client_from_dependency_is_captured(
-    tmp_path, config_file, monkeypatch
+    tmp_path, config_file, monkeypatch, validated
 ):
     # A dependency that builds its Client at import time keeps it in a module
     # global; its writes must still be captured, never reach the real writer
     (tmp_path / "lineage_dep_helpers.py").write_text(
+        "import lineage_test_io  # noqa: F401  registers the test reader/writer\n"
         "from datacustomcode.client import Client\n"
         "from datacustomcode.io.writer.base import WriteMode\n"
         "client = Client()\n"
@@ -249,7 +219,6 @@ def test_retained_client_from_dependency_is_captured(
         "    client.write_to_dlo('out__dll', df, WriteMode.APPEND)\n"
     )
     monkeypatch.syspath_prepend(str(tmp_path))
-    monkeypatch.delitem(sys.modules, "lineage_dep_helpers", raising=False)
     entrypoint = make_package(
         tmp_path,
         """
@@ -265,71 +234,77 @@ def test_retained_client_from_dependency_is_captured(
     )
 
     assert result.data_lineage == {"out__dll.id__c": ["orders__dll.id"]}
-    assert VALIDATED == [("out__dll", ["id__c"])]
+    assert validated() == [("out__dll", ["id__c"])]
 
 
-def test_repeated_generation_captures_retained_client(
-    tmp_path, config_file, monkeypatch
-):
-    # The helper module stays imported after the first run, keeping the client
-    # it built then; the second run must capture that client too
-    (tmp_path / "lineage_cached_helpers.py").write_text(
-        "from datacustomcode.client import Client\n"
-        "from datacustomcode.io.writer.base import WriteMode\n"
-        "client = Client()\n"
-        "def save(df):\n"
-        "    client.write_to_dlo('out__dll', df, WriteMode.APPEND)\n"
-    )
-    monkeypatch.syspath_prepend(str(tmp_path))
-    monkeypatch.delitem(sys.modules, "lineage_cached_helpers", raising=False)
+def test_repeated_generation_is_independent(tmp_path, config_file, validated):
     entrypoint = make_package(
         tmp_path,
         """
-        import lineage_cached_helpers
-        lineage_cached_helpers.save(
-            client.read_dlo("orders__dll").select(F.col("id").alias("id__c"))
+        client.write_to_dlo(
+            "out__dll",
+            client.read_dlo("orders__dll").select(F.col("id").alias("id__c")),
+            WriteMode.APPEND,
         )
         """,
     )
 
     for _ in range(2):
-        result = generate_lineage(
-            entrypoint, config_file, dependencies=["lineage_cached_helpers"]
-        )
+        result = generate_lineage(entrypoint, config_file)
         assert result.data_lineage == {"out__dll.id__c": ["orders__dll.id"]}
-    assert sys.modules["lineage_cached_helpers"].client is not Client._instance
+    assert validated() == [("out__dll", ["id__c"])] * 2
 
 
-def test_client_built_with_reader_and_writer_is_captured(spark, config_file):
-    config.load(config_file)
-    reader, writer = InMemoryReader(spark), RefusingWriter(spark)
-    collector = LineageCollector()
+def test_client_built_with_explicit_reader_and_writer_is_captured(
+    tmp_path, config_file
+):
+    # force=True overrides even a reader/writer passed straight to Client; the
+    # writer here would raise if it were used
+    entrypoint = make_package(
+        tmp_path,
+        """
+        class ExplodingWriter(lineage_test_io.RefusingWriter):
+            CONFIG_NAME = "LineageTestExplodingWriter"
 
-    with capture_lineage(collector):
-        client = Client(reader=reader, writer=writer)
-        assert client._reader._delegate is reader
-        assert client._writer._delegate is writer
-        client.write_to_dlo(
-            "out__dll",
-            client.read_dlo("orders__dll").select("id"),
-            WriteMode.APPEND,
+            def validate_dataframe_columns_against_dlo(self, dataframe, dlo_name):
+                raise AssertionError("explicit writer must not be used")
+
+        from pyspark.sql import SparkSession
+        spark = SparkSession.builder.getOrCreate()
+        client = Client(
+            reader=lineage_test_io.InMemoryReader(spark),
+            writer=ExplodingWriter(spark),
         )
+        client.write_to_dlo(
+            "out__dll", client.read_dlo("orders__dll").select("id"), WriteMode.APPEND
+        )
+        """,
+        with_client=False,
+    )
 
-    assert collector.result().data_lineage == {"out__dll.id": ["orders__dll.id"]}
-    assert (client._reader, client._writer) == (reader, writer)
+    result = generate_lineage(entrypoint, config_file)
+
+    assert result.data_lineage == {"out__dll.id": ["orders__dll.id"]}
 
 
-def test_nested_capture_is_rejected(config_file):
-    with capture_lineage(LineageCollector()):
-        with pytest.raises(RuntimeError, match="already active"):
-            with capture_lineage(LineageCollector()):
-                pass
+def test_capture_falls_through_to_delegate_attributes(spark):
+    writer = LineageCaptureWriter(
+        spark,
+        AccessLayerObjectConfig(type_config_name=RefusingWriter.CONFIG_NAME),
+        LineageCollector(),
+    )
+
+    assert writer.validate_dataframe_columns_against_dlo is not None
+    assert isinstance(writer._delegate, RefusingWriter)
 
 
-def test_capture_falls_through_to_delegate_attributes(config_file):
-    config.load(config_file)
+def test_result_round_trips_through_dict():
+    result = LineageResult(
+        data_lineage={"out__dll.a__c": ["in__dll.a", "in__dll.b"]},
+        unresolved={"out__dll.b__c": "untraceable source"},
+        no_sources=["out__dll.c__c"],
+        targets=["out__dll"],
+        sources=["in__dll"],
+    )
 
-    with capture_lineage(LineageCollector()):
-        writer = Client()._writer
-        assert writer.validate_dataframe_columns_against_dlo is not None
-        assert isinstance(writer._delegate, RefusingWriter)
+    assert LineageResult.from_dict(result.to_dict()).to_dict() == result.to_dict()

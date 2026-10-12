@@ -26,7 +26,6 @@ from typing import (
     Union,
     cast,
 )
-import weakref
 
 from datacustomcode.config import config
 from datacustomcode.einstein_predictions_config import spark_einstein_predictions_config
@@ -350,10 +349,6 @@ class _BaseClient:
     # — and therefore one underlying connection — instead of opening two
     # containing differing state
     _shared_spark: ClassVar[Optional[SparkSession]] = None
-    # Every client built in this process, including ones no longer the
-    # singleton that a module still holds a reference to (lineage capture must
-    # reach those too)
-    _live_instances: ClassVar[weakref.WeakSet[_BaseClient]] = weakref.WeakSet()
     _reader: BaseDataCloudReader
     _writer: BaseDataCloudWriter
     _file: DefaultFindFilePath
@@ -381,7 +376,13 @@ class _BaseClient:
             instance._spark_named_credential = spark_named_credential
             # Initialize Readers and Writers from config
             # and/or provided reader and writer
-            if reader is None or writer is None:
+            reader_forced = (
+                config.reader_config is not None and config.reader_config.force
+            )
+            writer_forced = (
+                config.writer_config is not None and config.writer_config.force
+            )
+            if reader is None or writer is None or reader_forced or writer_forced:
                 # We need a spark because we will initialize readers and writers.
                 # Reuse the process-wide session if one client already built it,
                 # so a Client and a StreamingClient share a single connection.
@@ -409,9 +410,7 @@ class _BaseClient:
                 raise ValueError(
                     "Reader config is required when reader is not provided"
                 )
-            elif reader is None or (
-                config.reader_config is not None and config.reader_config.force
-            ):
+            elif reader is None or reader_forced:
                 reader_init = config.reader_config.to_object(spark)  # type: ignore
             else:
                 reader_init = reader
@@ -419,9 +418,7 @@ class _BaseClient:
                 raise ValueError(
                     "Writer config is required when writer is not provided"
                 )
-            elif writer is None or (
-                config.writer_config is not None and config.writer_config.force
-            ):
+            elif writer is None or writer_forced:
                 writer_init = config.writer_config.to_object(spark)  # type: ignore
             else:
                 writer_init = writer
@@ -434,7 +431,6 @@ class _BaseClient:
                 DataCloudObjectType.DMO: set(),
             }
             cls._instance = instance
-            _BaseClient._live_instances.add(instance)
         elif reader is not None or writer is not None:
             raise ValueError("Cannot set reader or writer after client is initialized")
         return cast(_ClientT, cls._instance)

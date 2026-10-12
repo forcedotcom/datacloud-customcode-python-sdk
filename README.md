@@ -237,7 +237,7 @@ print(result.to_dict()["dataLineage"])
 #   "sourceFields": ["Input__dll.first__c", "Input__dll.last__c"]}, ...]
 ```
 
-The entry point runs exactly as it would locally (same config, reader, and credentials), except that writes are traced and validated against the target DLO instead of being performed. Reads use the reader's `default_row_limit` (1000 by default; set it in your `config.yaml`).
+The entry point runs exactly as it would locally (same config, reader, and credentials), except that writes are traced and validated against the target DLO instead of being performed. It runs in a separate Python process, which inherits your working directory, environment, and `sys.path`; errors raised by the script are re-raised from `generate_lineage`. Reads use the reader's `default_row_limit` (1000 by default; set it in your `config.yaml`).
 
 - A target field's sources are the fields its *value* is computed from. Filter conditions and join keys aren't sources.
 - Fields computed only from literals are listed in `noSources`.

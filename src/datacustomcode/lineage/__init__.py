@@ -16,14 +16,26 @@
 
 from __future__ import annotations
 
-from typing import Optional, Sequence
+import builtins
+import json
+import os
+import subprocess
+import sys
+import tempfile
+from typing import (
+    Any,
+    Dict,
+    NoReturn,
+    Optional,
+    Sequence,
+)
 
 from datacustomcode.lineage.capture import (
     LineageCaptureReader,
     LineageCaptureWriter,
     LineageCollector,
     LineageResult,
-    capture_lineage,
+    install_capture,
 )
 from datacustomcode.lineage.tracer import LineageTraceError
 
@@ -33,8 +45,8 @@ __all__ = [
     "LineageCollector",
     "LineageResult",
     "LineageTraceError",
-    "capture_lineage",
     "generate_lineage",
+    "install_capture",
 ]
 
 
@@ -48,7 +60,10 @@ def generate_lineage(
     """Run a script entrypoint and return the field-level lineage it produces.
 
     The entrypoint runs exactly as with ``run`` (same config resolution, reader
-    and credentials), except that writes are traced instead of performed.
+    and credentials), except that writes are traced instead of performed. It runs
+    in a fresh Python process, so no client or config from the caller's process
+    leaks into the capture. The process inherits this one's working directory,
+    environment, ``sys.path`` and stdout/stderr.
 
     Args:
         entrypoint: The script entrypoint to run.
@@ -62,26 +77,61 @@ def generate_lineage(
 
     Raises:
         ValueError: If the package is not a batch script.
+        Exception: Whatever the run raised, re-raised as the same built-in
+            exception type or :class:`LineageTraceError`, else ``RuntimeError``.
     """
-    from datacustomcode.run import (
-        execute_entrypoint,
-        import_dependencies,
-        prepare_run,
-    )
-
-    # Dependencies are imported inside the capture, so a Client they create at
-    # import time is captured too
-    context = prepare_run(entrypoint, config_file, [], profile, sf_cli_org)
-    if context.package_type != "script":
-        raise ValueError(
-            f"Lineage can only be generated for script packages, not "
-            f"{context.package_type} packages"
+    with tempfile.TemporaryDirectory(prefix="datacustomcode-lineage-") as tmp:
+        request_file = os.path.join(tmp, "request.json")
+        response_file = os.path.join(tmp, "response.json")
+        with open(request_file, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "args": {
+                        "entrypoint": entrypoint,
+                        "config_file": config_file,
+                        "dependencies": list(dependencies),
+                        "profile": profile,
+                        "sf_cli_org": sf_cli_org,
+                    },
+                    "response_file": response_file,
+                },
+                f,
+            )
+        # The worker sees the same modules this process does
+        env = dict(os.environ)
+        env["PYTHONPATH"] = os.pathsep.join(path for path in sys.path if path)
+        completed = subprocess.run(
+            [sys.executable, "-m", "datacustomcode.lineage._worker", request_file],
+            env=env,
+            check=False,
         )
-    if context.config_json.get("streamingSource"):
-        raise ValueError("Lineage generation does not support streaming scripts")
+        if not os.path.exists(response_file):
+            raise RuntimeError(
+                f"Lineage generation exited with code {completed.returncode} "
+                "without a result"
+            )
+        with open(response_file, encoding="utf-8") as f:
+            response = json.load(f)
+    if "error" in response:
+        _raise(response["error"])
+    return LineageResult.from_dict(response["result"])
 
-    collector = LineageCollector()
-    with capture_lineage(collector):
-        import_dependencies(list(dependencies))
-        execute_entrypoint(entrypoint, context)
-    return collector.result()
+
+def _raise(error: Dict[str, Any]) -> NoReturn:
+    """Re-raise an error reported by the worker as the closest local type."""
+    message = error["message"]
+    if error["type"] == LineageTraceError.__name__:
+        raise LineageTraceError(message)
+    exc_type = getattr(builtins, error["type"], None)
+    if (
+        error["module"] == "builtins"
+        and isinstance(exc_type, type)
+        and issubclass(exc_type, Exception)
+    ):
+        try:
+            exc = exc_type(message)
+        except TypeError:  # e.g. UnicodeDecodeError takes more arguments
+            pass
+        else:
+            raise exc
+    raise RuntimeError(f"{error['module']}.{error['type']}: {message}")
