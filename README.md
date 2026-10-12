@@ -151,8 +151,8 @@ For a batch transform, use `Client`. You should only need the following methods:
 * `find_file_path(file_name)` – Resolve a bundled file (placed under `payload/files/`) to a `pathlib.Path` that exists. Works the same locally and inside Data Cloud — see [Bundled file resolution](#bundled-file-resolution) below for the full lookup order. Raises `FileNotFoundError` if the file isn't found.
 * `read_dlo(name)` – Read from a Data Lake Object by name
 * `read_dmo(name)` – Read from a Data Model Object by name
-* `write_to_dlo(name, spark_dataframe, write_mode)` – Write to a Data Model Object by name with a Spark dataframe
-* `write_to_dmo(name, spark_dataframe, write_mode)` – Write to a Data Lake Object by name with a Spark dataframe
+* `write_to_dlo(name, spark_dataframe, write_mode)` – Write to a Data Lake Object by name with a Spark dataframe
+* `write_to_dmo(name, spark_dataframe, write_mode)` – Write to a Data Model Object by name with a Spark dataframe
 
 For a streaming (delta) transform, use `StreamingClient`, which exposes the streaming counterparts:
 * `read_dlo_deltas()` – Read the streaming change feed (deltas) of a Data Lake Object as a streaming DataFrame.
@@ -175,6 +175,27 @@ client.write_to_dlo('output_DLO')
 
 > [!WARNING]
 > Currently we only support reading from DMOs and writing to DMOs or reading from DLOs and writing to DLOs, but they cannot mix.
+
+### Writing Currency fields
+
+A DLO or DMO with a Currency field has a system field, `cdp_sys_record_currency__c`, that holds each record's ISO currency code. Data Explorer UI uses it to display currency values, and shows a blank value if it's null (Query Editor still shows it).
+
+Code Extensions don't set `cdp_sys_record_currency__c` for you, since only your script knows what currency its amounts are in. When writing to an object with Currency fields, set it yourself:
+
+```python
+from pyspark.sql.functions import lit
+
+# Either source has Currency fields: keep its cdp_sys_record_currency__c in your output
+df = source.select("id__c", "amount__c", "cdp_sys_record_currency__c")
+
+# OR amounts are in a known currency
+df = df.withColumn("cdp_sys_record_currency__c", lit("EUR"))
+```
+
+- Use an ISO code that exists in your org's configured currency rates.
+- When aggregating, group by the currency code so amounts in different currencies aren't summed together.
+
+See [`docs/examples/script/currency_totals`](docs/examples/script/currency_totals) for a complete example.
 
 ### Streaming (delta) transforms
 
