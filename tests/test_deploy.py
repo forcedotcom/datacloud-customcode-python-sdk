@@ -61,7 +61,8 @@ class TestPrepareDependencyArchive:
 
     @patch("datacustomcode.deploy.cmd_output")
     @patch("datacustomcode.deploy.shutil.copy")
-    @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
+    @patch("datacustomcode.deploy.shutil.rmtree")
+    @patch("datacustomcode.deploy.tempfile.mkdtemp")
     @patch("datacustomcode.deploy.os.path.join")
     @patch("datacustomcode.deploy.os.makedirs")
     @patch("datacustomcode.deploy.docker_build_cmd")
@@ -72,16 +73,13 @@ class TestPrepareDependencyArchive:
         mock_docker_build_cmd,
         mock_makedirs,
         mock_join,
-        mock_temp_dir,
+        mock_mkdtemp,
+        mock_rmtree,
         mock_copy,
         mock_cmd_output,
     ):
         """Test prepare_dependency_archive when Docker image already exists."""
-        # Mock the temporary directory context manager
-        mock_temp_dir_instance = MagicMock()
-        mock_temp_dir_instance.__enter__.return_value = "/tmp/test_dir"
-        mock_temp_dir_instance.__exit__.return_value = None
-        mock_temp_dir.return_value = mock_temp_dir_instance
+        mock_mkdtemp.return_value = "/tmp/test_dir"
 
         # Mock cmd_output to return image ID (indicating image exists)
         mock_cmd_output.return_value = "abc123"
@@ -118,9 +116,13 @@ class TestPrepareDependencyArchive:
             "payload/archives/native_dependencies.tar.gz",
         )
 
+        # Verify cleanup was attempted
+        mock_rmtree.assert_called_once_with("/tmp/test_dir")
+
     @patch("datacustomcode.deploy.cmd_output")
     @patch("datacustomcode.deploy.shutil.copy")
-    @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
+    @patch("datacustomcode.deploy.shutil.rmtree")
+    @patch("datacustomcode.deploy.tempfile.mkdtemp")
     @patch("datacustomcode.deploy.os.path.join")
     @patch("datacustomcode.deploy.os.makedirs")
     @patch("datacustomcode.deploy.docker_build_cmd")
@@ -131,16 +133,13 @@ class TestPrepareDependencyArchive:
         mock_docker_build_cmd,
         mock_makedirs,
         mock_join,
-        mock_temp_dir,
+        mock_mkdtemp,
+        mock_rmtree,
         mock_copy,
         mock_cmd_output,
     ):
         """Test prepare_dependency_archive when Docker image needs to be built."""
-        # Mock the temporary directory context manager
-        mock_temp_dir_instance = MagicMock()
-        mock_temp_dir_instance.__enter__.return_value = "/tmp/test_dir"
-        mock_temp_dir_instance.__exit__.return_value = None
-        mock_temp_dir.return_value = mock_temp_dir_instance
+        mock_mkdtemp.return_value = "/tmp/test_dir"
 
         # Mock cmd_output to return None for image check (image doesn't exist)
         # and then return some value for subsequent calls
@@ -179,9 +178,13 @@ class TestPrepareDependencyArchive:
             "payload/archives/native_dependencies.tar.gz",
         )
 
+        # Verify cleanup was attempted
+        mock_rmtree.assert_called_once_with("/tmp/test_dir")
+
     @patch("datacustomcode.deploy.cmd_output")
     @patch("datacustomcode.deploy.shutil.copy")
-    @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
+    @patch("datacustomcode.deploy.shutil.rmtree")
+    @patch("datacustomcode.deploy.tempfile.mkdtemp")
     @patch("datacustomcode.deploy.os.path.join")
     @patch("datacustomcode.deploy.os.makedirs")
     @patch("datacustomcode.deploy.docker_build_cmd")
@@ -192,16 +195,13 @@ class TestPrepareDependencyArchive:
         mock_docker_build_cmd,
         mock_makedirs,
         mock_join,
-        mock_temp_dir,
+        mock_mkdtemp,
+        mock_rmtree,
         mock_copy,
         mock_cmd_output,
     ):
         """Test prepare_dependency_archive when Docker build fails."""
-        # Mock the temporary directory context manager
-        mock_temp_dir_instance = MagicMock()
-        mock_temp_dir_instance.__enter__.return_value = "/tmp/test_dir"
-        mock_temp_dir_instance.__exit__.return_value = None
-        mock_temp_dir.return_value = mock_temp_dir_instance
+        mock_mkdtemp.return_value = "/tmp/test_dir"
 
         # Mock cmd_output to return None for image check, then raise exception for build
         from datacustomcode.cmd import CalledProcessError
@@ -222,9 +222,13 @@ class TestPrepareDependencyArchive:
         # Verify docker build command was called
         mock_docker_build_cmd.assert_called_once_with("default")
 
+        # Build fails before mkdtemp() is called, so no cleanup needed
+        mock_rmtree.assert_not_called()
+
     @patch("datacustomcode.deploy.cmd_output")
     @patch("datacustomcode.deploy.shutil.copy")
-    @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
+    @patch("datacustomcode.deploy.shutil.rmtree")
+    @patch("datacustomcode.deploy.tempfile.mkdtemp")
     @patch("datacustomcode.deploy.os.path.join")
     @patch("datacustomcode.deploy.os.makedirs")
     @patch("datacustomcode.deploy.docker_build_cmd")
@@ -235,16 +239,13 @@ class TestPrepareDependencyArchive:
         mock_docker_build_cmd,
         mock_makedirs,
         mock_join,
-        mock_temp_dir,
+        mock_mkdtemp,
+        mock_rmtree,
         mock_copy,
         mock_cmd_output,
     ):
         """Test prepare_dependency_archive when Docker run fails."""
-        # Mock the temporary directory context manager
-        mock_temp_dir_instance = MagicMock()
-        mock_temp_dir_instance.__enter__.return_value = "/tmp/test_dir"
-        mock_temp_dir_instance.__exit__.return_value = None
-        mock_temp_dir.return_value = mock_temp_dir_instance
+        mock_mkdtemp.return_value = "/tmp/test_dir"
 
         # Mock cmd_output to return image ID, then raise exception for run
         from datacustomcode.cmd import CalledProcessError
@@ -269,9 +270,13 @@ class TestPrepareDependencyArchive:
         # Verify docker run command was called
         mock_docker_run_cmd.assert_called_once_with("default", "/tmp/test_dir")
 
+        # Verify cleanup was still attempted (in finally block)
+        mock_rmtree.assert_called_once_with("/tmp/test_dir")
+
     @patch("datacustomcode.deploy.cmd_output")
     @patch("datacustomcode.deploy.shutil.copy")
-    @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
+    @patch("datacustomcode.deploy.shutil.rmtree")
+    @patch("datacustomcode.deploy.tempfile.mkdtemp")
     @patch("datacustomcode.deploy.os.path.join")
     @patch("datacustomcode.deploy.os.makedirs")
     @patch("datacustomcode.deploy.docker_build_cmd")
@@ -282,16 +287,13 @@ class TestPrepareDependencyArchive:
         mock_docker_build_cmd,
         mock_makedirs,
         mock_join,
-        mock_temp_dir,
+        mock_mkdtemp,
+        mock_rmtree,
         mock_copy,
         mock_cmd_output,
     ):
         """Test prepare_dependency_archive when file copy fails."""
-        # Mock the temporary directory context manager
-        mock_temp_dir_instance = MagicMock()
-        mock_temp_dir_instance.__enter__.return_value = "/tmp/test_dir"
-        mock_temp_dir_instance.__exit__.return_value = None
-        mock_temp_dir.return_value = mock_temp_dir_instance
+        mock_mkdtemp.return_value = "/tmp/test_dir"
 
         # Mock cmd_output to return image ID
         mock_cmd_output.return_value = "abc123"
@@ -308,11 +310,14 @@ class TestPrepareDependencyArchive:
         # Verify files were attempted to be copied
         mock_copy.assert_any_call("requirements.txt", "/tmp/test_dir")
 
+        # Verify cleanup was still attempted (in finally block)
+        mock_rmtree.assert_called_once_with("/tmp/test_dir")
+
     @patch("datacustomcode.deploy.cmd_output")
     @patch("datacustomcode.deploy.shutil.copytree")
     @patch("datacustomcode.deploy.shutil.rmtree")
     @patch("datacustomcode.deploy.shutil.copy")
-    @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
+    @patch("datacustomcode.deploy.tempfile.mkdtemp")
     @patch("datacustomcode.deploy.os.path.exists")
     @patch("datacustomcode.deploy.os.path.join")
     @patch("datacustomcode.deploy.os.makedirs")
@@ -325,18 +330,14 @@ class TestPrepareDependencyArchive:
         mock_makedirs,
         mock_join,
         mock_exists,
-        mock_temp_dir,
+        mock_mkdtemp,
         mock_copy,
         mock_rmtree,
         mock_copytree,
         mock_cmd_output,
     ):
         """Test prepare_dependency_archive with function package type."""
-        # Mock the temporary directory context manager
-        mock_temp_dir_instance = MagicMock()
-        mock_temp_dir_instance.__enter__.return_value = "/tmp/test_dir"
-        mock_temp_dir_instance.__exit__.return_value = None
-        mock_temp_dir.return_value = mock_temp_dir_instance
+        mock_mkdtemp.return_value = "/tmp/test_dir"
 
         # Mock cmd_output to return image ID (indicating image exists)
         mock_cmd_output.return_value = "abc123"
@@ -382,8 +383,9 @@ class TestPrepareDependencyArchive:
         # Verify payload directory was created
         mock_makedirs.assert_called_once_with("payload", exist_ok=True)
 
-        # Verify py-files was NOT removed (doesn't exist yet)
-        mock_rmtree.assert_not_called()
+        # Verify cleanup was called only once
+        # (for temp dir, not py-files since it didn't exist)
+        mock_rmtree.assert_called_once_with("/tmp/test_dir")
 
         # Verify py-files directory was copied
         mock_copytree.assert_called_once_with(
@@ -392,7 +394,8 @@ class TestPrepareDependencyArchive:
 
     @patch("datacustomcode.deploy.cmd_output")
     @patch("datacustomcode.deploy.shutil.copy")
-    @patch("datacustomcode.deploy.tempfile.TemporaryDirectory")
+    @patch("datacustomcode.deploy.shutil.rmtree")
+    @patch("datacustomcode.deploy.tempfile.mkdtemp")
     @patch("datacustomcode.deploy.os.path.exists")
     @patch("datacustomcode.deploy.os.path.join")
     @patch("datacustomcode.deploy.os.makedirs")
@@ -405,7 +408,8 @@ class TestPrepareDependencyArchive:
         mock_makedirs,
         mock_join,
         mock_exists,
-        mock_temp_dir,
+        mock_mkdtemp,
+        mock_rmtree,
         mock_copy,
         mock_cmd_output,
     ):
@@ -413,11 +417,7 @@ class TestPrepareDependencyArchive:
         Test prepare_dependency_archive with function type when py-files is missing.
         Should log and continue without error.
         """
-        # Mock the temporary directory context manager
-        mock_temp_dir_instance = MagicMock()
-        mock_temp_dir_instance.__enter__.return_value = "/tmp/test_dir"
-        mock_temp_dir_instance.__exit__.return_value = None
-        mock_temp_dir.return_value = mock_temp_dir_instance
+        mock_mkdtemp.return_value = "/tmp/test_dir"
 
         # Mock cmd_output to return image ID (indicating image exists)
         mock_cmd_output.return_value = "abc123"
@@ -443,6 +443,9 @@ class TestPrepareDependencyArchive:
         # Verify docker commands were called
         mock_cmd_output.assert_any_call(self.EXPECTED_DOCKER_IMAGES_CMD)
         mock_docker_run_cmd.assert_called_once_with("default", "/tmp/test_dir")
+
+        # Verify cleanup was attempted
+        mock_rmtree.assert_called_once_with("/tmp/test_dir")
 
 
 class TestHasNonemptyRequirementsFile:
