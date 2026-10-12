@@ -1,0 +1,7 @@
+id,customer_id,amount,currency_code
+P1,C1,100.00,EUR
+P2,C1,250.50,EUR
+P3,C1,40.00,USD
+P4,C2,1200.00,USD
+P5,C2,300.00,USD
+P6,C3,75.25,GBP

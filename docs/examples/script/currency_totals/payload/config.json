@@ -1,0 +1,13 @@
+{
+  "sdkVersion": "6.1.0",
+  "entryPoint": "entrypoint.py",
+  "dataspace": "default",
+  "permissions": {
+    "read": {
+      "dlo": ["Payment__dll"]
+    },
+    "write": {
+      "dlo": ["Customer_Payment_Totals__dll"]
+    }
+  }
+}
