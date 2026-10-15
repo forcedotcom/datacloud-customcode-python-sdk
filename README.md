@@ -239,8 +239,10 @@ print(result.to_dict()["dataLineage"])
 
 The entry point runs exactly as it would locally (same config, reader, and credentials), except that writes are traced and validated against the target DLO instead of being performed. It runs in a separate Python process, which inherits your working directory, environment, and `sys.path`; errors raised by the script are re-raised from `generate_lineage`. Reads use the reader's `default_row_limit` (1000 by default; set it in your `config.yaml`).
 
-- A target field's sources are the fields its *value* is computed from. Filter conditions and join keys aren't sources.
-- Fields computed only from literals are listed in `noSources`.
+> **Review the output before you use it.** The generated lineage is a starting point for review, not a guarantee. It reflects only the code paths and data your local run exercised, and it can't see inside UDFs. Accurate and complete `dataLineage` in your package is your responsibility as the package author.
+
+- A target field's sources are the fields its *value* is computed from. Fields that only decide which rows, groups or branch are used aren't sources, however the logic is written: filter conditions, join keys, `groupBy` keys, sort keys, window `partitionBy`/`orderBy` keys, `when()`/`if()` conditions, and aggregate `FILTER (WHERE …)` clauses. For example, `groupBy("region").agg(sum("amount"))` and `sum("amount").over(Window.partitionBy("region"))` both trace to `amount` only.
+- Fields computed only from literals are listed in `noSources`. So are fields whose value doesn't come from any input field's value, such as `row_number()`, `rank()`, `count("*")`, or `sum(when(cond, 1))`.
 - Fields that can't be traced are listed in `unresolved` with a reason and get no lineage. This covers data that didn't come from `read_dlo`/`read_dmo` (for example a `toPandas()` → `createDataFrame` round trip), `mapInPandas`, and subqueries.
 - `pairCount` is the total number of (target, source) field pairs.
 - Only batch script packages are supported.

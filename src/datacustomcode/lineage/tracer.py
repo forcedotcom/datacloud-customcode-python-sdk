@@ -22,8 +22,12 @@ Leaf identity (rather than ``exprId``) is what makes self-joins traceable: Spark
 re-aliases one side of a self-join to fresh ``exprId`` values, but both sides
 still sit on the same underlying RDD / local data.
 
-Only the columns that feed a column's *value* are sources. Filter predicates,
-join conditions and sort keys gate or order rows and are deliberately ignored.
+Only the columns that feed a column's *value* are sources. Columns that only
+decide which rows, groups or branch are used are deliberately ignored, wherever
+they appear: filter predicates, join conditions, grouping and sort keys, window
+partition/order keys, ``CASE WHEN``/``IF`` conditions and aggregate ``FILTER``
+clauses. A value computed from none of its inputs' values (``row_number()``,
+``rank()``, ``count(*)``) therefore has no sources.
 """
 
 from __future__ import annotations
@@ -72,6 +76,24 @@ _UDF_EXPRESSIONS = frozenset(
         "ScalaAggregator",
     }
 )
+
+
+# Expressions with children that only decide which rows, groups or branch are used
+_ROW_GATING_EXPRESSIONS = frozenset(
+    {"WindowExpression", "AggregateExpression", "CaseWhen", "If"}
+)
+
+
+def _keep_value_children(expr_class: str, position: int, count: int) -> bool:
+    """Whether child ``position`` of a row-gating expression feeds its value."""
+    if expr_class in ("WindowExpression", "AggregateExpression"):
+        # (function, window spec) / (function, optional FILTER predicate)
+        return position == 0
+    if expr_class == "CaseWhen":
+        # (cond, value)* then an optional else value
+        return position % 2 == 1 or (count % 2 == 1 and position == count - 1)
+    # If: (predicate, true value, false value)
+    return position != 0
 
 
 class LineageTraceError(Exception):
@@ -422,10 +444,20 @@ def _child_subtrees(expression: List[dict]) -> List[List[dict]]:
 def _trace_expression(
     expression: List[dict], traces: Dict[int, _AttrTrace]
 ) -> _AttrTrace:
-    """Union the traces of every attribute an expression (sub)tree references."""
+    """Union the traces of every attribute an expression (sub)tree's value reads."""
     result = _EMPTY
-    for expr_node in expression:
-        expr_class = expr_node["class"].rsplit(".", 1)[-1]
+    index = 0
+    while index < len(expression):
+        expr_node = expression[index]
+        expr_class = _class_name(expr_node)
+        if expr_class in _ROW_GATING_EXPRESSIONS:
+            children = _child_subtrees(expression[index:])
+            for position, child in enumerate(children):
+                if _keep_value_children(expr_class, position, len(children)):
+                    result = result.merge(_trace_expression(child, traces))
+            index = _subtree_end(expression, index)
+            continue
+        index += 1
         if expr_class in _OPAQUE_EXPRESSIONS:
             result = result.merge(
                 _AttrTrace(frozenset(), f"{expr_class} inputs cannot be traced")

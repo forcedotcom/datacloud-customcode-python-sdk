@@ -194,13 +194,59 @@ def test_union_by_name(registry, orders, customers):
     }
 
 
-def test_window(registry, orders):
-    window = Window.partitionBy("first").orderBy("amount")
+def test_window_keys_are_not_sources(registry, orders):
+    window = Window.partitionBy("first").orderBy("id")
     df = orders.select("id", F.sum("amount").over(window).alias("running"))
     assert sources(registry.trace(df)) == {
         "id": {"orders__dll.id"},
-        "running": {"orders__dll.amount", "orders__dll.first"},
+        "running": {"orders__dll.amount"},
     }
+
+
+def test_window_matches_group_by(registry, orders):
+    grouped = orders.groupBy("first").agg(F.sum("amount").alias("total"))
+    windowed = orders.select(
+        F.sum("amount").over(Window.partitionBy("first")).alias("total")
+    )
+    assert sources(registry.trace(grouped))["total"] == {"orders__dll.amount"}
+    assert sources(registry.trace(windowed))["total"] == {"orders__dll.amount"}
+
+
+def test_ranking_function_has_no_sources(registry, orders):
+    window = Window.partitionBy("first").orderBy("amount")
+    df = orders.select(F.row_number().over(window).alias("rn"))
+    assert sources(registry.trace(df)) == {"rn": set()}
+
+
+def test_when_condition_is_not_a_source(registry, orders):
+    df = orders.select(
+        F.when(F.col("first") == "a", F.col("amount"))
+        .when(F.col("last") == "y", F.col("id"))
+        .otherwise(F.col("last"))
+        .alias("picked")
+    )
+    assert sources(registry.trace(df)) == {
+        "picked": {"orders__dll.amount", "orders__dll.id", "orders__dll.last"}
+    }
+
+
+def test_sql_if_condition_is_not_a_source(registry, orders):
+    df = orders.select(F.expr("if(first = 'a', amount, id)").alias("picked"))
+    assert sources(registry.trace(df)) == {
+        "picked": {"orders__dll.amount", "orders__dll.id"}
+    }
+
+
+def test_conditional_count_has_no_sources(registry, orders):
+    df = orders.select(F.sum(F.when(F.col("first") == "a", 1)).alias("count_a"))
+    assert sources(registry.trace(df)) == {"count_a": set()}
+
+
+def test_aggregate_filter_matches_dataframe_filter(registry, orders):
+    filtered = orders.filter(F.col("first") == "a").agg(F.sum("amount").alias("t"))
+    sql_filter = orders.agg(F.expr("sum(amount) FILTER (WHERE first = 'a')").alias("t"))
+    assert sources(registry.trace(filtered))["t"] == {"orders__dll.amount"}
+    assert sources(registry.trace(sql_filter))["t"] == {"orders__dll.amount"}
 
 
 def test_explode(registry, orders):
