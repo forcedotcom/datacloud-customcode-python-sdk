@@ -60,6 +60,19 @@ _OPAQUE_EXPRESSIONS = frozenset(
     {"ScalarSubquery", "Exists", "ListQuery", "InSubquery", "LateralSubquery"}
 )
 
+# User-defined functions: their arguments are traced, but the body can read data
+# the plan does not show (a captured lookup, a broadcast, a file)
+_UDF_EXPRESSIONS = frozenset(
+    {
+        "PythonUDF",
+        "PythonUDAF",
+        "PythonUDTF",
+        "ScalaUDF",
+        "ScalaUDAF",
+        "ScalaAggregator",
+    }
+)
+
 
 class LineageTraceError(Exception):
     """Raised when a DataFrame's plan cannot be traced at all."""
@@ -76,12 +89,15 @@ class ColumnTrace:
             ``mapInPandas`` or subquery); ``leaves`` is then incomplete.
         direct: The column is its single leaf column passed through unchanged
             (possibly renamed), not computed from it.
+        udf: The value is computed by a user-defined function, which may read
+            more than ``leaves``.
     """
 
     name: str
     leaves: FrozenSet[LeafColumn] = field(default_factory=frozenset)
     opaque_reason: Optional[str] = None
     direct: bool = False
+    udf: bool = False
 
 
 @dataclass(frozen=True)
@@ -89,11 +105,14 @@ class _AttrTrace:
     leaves: FrozenSet[LeafColumn]
     opaque_reason: Optional[str] = None
     direct: bool = False
+    udf: bool = False
 
     def merge(self, other: _AttrTrace) -> _AttrTrace:
         # A merge combines inputs, so the result is never a direct pass-through
         return _AttrTrace(
-            self.leaves | other.leaves, self.opaque_reason or other.opaque_reason
+            self.leaves | other.leaves,
+            self.opaque_reason or other.opaque_reason,
+            udf=self.udf or other.udf,
         )
 
 
@@ -108,10 +127,13 @@ class TraceResult:
         sources: ``"Object.field"`` names the value is computed from.
         reason: Set when the column cannot be fully traced; ``sources`` must
             then not be used.
+        udf: The value is computed by a user-defined function, so ``sources``
+            may be incomplete and needs review.
     """
 
     sources: FrozenSet[str] = field(default_factory=frozenset)
     reason: Optional[str] = None
+    udf: bool = False
 
     @property
     def unresolved(self) -> bool:
@@ -156,7 +178,8 @@ class SourceRegistry:
                 results[column.name] = TraceResult(reason=UNTRACEABLE_SOURCE)
             else:
                 results[column.name] = TraceResult(
-                    sources=frozenset(self._fields[leaf] for leaf in column.leaves)
+                    sources=frozenset(self._fields[leaf] for leaf in column.leaves),
+                    udf=column.udf,
                 )
         return results
 
@@ -214,7 +237,9 @@ def trace_columns(df: PySparkDataFrame) -> List[ColumnTrace]:
     for name, expr_id in zip(df.columns, root_ids, strict=False):
         trace = traces.get(expr_id, _EMPTY)
         columns.append(
-            ColumnTrace(name, trace.leaves, trace.opaque_reason, trace.direct)
+            ColumnTrace(
+                name, trace.leaves, trace.opaque_reason, trace.direct, trace.udf
+            )
         )
     return columns
 
@@ -405,6 +430,8 @@ def _trace_expression(
             result = result.merge(
                 _AttrTrace(frozenset(), f"{expr_class} inputs cannot be traced")
             )
+        elif expr_class in _UDF_EXPRESSIONS:
+            result = result.merge(_AttrTrace(frozenset(), udf=True))
         elif expr_class == "AttributeReference":
             expr_id = _expr_id(expr_node)
             if expr_id in traces:

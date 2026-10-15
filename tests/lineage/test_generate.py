@@ -109,6 +109,7 @@ def test_generate_lineage_end_to_end(tmp_path, config_file, validated):
             {"targetField": "out__dll.lookup_id__c", "reason": "untraceable source"}
         ],
         "noSources": ["out__dll.const__c"],
+        "udfFields": [],
         "targets": ["out__dll"],
         "sources": ["orders__dll"],
         "pairCount": 3,
@@ -140,6 +141,55 @@ def test_repeat_writes_union_sources(tmp_path, config_file):
             "sourceFields": ["orders__dll.first", "orders__dll.last"],
         }
     ]
+
+
+def test_udf_fields_are_reported(tmp_path, config_file):
+    entrypoint = make_package(
+        tmp_path,
+        """
+        orders = client.read_dlo("orders__dll")
+        shout = F.udf(lambda a: a.upper(), "string")
+        constant = F.udf(lambda: "x", "string")
+        df = orders.select(
+            F.col("id").alias("id__c"),
+            shout("first").alias("loud__c"),
+            constant().alias("const__c"),
+        )
+        client.write_to_dlo("out__dll", df, WriteMode.APPEND)
+        """,
+    )
+
+    result = generate_lineage(entrypoint, config_file).to_dict()
+
+    assert result["udfFields"] == ["out__dll.const__c", "out__dll.loud__c"]
+    assert {e["targetField"]: e["sourceFields"] for e in result["dataLineage"]} == {
+        "out__dll.id__c": ["orders__dll.id"],
+        "out__dll.loud__c": ["orders__dll.first"],
+    }
+    assert result["noSources"] == ["out__dll.const__c"]
+
+
+def test_repeat_writes_keep_udf_flag(tmp_path, config_file):
+    entrypoint = make_package(
+        tmp_path,
+        """
+        orders = client.read_dlo("orders__dll")
+        shout = F.udf(lambda a: a.upper(), "string")
+        client.write_to_dlo(
+            "out__dll", orders.select(shout("first").alias("v__c")), WriteMode.APPEND
+        )
+        client.write_to_dlo(
+            "out__dll", orders.select(F.col("last").alias("v__c")), WriteMode.APPEND
+        )
+        """,
+    )
+
+    result = generate_lineage(entrypoint, config_file)
+
+    assert result.data_lineage == {
+        "out__dll.v__c": ["orders__dll.first", "orders__dll.last"]
+    }
+    assert result.udf_fields == ["out__dll.v__c"]
 
 
 def test_dmo_read_and_write(tmp_path, config_file, validated):
@@ -303,6 +353,7 @@ def test_result_round_trips_through_dict():
         data_lineage={"out__dll.a__c": ["in__dll.a", "in__dll.b"]},
         unresolved={"out__dll.b__c": "untraceable source"},
         no_sources=["out__dll.c__c"],
+        udf_fields=["out__dll.a__c", "out__dll.c__c"],
         targets=["out__dll"],
         sources=["in__dll"],
     )

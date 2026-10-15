@@ -94,9 +94,73 @@ def test_using_join_key_is_coalesced(registry, orders, customers):
 def test_python_udf_inputs(registry, orders):
     shout = F.udf(lambda a, b: f"{a}{b}".upper(), StringType())
     df = orders.select(shout("first", "last").alias("loud"))
-    assert sources(registry.trace(df)) == {
-        "loud": {"orders__dll.first", "orders__dll.last"}
+    results = registry.trace(df)
+    assert sources(results) == {"loud": {"orders__dll.first", "orders__dll.last"}}
+    assert results["loud"].udf
+
+
+def test_udf_flag_marks_only_udf_columns(registry, orders):
+    shout = F.udf(lambda a: a.upper(), StringType())
+    df = orders.select("id", F.upper("last").alias("up"), shout("first").alias("s"))
+    results = registry.trace(df)
+    assert {name for name, r in results.items() if r.udf} == {"s"}
+
+
+def test_pandas_udf_is_flagged(registry, orders):
+    @F.pandas_udf("double")
+    def double_it(s: pd.Series) -> pd.Series:
+        return s * 2
+
+    results = registry.trace(orders.select(double_it("amount").alias("dbl")))
+    assert results["dbl"] == TraceResult(
+        sources=frozenset({"orders__dll.amount"}), udf=True
+    )
+
+
+def test_grouped_agg_pandas_udf_is_flagged(registry, orders):
+    @F.pandas_udf("double")
+    def total(s: pd.Series) -> float:
+        return float(s.sum())
+
+    results = registry.trace(orders.groupBy("first").agg(total("amount").alias("t")))
+    assert sources(results) == {
+        "first": {"orders__dll.first"},
+        "t": {"orders__dll.amount"},
     }
+    assert results["t"].udf
+    assert not results["first"].udf
+
+
+def test_sql_registered_udf_is_flagged(spark, registry, orders):
+    spark.udf.register("lineage_shout", lambda a: a.upper(), StringType())
+    orders.createOrReplaceTempView("orders_udf_view")
+    df = spark.sql("SELECT id, lineage_shout(first) AS s FROM orders_udf_view")
+    results = registry.trace(df)
+    assert results["s"] == TraceResult(
+        sources=frozenset({"orders__dll.first"}), udf=True
+    )
+    assert not results["id"].udf
+
+
+def test_udf_flag_survives_rename_and_later_expressions(registry, orders):
+    shout = F.udf(lambda a: a.upper(), StringType())
+    df = (
+        orders.select(shout("first").alias("s"), "last")
+        .withColumnRenamed("s", "renamed")
+        .withColumn("joined", F.concat("renamed", "last"))
+    )
+    results = registry.trace(df)
+    assert results["renamed"].udf
+    assert results["joined"] == TraceResult(
+        sources=frozenset({"orders__dll.first", "orders__dll.last"}), udf=True
+    )
+    assert not results["last"].udf
+
+
+def test_udf_without_arguments_has_no_sources_but_is_flagged(registry, orders):
+    constant = F.udf(lambda: "x", StringType())
+    results = registry.trace(orders.select(constant().alias("c")))
+    assert results["c"] == TraceResult(udf=True)
 
 
 def test_aggregate(registry, orders):

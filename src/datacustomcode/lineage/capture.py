@@ -61,6 +61,8 @@ class LineageResult:
         data_lineage: Target field to its sorted source fields.
         unresolved: Target field to the reason its lineage could not be traced.
         no_sources: Target fields computed from no source field (e.g. literals).
+        udf_fields: Target fields in ``data_lineage`` or ``no_sources`` computed
+            by a user-defined function, whose sources may be incomplete.
         targets: Objects written.
         sources: Objects read.
     """
@@ -68,6 +70,7 @@ class LineageResult:
     data_lineage: Dict[str, List[str]] = field(default_factory=dict)
     unresolved: Dict[str, str] = field(default_factory=dict)
     no_sources: List[str] = field(default_factory=list)
+    udf_fields: List[str] = field(default_factory=list)
     targets: List[str] = field(default_factory=list)
     sources: List[str] = field(default_factory=list)
 
@@ -88,6 +91,7 @@ class LineageResult:
                 for target in sorted(self.unresolved)
             ],
             "noSources": sorted(self.no_sources),
+            "udfFields": sorted(self.udf_fields),
             "targets": sorted(self.targets),
             "sources": sorted(self.sources),
             "pairCount": self.pair_count,
@@ -105,6 +109,7 @@ class LineageResult:
                 entry["targetField"]: entry["reason"] for entry in data["unresolved"]
             },
             no_sources=list(data["noSources"]),
+            udf_fields=list(data["udfFields"]),
             targets=list(data["targets"]),
             sources=list(data["sources"]),
         )
@@ -126,12 +131,16 @@ class LineageCollector:
             if column == MERGE_RECORD_TYPE_COLUMN:
                 continue
             # Repeat writes to the same target: a field reads from the union of
-            # every write, and stays unresolved if any write was unresolved
+            # every write, stays unresolved if any write was unresolved, and is
+            # UDF-computed if any write computed it with a UDF
             previous = fields.get(column)
             if previous is None or (traced.unresolved and not previous.unresolved):
                 fields[column] = traced
             elif not previous.unresolved:
-                fields[column] = TraceResult(sources=previous.sources | traced.sources)
+                fields[column] = TraceResult(
+                    sources=previous.sources | traced.sources,
+                    udf=previous.udf or traced.udf,
+                )
 
     def result(self) -> LineageResult:
         result = LineageResult(
@@ -142,10 +151,13 @@ class LineageCollector:
                 target = f"{object_name}.{column}"
                 if traced.reason is not None:
                     result.unresolved[target] = traced.reason
-                elif traced.sources:
+                    continue
+                if traced.sources:
                     result.data_lineage[target] = sorted(traced.sources)
                 else:
                     result.no_sources.append(target)
+                if traced.udf:
+                    result.udf_fields.append(target)
         return result
 
 
