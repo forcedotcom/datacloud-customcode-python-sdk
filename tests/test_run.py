@@ -575,3 +575,32 @@ class TestStreamingSourceScenarios:
     def test_streaming_source_none_for_batch_without_field(self):
         content = self._run_capturing_streaming_source({"dataspace": "default"})
         assert "streaming_source: None" in content
+
+
+def test_prepare_run_resolves_without_executing(tmp_path):
+    from datacustomcode.run import prepare_run
+
+    entrypoint = tmp_path / "entrypoint.py"
+    entrypoint.write_text("raise AssertionError('must not run')\n")
+    (tmp_path / "config.json").write_text(json.dumps({"dataspace": "ds1"}))
+
+    context = prepare_run(str(entrypoint), None, [], "default")
+
+    assert context.package_type == "script"
+    assert context.config_json == {"dataspace": "ds1"}
+    assert config.reader_config.options["dataspace"] == "ds1"
+
+
+def test_execute_entrypoint_runs_prepared_script(tmp_path):
+    from datacustomcode.run import execute_entrypoint, prepare_run
+
+    marker = tmp_path / "ran.txt"
+    entrypoint = tmp_path / "entrypoint.py"
+    entrypoint.write_text(f"open({str(marker)!r}, 'w').write(__name__)\n")
+    (tmp_path / "config.json").write_text(json.dumps({"dataspace": "default"}))
+
+    context = prepare_run(str(entrypoint), None, [], "default")
+    assert not marker.exists()
+    execute_entrypoint(str(entrypoint), context)
+
+    assert marker.read_text() == "__main__"

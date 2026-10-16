@@ -245,6 +245,29 @@ If none of these exist, `find_file_path` raises `FileNotFoundError` with the lis
 
 `$LIBRARY_PATH` is set automatically to the root of the package at runtime inside Data Cloud.
 
+### Generating lineage
+
+`generate_lineage` runs a script entry point locally and derives the field-level `dataLineage` section of `config.json` from the Spark plans of the DataFrames it writes:
+
+```python
+from datacustomcode.lineage import generate_lineage
+
+result = generate_lineage("payload/entrypoint.py", sf_cli_org="my-org")
+print(result.to_dict()["dataLineage"])
+# [{"targetField": "Output__dll.name__c",
+#   "sourceFields": ["Input__dll.first__c", "Input__dll.last__c"]}, ...]
+```
+
+The entry point runs exactly as it would locally (same config, reader, and credentials), except that writes are traced and validated against the target DLO instead of being performed. It runs in a separate Python process, which inherits your working directory, environment, and `sys.path`; errors raised by the script are re-raised from `generate_lineage`. Reads use the reader's `default_row_limit` (1000 by default; set it in your `config.yaml`).
+
+> **Review the output before you use it.** The generated lineage is a starting point for review, not a guarantee. It reflects only the code paths and data your local run exercised, and it can't see inside UDFs. Accurate and complete `dataLineage` in your package is your responsibility as the package author.
+
+- A target field's sources are the fields its *value* is computed from. Fields that only decide which rows, groups or branch are used aren't sources, however the logic is written: filter conditions, join keys, `groupBy` keys, sort keys, window `partitionBy`/`orderBy` keys, `when()`/`if()` conditions, and aggregate `FILTER (WHERE …)` clauses. For example, `groupBy("region").agg(sum("amount"))` and `sum("amount").over(Window.partitionBy("region"))` both trace to `amount` only.
+- Fields computed only from literals are listed in `noSources`. So are fields whose value doesn't come from any input field's value, such as `row_number()`, `rank()`, `count("*")`, or `sum(when(cond, 1))`.
+- Fields that can't be traced are listed in `unresolved` with a reason and get no lineage. This covers data that didn't come from `read_dlo`/`read_dmo` (for example a `toPandas()` → `createDataFrame` round trip), `mapInPandas`, and subqueries.
+- `pairCount` is the total number of (target, source) field pairs.
+- Only batch script packages are supported.
+
 
 ## CLI
 

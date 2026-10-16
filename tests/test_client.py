@@ -159,6 +159,44 @@ class TestClient:
             assert client._reader is mock_reader
             assert client._writer is mock_writer
 
+    @patch("datacustomcode.client.config")
+    def test_forced_config_overrides_provided_reader_and_writer(
+        self, mock_config, reset_client, mock_spark
+    ):
+        """Forced configs replace a passed reader and writer, which needs a
+        session even though both were provided."""
+        from datacustomcode.spark.default import DefaultSparkSessionProvider
+
+        with patch.object(
+            DefaultSparkSessionProvider, "get_session"
+        ) as mock_get_session:
+            mock_get_session.return_value = mock_spark
+
+            mock_reader = MagicMock(spec=BaseDataCloudReader)
+            mock_reader_config = MagicMock()
+            mock_reader_config.to_object.return_value = mock_reader
+            mock_reader_config.force = True
+
+            mock_writer = MagicMock(spec=BaseDataCloudWriter)
+            mock_writer_config = MagicMock()
+            mock_writer_config.to_object.return_value = mock_writer
+            mock_writer_config.force = True
+
+            mock_config.spark_provider_config = None
+            mock_config.reader_config = mock_reader_config
+            mock_config.writer_config = mock_writer_config
+            mock_config.spark_config = MagicMock(spec=SparkConfig)
+
+            client = Client(
+                reader=MagicMock(spec=BaseDataCloudReader),
+                writer=MagicMock(spec=BaseDataCloudWriter),
+            )
+
+            mock_reader_config.to_object.assert_called_once_with(mock_spark)
+            mock_writer_config.to_object.assert_called_once_with(mock_spark)
+            assert client._reader is mock_reader
+            assert client._writer is mock_writer
+
     def test_read_dlo(self, reset_client, mock_spark):
         reader = MagicMock(spec=BaseDataCloudReader)
         writer = MagicMock(spec=BaseDataCloudWriter)

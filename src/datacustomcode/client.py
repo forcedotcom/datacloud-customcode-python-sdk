@@ -376,7 +376,13 @@ class _BaseClient:
             instance._spark_named_credential = spark_named_credential
             # Initialize Readers and Writers from config
             # and/or provided reader and writer
-            if reader is None or writer is None:
+            reader_forced = (
+                config.reader_config is not None and config.reader_config.force
+            )
+            writer_forced = (
+                config.writer_config is not None and config.writer_config.force
+            )
+            if reader is None or writer is None or reader_forced or writer_forced:
                 # We need a spark because we will initialize readers and writers.
                 # Reuse the process-wide session if one client already built it,
                 # so a Client and a StreamingClient share a single connection.
@@ -404,9 +410,7 @@ class _BaseClient:
                 raise ValueError(
                     "Reader config is required when reader is not provided"
                 )
-            elif reader is None or (
-                config.reader_config is not None and config.reader_config.force
-            ):
+            elif reader is None or reader_forced:
                 reader_init = config.reader_config.to_object(spark)  # type: ignore
             else:
                 reader_init = reader
@@ -414,9 +418,7 @@ class _BaseClient:
                 raise ValueError(
                     "Writer config is required when writer is not provided"
                 )
-            elif writer is None or (
-                config.writer_config is not None and config.writer_config.force
-            ):
+            elif writer is None or writer_forced:
                 writer_init = config.writer_config.to_object(spark)  # type: ignore
             else:
                 writer_init = writer

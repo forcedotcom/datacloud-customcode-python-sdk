@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from dataclasses import dataclass, field
 import importlib
 import json
 import os
@@ -102,6 +103,15 @@ def _update_config_options(profile: Optional[str], sf_cli_org: Optional[str]):
         )
 
 
+@dataclass(frozen=True)
+class RunContext:
+    """State resolved by :func:`prepare_run` and consumed by
+    :func:`execute_entrypoint`."""
+
+    package_type: str
+    config_json: dict = field(default_factory=dict)
+
+
 def run_entrypoint(
     entrypoint: str,
     config_file: Union[str, None],
@@ -120,6 +130,34 @@ def run_entrypoint(
         test_file: Optional test JSON file for function testing.
         sf_cli_org: Optional SF CLI org alias or username. If provided, credentials
             are fetched via `sf org display` instead of from credentials.ini.
+    """
+    context = prepare_run(entrypoint, config_file, dependencies, profile, sf_cli_org)
+    execute_entrypoint(entrypoint, context, test_file)
+
+
+def prepare_run(
+    entrypoint: str,
+    config_file: Union[str, None],
+    dependencies: List[str],
+    profile: str,
+    sf_cli_org: Optional[str] = None,
+) -> RunContext:
+    """Resolve config and import dependencies for an entrypoint, without running it.
+
+    This is the setup half of :func:`run_entrypoint`. Callers that need to act
+    between setup and running (e.g. lineage generation starting its capture) call
+    this, then :func:`execute_entrypoint`. Such callers can pass no dependencies
+    here and call :func:`import_dependencies` themselves at the right moment.
+
+    Args:
+        entrypoint: The entrypoint script to run.
+        config_file: The config file to use.
+        dependencies: The dependencies to import.
+        profile: The credentials profile to use.
+        sf_cli_org: Optional SF CLI org alias or username.
+
+    Returns:
+        The resolved :class:`RunContext`.
     """
     add_py_folder(entrypoint)
 
@@ -169,7 +207,17 @@ def run_entrypoint(
         config.streaming_source = _read_streaming_source(config_json)
 
     _update_config_options(profile, sf_cli_org)
+    import_dependencies(dependencies)
 
+    return RunContext(package_type=package_type, config_json=config_json)
+
+
+def import_dependencies(dependencies: List[str]) -> None:
+    """Import each dependency module (or ``module.attribute``), as ``run`` does.
+
+    Args:
+        dependencies: The dependencies to import.
+    """
     for dependency in dependencies:
         try:
             importlib.import_module(dependency)
@@ -184,8 +232,19 @@ def run_entrypoint(
             except (ModuleNotFoundError, AttributeError) as inner_exc:
                 raise inner_exc from exc
 
+
+def execute_entrypoint(
+    entrypoint: str, context: RunContext, test_file: Optional[str] = None
+) -> None:
+    """Run an entrypoint previously set up with :func:`prepare_run`.
+
+    Args:
+        entrypoint: The entrypoint script to run.
+        context: The context returned by :func:`prepare_run`.
+        test_file: Optional test JSON file for function testing.
+    """
     # Handle test file for functions
-    if test_file and package_type == "function":
+    if test_file and context.package_type == "function":
         run_function_with_test(entrypoint, test_file)
     else:
         runpy.run_path(entrypoint, init_globals=globals(), run_name="__main__")
