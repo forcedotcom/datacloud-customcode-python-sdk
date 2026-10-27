@@ -440,6 +440,40 @@ class TestStreamingClient:
         assert "test_dmo" in str(exc_info.value)
         writer.write_dlo_deltas.assert_not_called()
 
+    def test_write_dmo_deltas(self, reset_client, mock_spark):
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        mock_df = MagicMock(spec=DataFrame)
+        mock_query = MagicMock()
+        writer.write_dmo_deltas.return_value = mock_query
+
+        client = StreamingClient(reader=reader, writer=writer)
+        client._record_dmo_access("some_dmo")
+
+        result = client.write_dmo_deltas("test_dmo", mock_df, extra_param=True)
+
+        writer.write_dmo_deltas.assert_called_once_with(
+            "test_dmo", mock_df, extra_param=True
+        )
+        assert result is mock_query
+
+    def test_write_dmo_deltas_after_dlo_read_raises_exception(
+        self, reset_client, mock_spark
+    ):
+        """Streaming DMO write is subject to the same DLO/DMO mixing guard."""
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        mock_df = MagicMock(spec=DataFrame)
+
+        client = StreamingClient(reader=reader, writer=writer)
+        client._record_dlo_access("test_dlo")
+
+        with pytest.raises(DataCloudAccessLayerException) as exc_info:
+            client.write_dmo_deltas("test_dmo", mock_df)
+
+        assert "test_dlo" in str(exc_info.value)
+        writer.write_dmo_deltas.assert_not_called()
+
     def test_streaming_read_write_flow(self, reset_client, mock_spark):
         """A read_dlo_deltas → write_dlo_deltas flow stays within the DLO layer."""
         reader = MagicMock(spec=BaseDataCloudReader)
@@ -457,6 +491,24 @@ class TestStreamingClient:
         reader.read_dlo_deltas.assert_called_once_with()
         writer.write_dlo_deltas.assert_called_once_with("target_dll", stream_df)
         assert "source_dll" in client._data_layer_history[DataCloudObjectType.DLO]
+
+    def test_streaming_dmo_read_write_flow(self, reset_client, mock_spark):
+        """A read_dmo_deltas → write_dmo_deltas flow stays within the DMO layer."""
+        reader = MagicMock(spec=BaseDataCloudReader)
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        stream_df = MagicMock(spec=DataFrame)
+        reader.read_dmo_deltas.return_value = stream_df
+
+        client = StreamingClient(reader=reader, writer=writer)
+
+        with patch("datacustomcode.client.config") as mock_config:
+            mock_config.streaming_source = "source_dlm"
+            df = client.read_dmo_deltas()
+        client.write_dmo_deltas("target_dlm", df)
+
+        reader.read_dmo_deltas.assert_called_once_with()
+        writer.write_dmo_deltas.assert_called_once_with("target_dlm", stream_df)
+        assert "source_dlm" in client._data_layer_history[DataCloudObjectType.DMO]
 
     def test_auto_write_to_dlo(self, reset_client, mock_spark):
         reader = MagicMock(spec=BaseDataCloudReader)

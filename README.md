@@ -158,6 +158,7 @@ For a streaming (delta) transform, use `StreamingClient`, which exposes the stre
 * `read_dlo_deltas()` – Read the streaming change feed (deltas) of a Data Lake Object as a streaming DataFrame.
 * `read_dmo_deltas()` – Read the streaming change feed (deltas) of a Data Model Object as a streaming DataFrame.
 * `write_dlo_deltas(name, spark_dataframe)` – Write a streaming DataFrame of deltas to a Data Lake Object; returns the started `StreamingQuery`
+* `write_dmo_deltas(name, spark_dataframe)` – Write a streaming DataFrame of deltas to a Data Model Object; returns the started `StreamingQuery`
 
 `find_file_path`, `llm_gateway_generate_text`, and `einstein_predict` are available on both clients.
 
@@ -219,6 +220,15 @@ transformed = deltas.withColumn("description__c", upper(col("description__c")))
 # The runtime owns the trigger and checkpoint location; you
 # choose only the target table.
 query = client.write_dlo_deltas("Output__dll", transformed)
+query.awaitTermination()
+```
+
+A streaming transform can also read and write Data Model Objects with `read_dmo_deltas()` and `write_dmo_deltas()`:
+
+```python
+deltas = client.read_dmo_deltas()
+transformed = deltas.withColumn("description__c", upper(col("description__c")))
+query = client.write_dmo_deltas("Output__dlm", transformed)
 query.awaitTermination()
 ```
 
