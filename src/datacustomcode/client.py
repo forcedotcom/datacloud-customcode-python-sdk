@@ -726,6 +726,25 @@ class StreamingClient(_BaseClient):
         self._validate_data_layer_history_does_not_contain(DataCloudObjectType.DMO)
         return self._writer.write_dlo_deltas(name, dataframe, **kwargs)  # type: ignore[no-any-return]
 
+    def write_dmo_deltas(
+        self, name: str, dataframe: PySparkDataFrame, **kwargs
+    ) -> StreamingQuery:
+        """Write a streaming DataFrame of deltas to a DMO in Data Cloud.
+
+        Starts a streaming query that writes each micro-batch to the
+        target DMO and returns the ``StreamingQuery`` handle; the caller
+        typically calls ``query.awaitTermination()``.
+
+        Args:
+            name: The name of the DMO to write to.
+            dataframe: The streaming PySpark DataFrame to write.
+
+        Returns:
+            The started ``StreamingQuery``.
+        """
+        self._validate_data_layer_history_does_not_contain(DataCloudObjectType.DLO)
+        return self._writer.write_dmo_deltas(name, dataframe, **kwargs)  # type: ignore[no-any-return]
+
     def auto_write_to_dlo(self, name: str, dataframe: PySparkDataFrame) -> None:
         """Write a PySpark DataFrame to a DLO in Data Cloud automatically picking
         the WriteMode.
