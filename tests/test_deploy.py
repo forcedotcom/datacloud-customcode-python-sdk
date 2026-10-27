@@ -1645,9 +1645,7 @@ class TestDataTransformConfigStreaming:
         )
         assert config.is_streaming is False
 
-    def test_streaming_allows_dmo_read_dlo_write(self):
-        """Streaming may read a DMO change feed and write a DLO (writes are
-        DLO-only)"""
+    def test_streaming_allows_dmo_read_dmo_write(self):
         config = DataTransformConfig(
             sdkVersion="1.0.0",
             entryPoint="entrypoint.py",
@@ -1655,24 +1653,24 @@ class TestDataTransformConfigStreaming:
             streamingSource=StreamingSource(type="dmo", name="input_dmo__dlm"),
             permissions=Permissions(
                 read=DmoPermission(dmo=["input_dmo__dlm"]),
-                write=DloPermission(dlo=["output_dlo"]),
+                write=DmoPermission(dmo=["output_dmo__dlm"]),
             ),
         )
         assert config.is_streaming is True
         assert isinstance(config.permissions.read, DmoPermission)
-        assert isinstance(config.permissions.write, DloPermission)
+        assert isinstance(config.permissions.write, DmoPermission)
 
-    def test_streaming_rejects_dmo_write(self):
-        """Streaming writes must target a DLO."""
-        with pytest.raises(ValueError, match="must write to a DLO"):
+    def test_streaming_rejects_dmo_read_dlo_write(self):
+        """Streaming follows the same same-layer rule as batch."""
+        with pytest.raises(ValueError, match="both reference"):
             DataTransformConfig(
                 sdkVersion="1.0.0",
                 entryPoint="entrypoint.py",
                 dataspace="default",
-                streamingSource=StreamingSource(type="dlo", name="input_dlo"),
+                streamingSource=StreamingSource(type="dmo", name="input_dmo__dlm"),
                 permissions=Permissions(
-                    read=DloPermission(dlo=["input_dlo"]),
-                    write=DmoPermission(dmo=["output_dmo__dlm"]),
+                    read=DmoPermission(dmo=["input_dmo__dlm"]),
+                    write=DloPermission(dlo=["output_dlo"]),
                 ),
             )
 

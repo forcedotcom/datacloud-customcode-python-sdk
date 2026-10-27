@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.2.0
+
+### Added
+
+- **`StreamingClient.write_dmo_deltas(name, dataframe)`** – start a streaming query that writes each micro-batch to the target DMO and return the `StreamingQuery` handle. It is the DMO counterpart to `write_dlo_deltas` and pairs with `read_dmo_deltas()`.
+
 ## 6.1.0
 
 ### Added

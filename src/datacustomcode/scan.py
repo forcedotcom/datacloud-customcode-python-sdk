@@ -34,7 +34,7 @@ from datacustomcode.version import get_version
 
 DATA_ACCESS_METHODS = ["read_dlo", "read_dmo", "write_to_dlo", "write_to_dmo"]
 STREAMING_READ_METHODS = ["read_dlo_deltas", "read_dmo_deltas"]
-STREAMING_WRITE_METHODS = ["write_dlo_deltas"]
+STREAMING_WRITE_METHODS = ["write_dlo_deltas", "write_dmo_deltas"]
 
 DATA_TRANSFORM_CONFIG_TEMPLATE = {
     "sdkVersion": get_version(),
@@ -181,6 +181,7 @@ class StreamingDataAccessLayerCalls(pydantic.BaseModel):
     read_dlo_deltas: bool
     read_dmo_deltas: bool
     write_dlo_deltas: frozenset[str]
+    write_dmo_deltas: frozenset[str]
 
     @pydantic.model_validator(mode="after")
     def validate_access_layer(self) -> StreamingDataAccessLayerCalls:
@@ -193,10 +194,19 @@ class StreamingDataAccessLayerCalls(pydantic.BaseModel):
                 "A streaming transform must read from at least one DLO or DMO "
                 "delta stream (read_dlo_deltas / read_dmo_deltas)."
             )
-        if not self.write_dlo_deltas:
+        if not self.write_dlo_deltas and not self.write_dmo_deltas:
             raise ValueError(
-                "A streaming transform must write to at least one DLO via "
-                "write_dlo_deltas."
+                "A streaming transform must write to at least one DLO or DMO "
+                "via write_dlo_deltas / write_dmo_deltas."
+            )
+        if self.write_dlo_deltas and self.write_dmo_deltas:
+            raise ValueError(
+                "Cannot write DLO and DMO deltas in the same streaming transform."
+            )
+        if self.read_layer != self.write_layer:
+            raise ValueError(
+                "A streaming transform must read and write the same layer "
+                f"(got read={self.read_layer}, write={self.write_layer})."
             )
         return self
 
@@ -204,6 +214,11 @@ class StreamingDataAccessLayerCalls(pydantic.BaseModel):
     def read_layer(self) -> str:
         """Return the read source layer, ``"dlo"`` or ``"dmo"``."""
         return "dlo" if self.read_dlo_deltas else "dmo"
+
+    @property
+    def write_layer(self) -> str:
+        """Return the write target layer, ``"dlo"`` or ``"dmo"``."""
+        return "dlo" if self.write_dlo_deltas else "dmo"
 
 
 class ClientMethodVisitor(ast.NodeVisitor):
@@ -217,6 +232,7 @@ class ClientMethodVisitor(ast.NodeVisitor):
         self._read_dlo_deltas: bool = False
         self._read_dmo_deltas: bool = False
         self._write_dlo_deltas_instances: set[str] = set()
+        self._write_dmo_deltas_instances: set[str] = set()
         self.variable_values: Dict[str, Union[str, None]] = {}
 
     def visit_Assign(self, node: ast.Assign) -> None:
@@ -261,6 +277,8 @@ class ClientMethodVisitor(ast.NodeVisitor):
                 name = self._resolve_name_arg(node.args[0])
                 if name and method_name == "write_dlo_deltas":
                     self._write_dlo_deltas_instances.add(name)
+                elif name and method_name == "write_dmo_deltas":
+                    self._write_dmo_deltas_instances.add(name)
         self.generic_visit(node)
 
     def _resolve_name_arg(self, arg: ast.expr) -> Union[str, None]:
@@ -278,6 +296,7 @@ class ClientMethodVisitor(ast.NodeVisitor):
             self._read_dlo_deltas
             or self._read_dmo_deltas
             or bool(self._write_dlo_deltas_instances)
+            or bool(self._write_dmo_deltas_instances)
         )
 
     def found(self) -> DataAccessLayerCalls:
@@ -293,6 +312,7 @@ class ClientMethodVisitor(ast.NodeVisitor):
             read_dlo_deltas=self._read_dlo_deltas,
             read_dmo_deltas=self._read_dmo_deltas,
             write_dlo_deltas=frozenset(self._write_dlo_deltas_instances),
+            write_dmo_deltas=frozenset(self._write_dmo_deltas_instances),
         )
 
 
@@ -516,10 +536,10 @@ def _update_streaming_config(existing_config: dict[str, Any], file_path: str) ->
         )
 
     read_names = [source_name] if source_name else []
-    write_names = list(output.write_dlo_deltas)
+    write_names = list(output.write_dlo_deltas or output.write_dmo_deltas)
     existing_config["permissions"] = {
         "read": {read_layer: read_names},
-        "write": {"dlo": write_names},
+        "write": {output.write_layer: write_names},
     }
 
 

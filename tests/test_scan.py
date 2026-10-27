@@ -735,7 +735,7 @@ STREAMING_DMO_ENTRYPOINT = textwrap.dedent(
 
     client = StreamingClient()
     deltas = client.read_dmo_deltas()
-    query = client.write_dlo_deltas("Account_copy__dll", deltas)
+    query = client.write_dmo_deltas("Account_copy__dlm", deltas)
     query.awaitTermination()
     """
 )
@@ -746,6 +746,13 @@ class TestStreamingScan:
 
     def test_file_is_streaming_true_for_delta_methods(self):
         temp_path = create_test_script(STREAMING_DLO_ENTRYPOINT)
+        try:
+            assert file_is_streaming(temp_path) is True
+        finally:
+            os.unlink(temp_path)
+
+    def test_file_is_streaming_true_for_dmo_delta_methods(self):
+        temp_path = create_test_script(STREAMING_DMO_ENTRYPOINT)
         try:
             assert file_is_streaming(temp_path) is True
         finally:
@@ -778,13 +785,72 @@ class TestStreamingScan:
         finally:
             os.unlink(temp_path)
 
-    def test_scan_file_streaming_dmo_read(self):
+    def test_scan_file_streaming_dmo(self):
         temp_path = create_test_script(STREAMING_DMO_ENTRYPOINT)
         try:
             result = scan_file_streaming(temp_path)
+            assert result.read_dlo_deltas is False
             assert result.read_dmo_deltas is True
             assert result.read_layer == "dmo"
-            assert "Account_copy__dll" in result.write_dlo_deltas
+            assert "Account_copy__dlm" in result.write_dmo_deltas
+            assert result.write_layer == "dmo"
+            assert not result.write_dlo_deltas
+        finally:
+            os.unlink(temp_path)
+
+    def test_scan_file_streaming_rejects_both_write_methods(self):
+        content = textwrap.dedent(
+            """
+            from datacustomcode.client import StreamingClient
+
+            client = StreamingClient()
+            deltas = client.read_dlo_deltas()
+            client.write_dlo_deltas("Account_copy__dll", deltas)
+            client.write_dmo_deltas("Account_copy__dlm", deltas)
+            """
+        )
+        temp_path = create_test_script(content)
+        try:
+            with pytest.raises(ValueError, match="Cannot write DLO and DMO deltas"):
+                scan_file_streaming(temp_path)
+        finally:
+            os.unlink(temp_path)
+
+    def test_scan_file_streaming_rejects_dlo_read_dmo_write(self):
+        content = textwrap.dedent(
+            """
+            from datacustomcode.client import StreamingClient
+
+            client = StreamingClient()
+            deltas = client.read_dlo_deltas()
+            client.write_dmo_deltas("Account_copy__dlm", deltas)
+            """
+        )
+        temp_path = create_test_script(content)
+        try:
+            with pytest.raises(
+                ValueError, match=r"same layer \(got read=dlo, write=dmo\)"
+            ):
+                scan_file_streaming(temp_path)
+        finally:
+            os.unlink(temp_path)
+
+    def test_scan_file_streaming_rejects_dmo_read_dlo_write(self):
+        content = textwrap.dedent(
+            """
+            from datacustomcode.client import StreamingClient
+
+            client = StreamingClient()
+            deltas = client.read_dmo_deltas()
+            client.write_dlo_deltas("Account_copy__dll", deltas)
+            """
+        )
+        temp_path = create_test_script(content)
+        try:
+            with pytest.raises(
+                ValueError, match=r"same layer \(got read=dmo, write=dlo\)"
+            ):
+                scan_file_streaming(temp_path)
         finally:
             os.unlink(temp_path)
 
@@ -875,6 +941,7 @@ class TestStreamingUpdateConfig:
         assert updated["streamingSource"]["type"] == "dmo"
         assert updated["streamingSource"]["name"] == "Account__dlm"
         assert updated["permissions"]["read"]["dmo"] == ["Account__dlm"]
+        assert updated["permissions"]["write"] == {"dmo": ["Account_copy__dlm"]}
 
     def test_batch_entrypoint_drops_stale_streaming_source(self):
         """Switching a streaming entrypoint to batch clears streamingSource."""
