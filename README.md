@@ -383,6 +383,8 @@ Options:
 #### `datacustomcode zip`
 Zip a transformation job in preparation to upload to Data Cloud. Make sure to change directory into your code package folder (e.g., `my_package`) before running this command.
 
+Symlinks inside the payload folder are not followed or packaged. Each symlinked file that is skipped is reported with a warning, and symlinked directories are not included. `datacustomcode deploy` zips the same way.
+
 Arguments:
 - `PATH`: Path to the code directory i.e. the payload folder (default: "payload")
 

@@ -630,12 +630,15 @@ def zip(
     logger.debug(f"Zipping directory... {directory}")
 
     with zipfile.ZipFile(ZIP_FILE_NAME, "w", zipfile.ZIP_DEFLATED) as zipf:
-        for root, dirs, files in os.walk(directory):
-            # Skip .DS_Store and local credentials.
+        for root, dirs, files in os.walk(directory, followlinks=False):
+            # Skip symlinks, .DS_Store and local credentials.
             for file in files:
+                abs_path = os.path.join(root, file)
+                arcname = os.path.relpath(abs_path, directory)
+                if os.path.islink(abs_path):
+                    logger.warning(f"Skipping symlink file {arcname}")
+                    continue
                 if file not in EXCLUDED_FILES:
-                    abs_path = os.path.join(root, file)
-                    arcname = os.path.relpath(abs_path, directory)
                     zipf.write(abs_path, arcname)
 
     logger.debug(f"Created zip file: {ZIP_FILE_NAME}")
