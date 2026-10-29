@@ -841,6 +841,44 @@ class TestZip:
         assert not any(".DS_Store" in path for path in written)
 
 
+class TestZipSymlinks:
+    """zip() must skip symlinked files instead of following them into the archive."""
+
+    @pytest.fixture
+    def mocks(self):
+        with (
+            patch(
+                "datacustomcode.deploy.has_nonempty_requirements_file",
+                return_value=False,
+            ),
+            patch("zipfile.ZipFile") as mock_zipfile,
+            patch("os.walk") as mock_walk,
+        ):
+            yield mock_walk, mock_zipfile.return_value.__enter__.return_value
+
+    def test_zip_skips_symlinked_files(self, mocks):
+        mock_walk, mock_zipfile_instance = mocks
+        mock_walk.return_value = [
+            ("/test/dir", ["subdir"], ["entrypoint.py", "linked.txt"]),
+            ("/test/dir/subdir", [], ["nested.py", "linked.py"]),
+        ]
+        links = {"/test/dir/linked.txt", "/test/dir/subdir/linked.py"}
+
+        with patch("os.path.islink", side_effect=lambda path: path in links):
+            zip("/test/dir", "default", "script")
+
+        written = [call.args[0] for call in mock_zipfile_instance.write.call_args_list]
+        assert written == ["/test/dir/entrypoint.py", "/test/dir/subdir/nested.py"]
+
+    def test_zip_skips_symlinked_directories(self, mocks):
+        mock_walk, _ = mocks
+        mock_walk.return_value = []
+
+        zip("/test/dir", "default", "script")
+
+        mock_walk.assert_called_once_with("/test/dir", followlinks=False)
+
+
 class TestUploadZip:
     @patch("datacustomcode.deploy.requests.put")
     @patch("builtins.open", new_callable=mock_open, read_data=b"test data")

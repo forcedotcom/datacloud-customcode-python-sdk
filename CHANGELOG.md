@@ -2,6 +2,24 @@
 
 ## 7.0.0
 
+### Breaking Changes
+
+- **`datacustomcode zip` and `datacustomcode deploy` no longer package symlinks.**
+
+  Symlinks found inside the payload directory are skipped instead of being followed. A symlinked file logs a `Skipping symlink file <path>` warning and is left out of `deployment.zip`.
+
+  **Why:** Following a symlink packaged the bytes of its target into the archive, even when the target was outside the payload (for example `payload/notes.txt -> ~/.ssh/id_rsa`).
+
+  **Migration:** Replace any symlink in the payload with a real copy of the file or directory it points to:
+
+  ```bash
+  # Before
+  ln -s ../shared/helpers.py payload/helpers.py
+
+  # After
+  cp ../shared/helpers.py payload/helpers.py
+  ```
+
 ### Added
 
 - **`StreamingClient.write_dmo_deltas(name, dataframe)`** – start a streaming query that writes each micro-batch to the target DMO and return the `StreamingQuery` handle. It is the DMO counterpart to `write_dlo_deltas` and pairs with `read_dmo_deltas()`.
