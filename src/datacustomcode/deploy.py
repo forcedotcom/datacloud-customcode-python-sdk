@@ -415,13 +415,7 @@ class DataTransformConfig(BaseConfig):
     def _validate_layers(self) -> "DataTransformConfig":
         read_is_dlo = isinstance(self.permissions.read, DloPermission)
         write_is_dlo = isinstance(self.permissions.write, DloPermission)
-        if self.is_streaming:
-            if not write_is_dlo:
-                raise ValueError(
-                    "A streaming transform must write to a DLO "
-                    "(permissions.write must be a 'dlo' entry)."
-                )
-        elif read_is_dlo != write_is_dlo:
+        if read_is_dlo != write_is_dlo:
             raise ValueError(
                 "permissions.read and permissions.write must both reference "
                 "DLOs or both reference DMOs (got "
