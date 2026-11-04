@@ -210,7 +210,11 @@ def deploy(
     sf_cli_org: Optional[str],
     use_in_feature: Optional[str],
 ):
-    from datacustomcode.constants import USE_IN_FEATURE_MAPPING_FOR_CONNECT_API
+    from datacustomcode.constants import (
+        FUNCTION_INVOKE_OPTIONS_FEATURES,
+        REQUEST_TYPE_TO_FEATURE,
+        USE_IN_FEATURE_MAPPING_FOR_CONNECT_API,
+    )
     from datacustomcode.deploy import (
         COMPUTE_TYPES,
         CodeExtensionMetadata,
@@ -252,17 +256,22 @@ def deploy(
         else:
             click.secho(
                 "Error: Function signature does not match a supported type. "
-                "Use SearchIndexChunkingV1Request and "
-                "SearchIndexChunkingV1Response in function signature.",
+                "Use a matching <Feature>V1Request and <Feature>V1Response "
+                "pair in the function signature. Supported types: "
+                + ", ".join(REQUEST_TYPE_TO_FEATURE),
                 fg="red",
             )
             raise click.Abort()
 
-        # Map feature names to Connect API names
-        mapped_feature = USE_IN_FEATURE_MAPPING_FOR_CONNECT_API.get(
-            use_in_feature, use_in_feature
-        )
-        metadata.functionInvokeOptions = [mapped_feature]
+        if use_in_feature in FUNCTION_INVOKE_OPTIONS_FEATURES:
+            # Newer function features only bind through invokeOptions (v67.0)
+            metadata.invokeOptions = [use_in_feature]
+        else:
+            # Map feature names to Connect API names (legacy field)
+            mapped_feature = USE_IN_FEATURE_MAPPING_FOR_CONNECT_API.get(
+                use_in_feature, use_in_feature
+            )
+            metadata.functionInvokeOptions = [mapped_feature]
 
     try:
         if sf_cli_org:
@@ -287,11 +296,14 @@ def deploy(
     default=None,
     help=(
         "Invoke option for this package. For scripts: 'BatchTransform' "
-        "(default) or 'StreamingTransform'. For functions: 'SearchIndexChunking'."
+        "(default) or 'StreamingTransform'. For functions: 'SearchIndexChunking' "
+        "(default) or 'AgentforceScorer'."
     ),
 )
 def init(directory: str, code_type: str, use_in_feature: Optional[str]):
     from datacustomcode.constants import (
+        FEATURE_TEMPLATE_MAPPING,
+        FUNCTION_USE_IN_FEATURE_DEFAULT,
         SCRIPT_USE_IN_FEATURE_BATCH,
         SCRIPT_USE_IN_FEATURE_OPTIONS,
         SCRIPT_USE_IN_FEATURE_STREAMING,
@@ -315,7 +327,14 @@ def init(directory: str, code_type: str, use_in_feature: Optional[str]):
             raise click.Abort()
         streaming = use_in_feature == SCRIPT_USE_IN_FEATURE_STREAMING
     else:
-        use_in_feature = use_in_feature or "SearchIndexChunking"
+        use_in_feature = use_in_feature or FUNCTION_USE_IN_FEATURE_DEFAULT
+        if use_in_feature not in FEATURE_TEMPLATE_MAPPING:
+            click.secho(
+                f"Error: Invalid --use-in-feature '{use_in_feature}' for a "
+                f"function. Valid options: {', '.join(FEATURE_TEMPLATE_MAPPING)}.",
+                fg="red",
+            )
+            raise click.Abort()
 
     click.echo("Copying template to " + click.style(directory, fg="blue", bold=True))
     if code_type == "script":
