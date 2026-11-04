@@ -1,0 +1,16 @@
+{
+    "input": [
+        {
+            "text": "Product Review: Northstar Analytics\n\nWe rolled Northstar out to our whole revenue team last quarter and the difference has been night and day. Dashboards that used to take our analysts a full day to assemble now refresh in seconds, and the natural-language query box means our account executives can answer their own questions without filing a ticket.\n\nOnboarding was smoother than any tool we have adopted in years. The guided setup imported our Salesforce data on the first try and the sample templates gave us something useful on day one. Support answered our two questions within the hour. Easily the best purchase decision we made this year."
+        },
+        {
+            "text": "Support Ticket #48210: Repeated timeouts on scheduled exports\n\nFor the third week running our nightly export to the data warehouse has failed silently. There is no alert, no email, nothing in the activity log, and we only find out when the morning report is empty and the leadership meeting has no numbers.\n\nI have raised this twice already and both times the ticket was closed as resolved without anyone actually contacting me. This is costing us real credibility internally and I am extremely frustrated. If the connector cannot handle our volume we need to know now so we can plan a migration, because right now the product is not doing the one job we bought it for."
+        },
+        {
+            "text": "Renewal Feedback: mixed feelings heading into year two\n\nThe core product is genuinely good. The reporting engine is fast, the permissions model is granular enough for our compliance team, and our analysts like working in it. On the functionality alone I would renew without hesitation.\n\nWhat gives me pause is the pricing. The per-seat cost jumped noticeably at renewal and several add-ons that used to be included are now separate line items. The value is still there, but the conversation with my finance team was harder than it should have been, and I would like more transparency before the next cycle."
+        },
+        {
+            "text": "Feature Request: scheduled report subscriptions\n\nWe would like the ability to subscribe internal stakeholders to a report on a recurring schedule so a PDF lands in their inbox every Monday morning. Today we export manually and forward it, which is workable but easy to forget.\n\nA few teams have asked whether subscriptions could support filtered views per recipient, for example each regional manager receiving only their own territory. Not urgent for us, but it would remove a recurring bit of manual work and is something a couple of competing tools already offer."
+        }
+    ]
+}
