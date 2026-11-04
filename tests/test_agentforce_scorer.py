@@ -114,10 +114,10 @@ def test_run_agent_loop_defaults_to_empty():
 
 def test_response_serializes_outputs():
     response = AgentforceScorerV1Response(
-        outputs=[{"label": "resolution", "value": "resolved", "is_passed": True}]
+        outputs=[{"label": "resolution", "value": "resolved", "isPassed": True}]
     )
     assert response.model_dump() == {
-        "outputs": [{"label": "resolution", "value": "resolved", "is_passed": True}]
+        "outputs": [{"label": "resolution", "value": "resolved", "isPassed": True}]
     }
     assert AgentforceScorerV1Response().model_dump() == {"outputs": []}
 
@@ -171,7 +171,7 @@ def test_template_entrypoint_runs(tmp_path):
     assert isinstance(result, AgentforceScorerV1Response)
     assert result.outputs[0].label == "user_turns"
     assert result.outputs[0].value == "1"
-    assert result.outputs[0].is_passed is True
+    assert result.outputs[0].isPassed is True
 
     output = tmp_path / "test.json"
     generate_test_json(entrypoint, str(output))

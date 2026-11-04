@@ -183,7 +183,7 @@ class AgentforceScorerV1Output(BaseModel):
     value: Optional[str] = Field(
         default=None, description="Result value", examples=["resolved"]
     )
-    is_passed: Optional[bool] = Field(
+    isPassed: Optional[bool] = Field(
         default=None, description="Whether the session passed this check"
     )
     model_config = ConfigDict(extra="ignore")

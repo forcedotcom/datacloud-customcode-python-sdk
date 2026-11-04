@@ -37,7 +37,7 @@ def function(
             AgentforceScorerV1Output(
                 label="user_turns",
                 value=str(user_turns),
-                is_passed=user_turns > 0,
+                isPassed=user_turns > 0,
             )
         ]
     )
