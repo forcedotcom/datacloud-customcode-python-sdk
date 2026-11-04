@@ -12,13 +12,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import base64
+import hashlib
+import hmac
 import http.server
 import queue
+import secrets
 import socketserver
 import threading
 import time
 from typing import Any
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import (
+    parse_qs,
+    urlencode,
+    urlparse,
+)
 import webbrowser
 
 import click
@@ -28,16 +36,35 @@ import requests
 class OAuthCallbackHandler(http.server.SimpleHTTPRequestHandler):
     """HTTP request handler to capture OAuth callback."""
 
-    def __init__(self, *args, auth_code_queue=None, **kwargs):
+    def __init__(self, *args, auth_code_queue=None, expected_state=None, **kwargs):
         self.auth_code_queue = auth_code_queue
+        self.expected_state = expected_state
         super().__init__(*args, **kwargs)
 
+    def _state_matches(self, query_params: dict) -> bool:
+        """Check the callback's state parameter against the expected value."""
+        received = query_params.get("state", [""])[0]
+        if not self.expected_state or not received:
+            return False
+        return hmac.compare_digest(received, self.expected_state)
+
     def do_GET(self):
-        """Handle GET request from OAuth callback."""
+        """Handle GET request from OAuth callback.
+
+        Callbacks whose ``state`` does not match are rejected without touching
+        the queue, so a forged request can neither inject an authorization code
+        nor abort the legitimate login.
+        """
         parsed_path = urlparse(self.path)
         query_params = parse_qs(parsed_path.query)
 
-        if "code" in query_params:
+        is_callback = "code" in query_params or "error" in query_params
+        if is_callback and not self._state_matches(query_params):
+            self.send_response(400)
+            self.send_header("Content-type", "text/html")
+            self.end_headers()
+            self.wfile.write(b"<html><body><h1>Invalid callback</h1></body></html>")
+        elif "code" in query_params:
             auth_code = query_params["code"][0]
             self.auth_code_queue.put(auth_code)
             self.send_response(200)
@@ -70,14 +97,27 @@ class OAuthCallbackHandler(http.server.SimpleHTTPRequestHandler):
         """Suppress default logging."""
 
 
+def _generate_pkce_pair() -> tuple[str, str]:
+    """Generate a PKCE (RFC 7636) code verifier and its S256 code challenge.
+
+    Returns:
+        Tuple of (code_verifier, code_challenge)
+    """
+    code_verifier = secrets.token_urlsafe(64)
+    digest = hashlib.sha256(code_verifier.encode("ascii")).digest()
+    code_challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+    return code_verifier, code_challenge
+
+
 def _run_oauth_callback_server(
-    redirect_uri: str, auth_code_queue: "queue.Queue[str]"
+    redirect_uri: str, auth_code_queue: "queue.Queue[str]", expected_state: str
 ) -> tuple[socketserver.TCPServer, int]:
     """Start a local HTTP server to catch OAuth callback.
 
     Args:
         redirect_uri: The redirect URI configured in the OAuth app
         auth_code_queue: Queue to put the authorization code in
+        expected_state: OAuth state value the callback must echo back
 
     Returns:
         Tuple of (server instance, actual port number)
@@ -90,7 +130,12 @@ def _run_oauth_callback_server(
 
     # Create a custom handler factory
     def handler_factory(*args, **kwargs):
-        return OAuthCallbackHandler(*args, auth_code_queue=auth_code_queue, **kwargs)
+        return OAuthCallbackHandler(
+            *args,
+            auth_code_queue=auth_code_queue,
+            expected_state=expected_state,
+            **kwargs,
+        )
 
     server = socketserver.TCPServer((host, port), handler_factory)
     server.allow_reuse_address = True
@@ -113,6 +158,7 @@ def _exchange_code_for_tokens(
     client_secret: str,
     redirect_uri: str,
     auth_code: str,
+    code_verifier: str,
 ) -> Any:
     """Exchange authorization code for access and refresh tokens.
 
@@ -122,6 +168,7 @@ def _exchange_code_for_tokens(
         client_secret: OAuth client secret
         redirect_uri: Redirect URI used in authorization
         auth_code: Authorization code from callback
+        code_verifier: PKCE code verifier matching the authorize request
 
     Returns:
         Dictionary containing access_token and refresh_token
@@ -136,6 +183,7 @@ def _exchange_code_for_tokens(
         "client_id": client_id,
         "client_secret": client_secret,
         "redirect_uri": redirect_uri,
+        "code_verifier": code_verifier,
     }
 
     try:
@@ -168,17 +216,28 @@ def do_oauth_browser_flow(
     # Create queue for communication between server and main thread
     auth_code_queue: queue.Queue[str] = queue.Queue()
 
+    # CSRF protection (RFC 6749 10.12) and PKCE (RFC 7636 / RFC 8252)
+    state = secrets.token_urlsafe(32)
+    code_verifier, code_challenge = _generate_pkce_pair()
+
     # Start callback server
     click.echo(f"\nStarting local callback server on {redirect_uri}...")
-    server, _actual_port = _run_oauth_callback_server(redirect_uri, auth_code_queue)
+    server, _actual_port = _run_oauth_callback_server(
+        redirect_uri, auth_code_queue, state
+    )
 
     # Build authorization URL with final redirect_uri
-    auth_url = (
-        f"{login_url.rstrip('/')}/services/oauth2/authorize"
-        f"?response_type=code"
-        f"&client_id={client_id}"
-        f"&redirect_uri={redirect_uri}"
+    query = urlencode(
+        {
+            "response_type": "code",
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "state": state,
+            "code_challenge": code_challenge,
+            "code_challenge_method": "S256",
+        }
     )
+    auth_url = f"{login_url.rstrip('/')}/services/oauth2/authorize?{query}"
 
     # Open browser
     click.echo("Opening browser for authentication...")
@@ -208,7 +267,7 @@ def do_oauth_browser_flow(
     # Exchange code for tokens
     click.echo("Exchanging authorization code for tokens...")
     token_response = _exchange_code_for_tokens(
-        login_url, client_id, client_secret, redirect_uri, auth_code
+        login_url, client_id, client_secret, redirect_uri, auth_code, code_verifier
     )
 
     refresh_token = token_response.get("refresh_token")
