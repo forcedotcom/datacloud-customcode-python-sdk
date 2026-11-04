@@ -31,12 +31,22 @@ DEFAULT_CPU_SIZE = "CPU_2XL"
 # Feature to template folder mapping
 FEATURE_TEMPLATE_MAPPING = {
     "SearchIndexChunking": "chunking",
+    "AgentforceScorer": "agentforce_scorer",
 }
 
-# Feature name to Connect API name mapping
+# Default function feature
+FUNCTION_USE_IN_FEATURE_DEFAULT = "SearchIndexChunking"
+
+# Feature name to Connect API name mapping (legacy functionInvokeOptions field)
 USE_IN_FEATURE_MAPPING_FOR_CONNECT_API = {
     "SearchIndexChunking": "UnstructuredChunking",
 }
+
+# Function features sent via invokeOptions (v67.0) instead of the legacy
+# functionInvokeOptions field
+FUNCTION_INVOKE_OPTIONS_FEATURES = [
+    "AgentforceScorer",
+]
 
 # Script (data transform) invoke options
 SCRIPT_USE_IN_FEATURE_BATCH = "BatchTransform"
@@ -50,4 +60,6 @@ SCRIPT_USE_IN_FEATURE_OPTIONS = [
 REQUEST_TYPE_TO_FEATURE = {
     "SearchIndexChunkingV1Request": "SearchIndexChunking",
     "SearchIndexChunkingV1Response": "SearchIndexChunking",
+    "AgentforceScorerV1Request": "AgentforceScorer",
+    "AgentforceScorerV1Response": "AgentforceScorer",
 }
