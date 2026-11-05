@@ -14,12 +14,16 @@
 # limitations under the License.
 from __future__ import annotations
 
+import base64
+import hashlib
 import queue
 from unittest.mock import (
+    ANY,
     MagicMock,
     Mock,
     patch,
 )
+from urllib.parse import parse_qs, urlparse
 
 import click
 import pytest
@@ -28,6 +32,7 @@ import requests
 from datacustomcode.auth import (
     OAuthCallbackHandler,
     _exchange_code_for_tokens,
+    _generate_pkce_pair,
     _run_oauth_callback_server,
     configure_oauth_tokens,
     do_oauth_browser_flow,
@@ -48,10 +53,11 @@ class TestOAuthCallbackHandler:
             client_address=("127.0.0.1", 5555),
             server=Mock(),
             auth_code_queue=auth_code_queue,
+            expected_state="expected_state_123",
         )
 
         # Mock the request path with code
-        handler.path = "/callback?code=test_auth_code_123"
+        handler.path = "/callback?code=test_auth_code_123&state=expected_state_123"
         handler.send_response = Mock()
         handler.send_header = Mock()
         handler.end_headers = Mock()
@@ -77,9 +83,13 @@ class TestOAuthCallbackHandler:
             client_address=("127.0.0.1", 5555),
             server=Mock(),
             auth_code_queue=auth_code_queue,
+            expected_state="expected_state_123",
         )
 
-        handler.path = "/callback?error=access_denied&error_description=User%20denied"
+        handler.path = (
+            "/callback?error=access_denied&error_description=User%20denied"
+            "&state=expected_state_123"
+        )
         handler.send_response = Mock()
         handler.send_header = Mock()
         handler.end_headers = Mock()
@@ -104,6 +114,7 @@ class TestOAuthCallbackHandler:
             client_address=("127.0.0.1", 5555),
             server=Mock(),
             auth_code_queue=auth_code_queue,
+            expected_state="expected_state_123",
         )
 
         handler.path = "/callback"
@@ -115,6 +126,63 @@ class TestOAuthCallbackHandler:
         handler.do_GET()
 
         # Verify no code was put in queue
+        assert auth_code_queue.empty()
+        handler.send_response.assert_called_once_with(400)
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/callback?code=attacker_code",
+            "/callback?code=attacker_code&state=",
+            "/callback?code=attacker_code&state=wrong_state",
+            "/callback?error=access_denied&state=wrong_state",
+            "/callback?error=access_denied",
+        ],
+    )
+    @patch("datacustomcode.auth.http.server.SimpleHTTPRequestHandler.__init__")
+    def test_do_get_rejects_missing_or_mismatched_state(self, mock_init, path):
+        """Callbacks without the expected state must not reach the queue."""
+        auth_code_queue = queue.Queue()
+        mock_init.return_value = None
+
+        handler = OAuthCallbackHandler(
+            request=Mock(),
+            client_address=("127.0.0.1", 5555),
+            server=Mock(),
+            auth_code_queue=auth_code_queue,
+            expected_state="expected_state_123",
+        )
+        handler.path = path
+        handler.send_response = Mock()
+        handler.send_header = Mock()
+        handler.end_headers = Mock()
+        handler.wfile = Mock()
+
+        handler.do_GET()
+
+        assert auth_code_queue.empty()
+        handler.send_response.assert_called_once_with(400)
+
+    @patch("datacustomcode.auth.http.server.SimpleHTTPRequestHandler.__init__")
+    def test_do_get_rejects_when_no_expected_state(self, mock_init):
+        """A handler without an expected state fails closed."""
+        auth_code_queue = queue.Queue()
+        mock_init.return_value = None
+
+        handler = OAuthCallbackHandler(
+            request=Mock(),
+            client_address=("127.0.0.1", 5555),
+            server=Mock(),
+            auth_code_queue=auth_code_queue,
+        )
+        handler.path = "/callback?code=some_code&state=anything"
+        handler.send_response = Mock()
+        handler.send_header = Mock()
+        handler.end_headers = Mock()
+        handler.wfile = Mock()
+
+        handler.do_GET()
+
         assert auth_code_queue.empty()
         handler.send_response.assert_called_once_with(400)
 
@@ -148,7 +216,9 @@ class TestRunOAuthCallbackServer:
         mock_server.server_address = ("localhost", 5555)
         mock_tcpserver.return_value = mock_server
 
-        _server, port = _run_oauth_callback_server(redirect_uri, auth_code_queue)
+        _server, port = _run_oauth_callback_server(
+            redirect_uri, auth_code_queue, "state"
+        )
 
         assert port == 5555
         mock_tcpserver.assert_called_once()
@@ -162,7 +232,7 @@ class TestRunOAuthCallbackServer:
         auth_code_queue = queue.Queue()
 
         with pytest.raises(ValueError, match="Invalid redirect URI"):
-            _run_oauth_callback_server(redirect_uri, auth_code_queue)
+            _run_oauth_callback_server(redirect_uri, auth_code_queue, "state")
 
     def test_run_oauth_callback_server_invalid_uri_no_port(self):
         """Test starting callback server with invalid URI (no port)."""
@@ -170,7 +240,7 @@ class TestRunOAuthCallbackServer:
         auth_code_queue = queue.Queue()
 
         with pytest.raises(ValueError, match="Invalid redirect URI"):
-            _run_oauth_callback_server(redirect_uri, auth_code_queue)
+            _run_oauth_callback_server(redirect_uri, auth_code_queue, "state")
 
     @patch("datacustomcode.auth.socketserver.TCPServer")
     @patch("datacustomcode.auth.threading.Thread")
@@ -186,13 +256,37 @@ class TestRunOAuthCallbackServer:
         mock_server.server_address = ("localhost", 8080)
         mock_tcpserver.return_value = mock_server
 
-        _server, port = _run_oauth_callback_server(redirect_uri, auth_code_queue)
+        _server, port = _run_oauth_callback_server(
+            redirect_uri, auth_code_queue, "state"
+        )
 
         assert port == 8080
         mock_tcpserver.assert_called_once()
         mock_thread.assert_called_once()
         # Verify server was started in a thread
         assert mock_server.allow_reuse_address is True
+
+
+class TestGeneratePkcePair:
+    """Test suite for _generate_pkce_pair."""
+
+    def test_verifier_and_challenge(self):
+        code_verifier, code_challenge = _generate_pkce_pair()
+
+        # RFC 7636 section 4.1: 43-128 unreserved characters
+        assert 43 <= len(code_verifier) <= 128
+        expected = (
+            base64.urlsafe_b64encode(
+                hashlib.sha256(code_verifier.encode("ascii")).digest()
+            )
+            .rstrip(b"=")
+            .decode("ascii")
+        )
+        assert code_challenge == expected
+        assert "=" not in code_challenge
+
+    def test_pairs_are_unique(self):
+        assert _generate_pkce_pair()[0] != _generate_pkce_pair()[0]
 
 
 class TestExchangeCodeForTokens:
@@ -216,6 +310,7 @@ class TestExchangeCodeForTokens:
             client_secret="test_client_secret",
             redirect_uri="http://localhost:5555/callback",
             auth_code="test_auth_code",
+            code_verifier="test_code_verifier",
         )
 
         assert result["access_token"] == "test_access_token"
@@ -228,6 +323,7 @@ class TestExchangeCodeForTokens:
         assert call_args[1]["data"]["client_id"] == "test_client_id"
         assert call_args[1]["data"]["client_secret"] == "test_client_secret"
         assert call_args[1]["data"]["redirect_uri"] == "http://localhost:5555/callback"
+        assert call_args[1]["data"]["code_verifier"] == "test_code_verifier"
 
     @patch("datacustomcode.auth.requests.post")
     def test_exchange_code_for_tokens_http_error(self, mock_post):
@@ -241,6 +337,7 @@ class TestExchangeCodeForTokens:
                 client_secret="test_client_secret",
                 redirect_uri="http://localhost:5555/callback",
                 auth_code="test_auth_code",
+                code_verifier="test_code_verifier",
             )
 
     @patch("datacustomcode.auth.requests.post")
@@ -255,6 +352,7 @@ class TestExchangeCodeForTokens:
                 client_secret="test_client_secret",
                 redirect_uri="http://localhost:5555/callback",
                 auth_code="test_auth_code",
+                code_verifier="test_code_verifier",
             )
 
     @patch("datacustomcode.auth.requests.post")
@@ -269,6 +367,7 @@ class TestExchangeCodeForTokens:
                 client_secret="test_client_secret",
                 redirect_uri="http://localhost:5555/callback",
                 auth_code="test_auth_code",
+                code_verifier="test_code_verifier",
             )
 
 
@@ -288,7 +387,7 @@ class TestDoOAuthBrowserFlow:
         auth_code_queue = queue.Queue()
         auth_code_queue.put("test_auth_code")
 
-        def server_factory(redirect_uri, queue):
+        def server_factory(redirect_uri, queue, expected_state):
             return (mock_server_instance, 5555)
 
         mock_server.side_effect = server_factory
@@ -315,8 +414,33 @@ class TestDoOAuthBrowserFlow:
                 "test_client_secret",
                 "http://localhost:5555/callback",
                 "test_auth_code",
+                ANY,
             )
             mock_server_instance.shutdown.assert_called()
+
+            # Authorize URL carries state + S256 PKCE challenge
+            auth_url = mock_browser.call_args[0][0]
+            params = parse_qs(urlparse(auth_url).query)
+            assert params["response_type"] == ["code"]
+            assert params["client_id"] == ["test_client_id"]
+            assert params["redirect_uri"] == ["http://localhost:5555/callback"]
+            assert params["code_challenge_method"] == ["S256"]
+
+            # The callback server expects the same state sent to the browser
+            server_state = mock_server.call_args[0][2]
+            assert params["state"] == [server_state]
+            assert len(server_state) >= 32
+
+            # The verifier sent at token exchange matches the challenge
+            code_verifier = mock_exchange.call_args[0][5]
+            expected_challenge = (
+                base64.urlsafe_b64encode(
+                    hashlib.sha256(code_verifier.encode("ascii")).digest()
+                )
+                .rstrip(b"=")
+                .decode("ascii")
+            )
+            assert params["code_challenge"] == [expected_challenge]
 
     @patch("datacustomcode.auth.webbrowser.open")
     @patch("datacustomcode.auth._run_oauth_callback_server")
@@ -325,7 +449,7 @@ class TestDoOAuthBrowserFlow:
         """Test OAuth browser flow with timeout."""
         mock_server_instance = MagicMock()
 
-        def server_factory(redirect_uri, queue):
+        def server_factory(redirect_uri, queue, expected_state):
             return (mock_server_instance, 5555)
 
         mock_server.side_effect = server_factory
@@ -356,7 +480,7 @@ class TestDoOAuthBrowserFlow:
         """Test OAuth browser flow with OAuth error response."""
         mock_server_instance = MagicMock()
 
-        def server_factory(redirect_uri, queue):
+        def server_factory(redirect_uri, queue, expected_state):
             return (mock_server_instance, 5555)
 
         mock_server.side_effect = server_factory
@@ -388,7 +512,7 @@ class TestDoOAuthBrowserFlow:
         """Test OAuth browser flow when no refresh token is returned."""
         mock_server_instance = MagicMock()
 
-        def server_factory(redirect_uri, queue):
+        def server_factory(redirect_uri, queue, expected_state):
             return (mock_server_instance, 5555)
 
         mock_server.side_effect = server_factory
