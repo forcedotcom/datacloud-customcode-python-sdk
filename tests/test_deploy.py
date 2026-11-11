@@ -609,7 +609,7 @@ class TestCreateDeployment:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 
@@ -633,7 +633,7 @@ class TestCreateDeployment:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 
@@ -657,7 +657,7 @@ class TestCreateDeployment:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             invokeOptions=["option1", "option2"],
             codeType="function",
         )
@@ -671,54 +671,6 @@ class TestCreateDeployment:
         mock_make_api_call.assert_called_once()
         assert isinstance(result, CreateDeploymentResponse)
         assert result.fileUploadUrl == "https://upload.example.com"
-
-    @patch("datacustomcode.deploy._make_api_call")
-    def test_create_deployment_default_path_no_invoke_options(self, mock_make_api_call):
-        """Without invokeOptions, the deployment uses the default v63.0 path."""
-        access_token = AccessTokenResponse(
-            access_token="test_token", instance_url="https://instance.example.com"
-        )
-        metadata = CodeExtensionMetadata(
-            name="test_job",
-            version="1.0.0",
-            description="Test job",
-            computeType="CPU_M",
-            codeType="script",
-        )
-        mock_make_api_call.return_value = {
-            "fileUploadUrl": "https://upload.example.com"
-        }
-
-        create_deployment(access_token, metadata)
-
-        url = mock_make_api_call.call_args[0][0]
-        assert "v63.0" in url
-        body = mock_make_api_call.call_args[1]["json"]
-        assert "invokeOptions" not in body
-
-    @patch("datacustomcode.deploy._make_api_call")
-    def test_create_deployment_invoke_options_routes_to_v67(self, mock_make_api_call):
-        access_token = AccessTokenResponse(
-            access_token="test_token", instance_url="https://instance.example.com"
-        )
-        metadata = CodeExtensionMetadata(
-            name="test_job",
-            version="1.0.0",
-            description="Test job",
-            computeType="CPU_M",
-            codeType="script",
-            invokeOptions=["StreamingTransform"],
-        )
-        mock_make_api_call.return_value = {
-            "fileUploadUrl": "https://upload.example.com"
-        }
-
-        create_deployment(access_token, metadata)
-
-        url = mock_make_api_call.call_args[0][0]
-        assert "v67.0" in url
-        body = mock_make_api_call.call_args[1]["json"]
-        assert body["invokeOptions"] == ["StreamingTransform"]
 
 
 class TestZip:
@@ -927,7 +879,7 @@ class TestGetDeployments:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 
@@ -955,7 +907,7 @@ class TestWaitForDeployment:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
         callback = MagicMock()
@@ -986,7 +938,7 @@ class TestWaitForDeployment:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 
@@ -1179,7 +1131,7 @@ class TestCreateDataTransform:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 
@@ -1228,7 +1180,7 @@ class TestCreateDataTransform:
             name="dmo_job",
             version="1.0.0",
             description="DMO job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 
@@ -1290,7 +1242,7 @@ class TestCreateDataTransform:
             name="dmo_multi",
             version="1.0.0",
             description="DMO multi",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 
@@ -1353,7 +1305,7 @@ class TestCreateDataTransform:
             name="test_package",
             version="1.0.0",
             description="DMO with schema",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 
@@ -1447,7 +1399,7 @@ class TestCreateDataTransform:
             name="test_package",
             version="1.0.0",
             description="DLO with schema",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 
@@ -1528,7 +1480,7 @@ class TestCreateDataTransform:
             name="dlo_job",
             version="1.0.0",
             description="DLO job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 
@@ -1563,7 +1515,7 @@ class TestCreateDataTransform:
             name="dmo_no_schema",
             version="1.0.0",
             description="DMO no schema",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 
@@ -1595,7 +1547,7 @@ class TestCreateDataTransform:
             name="batch_job",
             version="1.0.0",
             description="Batch job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
         data_transform_config = DataTransformConfig(
@@ -1629,7 +1581,7 @@ class TestCreateDataTransform:
             name="streaming_job",
             version="1.0.0",
             description="Streaming job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
         data_transform_config = DataTransformConfig(
@@ -1757,7 +1709,7 @@ class TestDeployFull:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
         callback = MagicMock()
@@ -1814,7 +1766,7 @@ class TestDeployFull:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
         callback = MagicMock()
@@ -1870,7 +1822,7 @@ class TestDeployFull:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
         access_token = AccessTokenResponse(
@@ -1899,7 +1851,7 @@ class TestDeployFull:
         mock_create_transform,
         mock_get_config,
     ):
-        """A batch config must not set invokeOptions (stays on the v63.0 path)."""
+        """A batch config must not set invokeOptions."""
         data_transform_config = DataTransformConfig(
             sdkVersion="1.0.0",
             entryPoint="entrypoint.py",
@@ -1914,7 +1866,7 @@ class TestDeployFull:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
         access_token = AccessTokenResponse(
@@ -1940,7 +1892,7 @@ class TestRunDataTransform:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 
@@ -1975,7 +1927,7 @@ class TestDeployFullWithDockerIntegration:
             name="test_job",
             version="1.0.0",
             description="Test job",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
         callback = MagicMock()
@@ -2042,7 +1994,7 @@ class TestDeployFullWithAccessTokenResponse:
             name="test",
             version="1.0.0",
             description="desc",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
         mock_get_config.return_value = MagicMock(spec=[])  # not DataTransformConfig
@@ -2094,7 +2046,7 @@ class TestCodeExtensionMetadataValidation:
             name=name,
             version="1.0.0",
             description="test",
-            computeType="CPU_M",
+            computeType="Standard_2XL",
             codeType="script",
         )
 
