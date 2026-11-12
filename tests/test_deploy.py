@@ -631,6 +631,31 @@ class TestMakeApiCallLogging:
         }
 
     @patch("datacustomcode.deploy.requests.request")
+    def test_request_param_values_not_logged(self, mock_request, debug_logs):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"key": "value"}
+        mock_request.return_value = mock_response
+
+        _make_api_call(
+            "https://example.com",
+            "POST",
+            json={"secret": "s3cr3t-json"},
+            params={"key": "s3cr3t-param"},
+            data="s3cr3t-data",
+        )
+
+        logged = "".join(debug_logs)
+        for secret in ("s3cr3t-json", "s3cr3t-param", "s3cr3t-data"):
+            assert secret not in logged
+        # Only the argument names are logged.
+        assert "['data', 'json', 'params']" in logged
+        # The values are still passed through to the request.
+        assert mock_request.call_args.kwargs["json"] == {"secret": "s3cr3t-json"}
+        assert mock_request.call_args.kwargs["params"] == {"key": "s3cr3t-param"}
+        assert mock_request.call_args.kwargs["data"] == "s3cr3t-data"
+
+    @patch("datacustomcode.deploy.requests.request")
     def test_sensitive_response_headers_not_logged_on_error(
         self, mock_request, debug_logs
     ):
