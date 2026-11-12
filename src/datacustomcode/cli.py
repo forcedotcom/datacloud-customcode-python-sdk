@@ -215,6 +215,7 @@ def deploy(
         COMPUTE_TYPES,
         CodeExtensionMetadata,
         deploy_full,
+        describe_supported_signatures,
         infer_use_in_feature,
     )
     from datacustomcode.token_provider import (
@@ -252,8 +253,9 @@ def deploy(
         else:
             click.secho(
                 "Error: Function signature does not match a supported type. "
-                "Use SearchIndexChunkingV1Request and "
-                "SearchIndexChunkingV1Response in function signature.",
+                "Use a supported Request/Response pair in the function "
+                "signature. For example, "
+                f"{describe_supported_signatures(entrypoint_path)}.",
                 fg="red",
             )
             raise click.Abort()

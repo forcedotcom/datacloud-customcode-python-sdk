@@ -46,8 +46,9 @@ SCRIPT_USE_IN_FEATURE_OPTIONS = [
     SCRIPT_USE_IN_FEATURE_STREAMING,
 ]
 
-# Pydantic request/response type names to feature names
+# (request type name, response type name) pair to feature name
 REQUEST_TYPE_TO_FEATURE = {
-    "SearchIndexChunkingV1Request": "SearchIndexChunking",
-    "SearchIndexChunkingV1Response": "SearchIndexChunking",
+    ("SearchIndexChunkingV1Request", "SearchIndexChunkingV1Response"): (
+        "SearchIndexChunking"
+    ),
 }
