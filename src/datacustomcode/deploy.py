@@ -95,15 +95,35 @@ def infer_use_in_feature(entrypoint_path: str) -> Union[str, None]:
     if not request_type_name or not response_type_name:
         return None
 
-    # Look up features for both types
-    request_feature = REQUEST_TYPE_TO_FEATURE.get(request_type_name)
-    response_feature = REQUEST_TYPE_TO_FEATURE.get(response_type_name)
+    return REQUEST_TYPE_TO_FEATURE.get((request_type_name, response_type_name))
 
-    # Both must be present and must match
-    if request_feature and response_feature and request_feature == response_feature:
-        return request_feature
 
-    return None
+def describe_supported_signatures(entrypoint_path: str) -> str:
+    """Build a contract-mismatch hint based on the function's feature type.
+
+    If the request or response type belongs to a known feature, only that
+    feature's expected pair is listed; otherwise all supported pairs are.
+    Each pair is followed by the use_in_feature it maps to, e.g.
+    ``Req/Resp for use_in_feature: SearchIndexChunking``.
+    """
+    from datacustomcode.function_utils import inspect_function_types_static
+
+    request_type_name, response_type_name = inspect_function_types_static(
+        entrypoint_path
+    )
+    supported = list(REQUEST_TYPE_TO_FEATURE.items())
+    sharing_a_type = [
+        ((expected_request, expected_response), feature)
+        for (expected_request, expected_response), feature in supported
+        if request_type_name == expected_request
+        or response_type_name == expected_response
+    ]
+    # Narrow the hint only when the detected types point at a single feature
+    to_show = sharing_a_type if len(sharing_a_type) == 1 else supported
+    return " or ".join(
+        f"{expected_request}/{expected_response} for use_in_feature: {feature}"
+        for (expected_request, expected_response), feature in to_show
+    )
 
 
 class CodeExtensionMetadata(BaseModel):
