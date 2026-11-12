@@ -30,6 +30,7 @@ with patch("datacustomcode.version.get_version", return_value="1.2.3"):
         DataTransformConfig,
         DeploymentsResponse,
         _make_api_call,
+        _redact_headers,
         _sanitize_api_name,
         create_data_transform,
         create_deployment,
@@ -596,6 +597,81 @@ class TestMakeApiCall:
 
         with pytest.raises(AssertionError, match="Unexpected response type"):
             _make_api_call("https://example.com", "GET")
+
+
+class TestMakeApiCallLogging:
+    """The bearer token must never reach the logs, even at DEBUG level."""
+
+    @pytest.fixture
+    def debug_logs(self):
+        from loguru import logger
+
+        messages: list = []
+        sink_id = logger.add(lambda m: messages.append(str(m)), level="DEBUG")
+        yield messages
+        logger.remove(sink_id)
+
+    @patch("datacustomcode.deploy.requests.request")
+    def test_token_not_logged_on_success(self, mock_request, debug_logs):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"key": "value"}
+        mock_request.return_value = mock_response
+
+        _make_api_call(
+            "https://example.com", "POST", token="s3cr3t-token", json={"a": "b"}
+        )
+
+        logged = "".join(debug_logs)
+        assert "s3cr3t-token" not in logged
+        assert "[REDACTED]" in logged
+        # The real token is still sent on the wire.
+        assert mock_request.call_args.kwargs["headers"] == {
+            "Authorization": "Bearer s3cr3t-token"
+        }
+
+    @patch("datacustomcode.deploy.requests.request")
+    def test_sensitive_response_headers_not_logged_on_error(
+        self, mock_request, debug_logs
+    ):
+        mock_response = MagicMock()
+        mock_response.status_code = 500
+        mock_response.headers = requests.structures.CaseInsensitiveDict(
+            {"Set-Cookie": "sid=s3cr3t-cookie", "Content-Type": "application/json"}
+        )
+        mock_response.text = '{"error": "boom"}'
+        mock_response.json.return_value = {"error": "boom"}
+        mock_request.return_value = mock_response
+
+        _make_api_call("https://example.com", "GET", token="s3cr3t-token")
+
+        logged = "".join(debug_logs)
+        assert "s3cr3t-token" not in logged
+        assert "s3cr3t-cookie" not in logged
+        assert "application/json" in logged
+
+
+class TestRedactHeaders:
+    def test_masks_sensitive_headers_case_insensitively(self):
+        headers = {
+            "authorization": "Bearer x",
+            "Proxy-Authorization": "Basic y",
+            "COOKIE": "a=b",
+            "Set-Cookie": "c=d",
+            "Content-Type": "application/json",
+        }
+        assert _redact_headers(headers) == {
+            "authorization": "[REDACTED]",
+            "Proxy-Authorization": "[REDACTED]",
+            "COOKIE": "[REDACTED]",
+            "Set-Cookie": "[REDACTED]",
+            "Content-Type": "application/json",
+        }
+
+    def test_does_not_mutate_input(self):
+        headers = {"Authorization": "Bearer x"}
+        _redact_headers(headers)
+        assert headers == {"Authorization": "Bearer x"}
 
 
 class TestCreateDeployment:
