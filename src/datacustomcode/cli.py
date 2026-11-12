@@ -215,6 +215,7 @@ def deploy(
         COMPUTE_TYPES,
         CodeExtensionMetadata,
         deploy_full,
+        describe_supported_signatures,
         infer_use_in_feature,
     )
     from datacustomcode.token_provider import (
@@ -252,8 +253,9 @@ def deploy(
         else:
             click.secho(
                 "Error: Function signature does not match a supported type. "
-                "Use SearchIndexChunkingV1Request and "
-                "SearchIndexChunkingV1Response in function signature.",
+                "Use a supported Request/Response pair in the function "
+                "signature. For example, "
+                f"{describe_supported_signatures(entrypoint_path)}.",
                 fg="red",
             )
             raise click.Abort()
@@ -349,14 +351,27 @@ def init(directory: str, code_type: str, use_in_feature: Optional[str]):
         + " to automatically update config.json when you make changes to your code"
     )
 
-    # Generate test.json for functions
+    # Prefer the sample tests/test.json shipped in the template; only
+    # generate one from the request model if the template doesn't have it
     if code_type == "function":
-        test_json_path = _generate_function_test_file(entrypoint_path)
-        if test_json_path:
+        template_test_json = os.path.join(
+            os.path.dirname(entrypoint_path), TESTS_DIR, TEST_FILE
+        )
+        test_json_path: Optional[str]
+        if os.path.isfile(template_test_json):
+            test_json_path = template_test_json
             click.echo(
-                "Generated test file at "
+                "Sample test file at "
                 + click.style(test_json_path, fg="blue", bold=True)
             )
+        else:
+            test_json_path = _generate_function_test_file(entrypoint_path)
+            if test_json_path:
+                click.echo(
+                    "Generated test file at "
+                    + click.style(test_json_path, fg="blue", bold=True)
+                )
+        if test_json_path:
             click.echo(
                 "Test your function locally with "
                 + click.style(
