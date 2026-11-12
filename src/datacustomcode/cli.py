@@ -354,10 +354,12 @@ def init(directory: str, code_type: str, use_in_feature: Optional[str]):
     # Prefer the sample tests/test.json shipped in the template; only
     # generate one from the request model if the template doesn't have it
     if code_type == "function":
-        test_json_path: Optional[str] = os.path.join(
+        template_test_json = os.path.join(
             os.path.dirname(entrypoint_path), TESTS_DIR, TEST_FILE
         )
-        if os.path.isfile(test_json_path):
+        test_json_path: Optional[str]
+        if os.path.isfile(template_test_json):
+            test_json_path = template_test_json
             click.echo(
                 "Sample test file at "
                 + click.style(test_json_path, fg="blue", bold=True)
