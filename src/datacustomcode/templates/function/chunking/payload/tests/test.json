@@ -1,0 +1,33 @@
+{
+  "input": [
+    {
+      "text": "Online Remittance Instructions",
+      "metadata": {
+        "type": "text",
+        "page_number": 1,
+        "transcript_fields": {
+          "speaker": "Agent",
+          "start_timestamp": 1.0,
+          "end_timestamp": 8.75
+        },
+        "text_as_html": "<p>Online Remittance Instructions</p>",
+        "source_dmo_fields": {
+          "FilePath__c": "quarterly_report.pdf",
+          "Size__c": 1377454.0,
+          "ContentType__c": "pdf",
+          "LastModified__c": "2026-03-25T02:01:24.918000"
+        },
+        "prepend": [
+          {
+            "dmo_name": "udmo_1__dlm",
+            "field_name": "ResolvedFilePath__c",
+            "value": "udlo_1__dll:quarterly_report.pdf"
+          }
+        ],
+        "image_base64": "sample_image_base64",
+        "image_mime_type": "image/png",
+        "image_type": "diagram"
+      }
+    }
+  ]
+}
