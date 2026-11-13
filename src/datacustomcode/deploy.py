@@ -27,6 +27,7 @@ from typing import (
     Callable,
     Dict,
     List,
+    Mapping,
     Optional,
     Union,
 )
@@ -166,6 +167,19 @@ JSONValue = Union[
 ]
 
 
+_SENSITIVE_HEADERS = frozenset(
+    {"authorization", "proxy-authorization", "cookie", "set-cookie"}
+)
+
+
+def _redact_headers(headers: Mapping[str, Any]) -> dict[str, Any]:
+    """Return a copy of ``headers`` safe to log, with secret-bearing values masked."""
+    return {
+        key: "[REDACTED]" if key.lower() in _SENSITIVE_HEADERS else value
+        for key, value in headers.items()
+    }
+
+
 def _make_api_call(
     url: str,
     method: str,
@@ -179,13 +193,13 @@ def _make_api_call(
         headers["Authorization"] = f"Bearer {token}"
 
     logger.debug(f"Making API call: {method} {url}")
-    logger.debug(f"Headers: {headers}")
-    logger.debug(f"Request params: {kwargs}")
+    logger.debug(f"Headers: {_redact_headers(headers)}")
+    logger.debug(f"Request params: {sorted(kwargs)}")
 
     response = requests.request(method=method, url=url, headers=headers, **kwargs)
     if response.status_code >= 400:
         logger.warning(f"Error Response Status: {response.status_code}")
-        logger.debug(f"Error Response Headers: {response.headers}")
+        logger.debug(f"Error Response Headers: {_redact_headers(response.headers)}")
         logger.warning(f"Error Response Text: {response.text[:500]}")
 
     if not response.text or response.text.strip() == "":
