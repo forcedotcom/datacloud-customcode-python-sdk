@@ -151,7 +151,7 @@ class TestDeployArgContract:
         "--description", "My description",
         "--path", "payload",
         "--sf-cli-org", "my-org",
-        "--cpu-size", "CPU_2XL",
+        "--cpu-size", "Standard_2XL",
     ]  # fmt: skip
 
     @patch("datacustomcode.token_provider.SFCLITokenProvider")

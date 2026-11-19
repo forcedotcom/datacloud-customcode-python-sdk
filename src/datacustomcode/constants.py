@@ -26,7 +26,7 @@ REQUIREMENTS_FILE = "requirements.txt"
 # Default values
 DEFAULT_PROFILE = "default"
 DEFAULT_NETWORK = "default"
-DEFAULT_CPU_SIZE = "CPU_2XL"
+DEFAULT_CPU_SIZE = "Standard_2XL"
 
 # Feature to template folder mapping
 FEATURE_TEMPLATE_MAPPING = {

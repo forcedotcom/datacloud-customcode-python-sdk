@@ -199,7 +199,7 @@ jobs:
           --package-version 0.0.1 \
           --description "Test script deploy" \
           --package-dir testScript/payload \
-          --cpu-size CPU_2XL \
+          --cpu-size Standard_2XL \
           -o dev1 || {
           echo "::error::sf data-code-extension script deploy FAILED. Check mock server output above for which endpoint failed. The deploy command flags or API contract may have changed."
           exit 1
@@ -303,7 +303,7 @@ jobs:
           --package-version 0.0.1 \
           --description "Test function deploy" \
           --package-dir testFunction/payload \
-          --cpu-size CPU_2XL \
+          --cpu-size Standard_2XL \
           -o dev1 || {
           echo "::error::sf data-code-extension function deploy FAILED. Check mock server output above for which endpoint failed. The deploy command flags or API contract may have changed."
           exit 1
