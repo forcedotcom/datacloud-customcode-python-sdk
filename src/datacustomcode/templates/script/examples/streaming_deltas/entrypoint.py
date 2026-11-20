@@ -27,6 +27,7 @@ from datacustomcode.client import (
     StreamingClient,
     get_run_mode,
 )
+from datacustomcode.io.dedup_order import SOURCE_RECORD_STANDARD
 
 
 def main():
@@ -41,7 +42,9 @@ def main():
 
         # Start the streaming write. write_dlo_deltas returns the StreamingQuery;
         # the trigger and checkpoint location are provided by the runtime.
-        query = client.write_dlo_deltas(target_dlo, transformed)
+        query = client.write_dlo_deltas(
+            target_dlo, transformed, dedup_order=SOURCE_RECORD_STANDARD
+        )
 
         # Drive the query's lifecycle. In the streaming runtime this blocks until
         # the job is stopped by the platform.

@@ -21,6 +21,8 @@ from typing import TYPE_CHECKING
 from datacustomcode.io.base import BaseDataAccessLayer
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
+
     from pyspark.sql import DataFrame as PySparkDataFrame, SparkSession
     from pyspark.sql.streaming import StreamingQuery
 
@@ -72,7 +74,11 @@ class BaseDataCloudWriter(BaseDataAccessLayer):
         raise NotImplementedError
 
     def write_dlo_deltas(
-        self, name: str, dataframe: PySparkDataFrame
+        self,
+        name: str,
+        dataframe: PySparkDataFrame,
+        *,
+        dedup_order: Sequence[Mapping[str, str]],
     ) -> StreamingQuery:
         """Write a streaming DataFrame of deltas to a Data Lake Object.
 
@@ -88,6 +94,8 @@ class BaseDataCloudWriter(BaseDataAccessLayer):
             name: Target Data Lake Object name.
             dataframe: Streaming PySpark DataFrame produced from a
                 ``read_dlo_deltas`` source.
+            dedup_order: Validated ``dedup_order`` entries; see
+                :mod:`datacustomcode.io.dedup_order`.
 
         Returns:
             The started ``StreamingQuery``; the caller drives its lifecycle
@@ -104,7 +112,11 @@ class BaseDataCloudWriter(BaseDataAccessLayer):
         )
 
     def write_dmo_deltas(
-        self, name: str, dataframe: PySparkDataFrame
+        self,
+        name: str,
+        dataframe: PySparkDataFrame,
+        *,
+        dedup_order: Sequence[Mapping[str, str]],
     ) -> StreamingQuery:
         """Write a streaming DataFrame of deltas to a Data Model Object.
 
@@ -120,6 +132,8 @@ class BaseDataCloudWriter(BaseDataAccessLayer):
             name: Target Data Model Object name.
             dataframe: Streaming PySpark DataFrame produced from a
                 ``read_dmo_deltas`` source.
+            dedup_order: Validated ``dedup_order`` entries; see
+                :mod:`datacustomcode.io.dedup_order`.
 
         Returns:
             The started ``StreamingQuery``; the caller drives its lifecycle

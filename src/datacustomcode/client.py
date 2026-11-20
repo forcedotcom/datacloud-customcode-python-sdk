@@ -30,12 +30,14 @@ from typing import (
 from datacustomcode.config import config
 from datacustomcode.einstein_predictions_config import spark_einstein_predictions_config
 from datacustomcode.file.path.default import DefaultFindFilePath
+from datacustomcode.io.dedup_order import validate_dedup_order
 from datacustomcode.io.reader.base import BaseDataCloudReader
 from datacustomcode.llm_gateway_config import spark_llm_gateway_config
 from datacustomcode.named_credential_config import spark_named_credential_config
 from datacustomcode.spark.default import DefaultSparkSessionProvider
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
     from pathlib import Path
 
     from pyspark.sql import (
@@ -708,7 +710,12 @@ class StreamingClient(_BaseClient):
         return self._reader.read_dmo_deltas()  # type: ignore[no-any-return]
 
     def write_dlo_deltas(
-        self, name: str, dataframe: PySparkDataFrame, **kwargs
+        self,
+        name: str,
+        dataframe: PySparkDataFrame,
+        *,
+        dedup_order: Sequence[Mapping[str, str]],
+        **kwargs,
     ) -> StreamingQuery:
         """Write a streaming DataFrame of deltas to a DLO in Data Cloud.
 
@@ -719,15 +726,32 @@ class StreamingClient(_BaseClient):
         Args:
             name: The name of the DLO to write to.
             dataframe: The streaming PySpark DataFrame to write.
+            dedup_order: Entries ``{"column", "direction", "partition"}`` that
+                pick one row per target key. ``partition`` is optional, and
+                entries with it must come first. Start with
+                ``*SOURCE_RECORD_STANDARD`` from
+                :mod:`datacustomcode.io.dedup_order`. Pass ``[]`` to fail the
+                batch when two different rows share a key.
 
         Returns:
             The started ``StreamingQuery``.
+
+        Raises:
+            ValueError: If ``dedup_order`` is malformed.
         """
         self._validate_data_layer_history_does_not_contain(DataCloudObjectType.DMO)
-        return self._writer.write_dlo_deltas(name, dataframe, **kwargs)  # type: ignore[no-any-return]
+        entries = validate_dedup_order(dedup_order)
+        return self._writer.write_dlo_deltas(  # type: ignore[no-any-return]
+            name, dataframe, dedup_order=entries, **kwargs
+        )
 
     def write_dmo_deltas(
-        self, name: str, dataframe: PySparkDataFrame, **kwargs
+        self,
+        name: str,
+        dataframe: PySparkDataFrame,
+        *,
+        dedup_order: Sequence[Mapping[str, str]],
+        **kwargs,
     ) -> StreamingQuery:
         """Write a streaming DataFrame of deltas to a DMO in Data Cloud.
 
@@ -738,12 +762,19 @@ class StreamingClient(_BaseClient):
         Args:
             name: The name of the DMO to write to.
             dataframe: The streaming PySpark DataFrame to write.
+            dedup_order: See :meth:`write_dlo_deltas`.
 
         Returns:
             The started ``StreamingQuery``.
+
+        Raises:
+            ValueError: If ``dedup_order`` is malformed.
         """
         self._validate_data_layer_history_does_not_contain(DataCloudObjectType.DLO)
-        return self._writer.write_dmo_deltas(name, dataframe, **kwargs)  # type: ignore[no-any-return]
+        entries = validate_dedup_order(dedup_order)
+        return self._writer.write_dmo_deltas(  # type: ignore[no-any-return]
+            name, dataframe, dedup_order=entries, **kwargs
+        )
 
     def auto_write_to_dlo(self, name: str, dataframe: PySparkDataFrame) -> None:
         """Write a PySpark DataFrame to a DLO in Data Cloud automatically picking

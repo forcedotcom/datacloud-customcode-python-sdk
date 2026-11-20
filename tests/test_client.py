@@ -24,6 +24,11 @@ from datacustomcode.config import (
     SparkConfig,
 )
 from datacustomcode.einstein_predictions.types import PredictionType
+from datacustomcode.io.dedup_order import (
+    SOURCE_RECORD_BY_LATEST_COMMIT_VERSION,
+    SOURCE_RECORD_STANDARD,
+    SOURCE_RECORD_UPSERT_OVER_DELETE,
+)
 from datacustomcode.io.reader.base import BaseDataCloudReader
 from datacustomcode.io.writer.base import BaseDataCloudWriter, WriteMode
 
@@ -416,12 +421,52 @@ class TestStreamingClient:
         client = StreamingClient(reader=reader, writer=writer)
         client._record_dlo_access("some_dlo")
 
-        result = client.write_dlo_deltas("test_dlo", mock_df, extra_param=True)
+        result = client.write_dlo_deltas(
+            "test_dlo",
+            mock_df,
+            dedup_order=[*SOURCE_RECORD_STANDARD, {"column": "a", "direction": "asc"}],
+            extra_param=True,
+        )
 
         writer.write_dlo_deltas.assert_called_once_with(
-            "test_dlo", mock_df, extra_param=True
+            "test_dlo",
+            mock_df,
+            dedup_order=[
+                dict(SOURCE_RECORD_BY_LATEST_COMMIT_VERSION),
+                dict(SOURCE_RECORD_UPSERT_OVER_DELETE),
+                {"column": "a", "direction": "asc"},
+            ],
+            extra_param=True,
         )
         assert result is mock_query
+
+    def test_write_dlo_deltas_requires_dedup_order(self, reset_client, mock_spark):
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        client = StreamingClient(
+            reader=MagicMock(spec=BaseDataCloudReader), writer=writer
+        )
+
+        with pytest.raises(TypeError, match="dedup_order"):
+            client.write_dlo_deltas("test_dlo", MagicMock(spec=DataFrame))
+
+        writer.write_dlo_deltas.assert_not_called()
+
+    def test_write_dlo_deltas_invalid_dedup_order_raises(
+        self, reset_client, mock_spark
+    ):
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        client = StreamingClient(
+            reader=MagicMock(spec=BaseDataCloudReader), writer=writer
+        )
+
+        with pytest.raises(ValueError, match="dedup_order"):
+            client.write_dlo_deltas(
+                "test_dlo",
+                MagicMock(spec=DataFrame),
+                dedup_order=[{"column": "a"}],
+            )
+
+        writer.write_dlo_deltas.assert_not_called()
 
     def test_write_dlo_deltas_after_dmo_read_raises_exception(
         self, reset_client, mock_spark
@@ -435,7 +480,7 @@ class TestStreamingClient:
         client._record_dmo_access("test_dmo")
 
         with pytest.raises(DataCloudAccessLayerException) as exc_info:
-            client.write_dlo_deltas("test_dlo", mock_df)
+            client.write_dlo_deltas("test_dlo", mock_df, dedup_order=[])
 
         assert "test_dmo" in str(exc_info.value)
         writer.write_dlo_deltas.assert_not_called()
@@ -450,12 +495,25 @@ class TestStreamingClient:
         client = StreamingClient(reader=reader, writer=writer)
         client._record_dmo_access("some_dmo")
 
-        result = client.write_dmo_deltas("test_dmo", mock_df, extra_param=True)
+        result = client.write_dmo_deltas(
+            "test_dmo", mock_df, dedup_order=[], extra_param=True
+        )
 
         writer.write_dmo_deltas.assert_called_once_with(
-            "test_dmo", mock_df, extra_param=True
+            "test_dmo", mock_df, dedup_order=[], extra_param=True
         )
         assert result is mock_query
+
+    def test_write_dmo_deltas_requires_dedup_order(self, reset_client, mock_spark):
+        writer = MagicMock(spec=BaseDataCloudWriter)
+        client = StreamingClient(
+            reader=MagicMock(spec=BaseDataCloudReader), writer=writer
+        )
+
+        with pytest.raises(TypeError, match="dedup_order"):
+            client.write_dmo_deltas("test_dmo", MagicMock(spec=DataFrame))
+
+        writer.write_dmo_deltas.assert_not_called()
 
     def test_write_dmo_deltas_after_dlo_read_raises_exception(
         self, reset_client, mock_spark
@@ -469,7 +527,7 @@ class TestStreamingClient:
         client._record_dlo_access("test_dlo")
 
         with pytest.raises(DataCloudAccessLayerException) as exc_info:
-            client.write_dmo_deltas("test_dmo", mock_df)
+            client.write_dmo_deltas("test_dmo", mock_df, dedup_order=[])
 
         assert "test_dlo" in str(exc_info.value)
         writer.write_dmo_deltas.assert_not_called()
@@ -486,10 +544,12 @@ class TestStreamingClient:
         with patch("datacustomcode.client.config") as mock_config:
             mock_config.streaming_source = "source_dll"
             df = client.read_dlo_deltas()
-        client.write_dlo_deltas("target_dll", df)
+        client.write_dlo_deltas("target_dll", df, dedup_order=[])
 
         reader.read_dlo_deltas.assert_called_once_with()
-        writer.write_dlo_deltas.assert_called_once_with("target_dll", stream_df)
+        writer.write_dlo_deltas.assert_called_once_with(
+            "target_dll", stream_df, dedup_order=[]
+        )
         assert "source_dll" in client._data_layer_history[DataCloudObjectType.DLO]
 
     def test_streaming_dmo_read_write_flow(self, reset_client, mock_spark):
@@ -504,10 +564,12 @@ class TestStreamingClient:
         with patch("datacustomcode.client.config") as mock_config:
             mock_config.streaming_source = "source_dlm"
             df = client.read_dmo_deltas()
-        client.write_dmo_deltas("target_dlm", df)
+        client.write_dmo_deltas("target_dlm", df, dedup_order=[])
 
         reader.read_dmo_deltas.assert_called_once_with()
-        writer.write_dmo_deltas.assert_called_once_with("target_dlm", stream_df)
+        writer.write_dmo_deltas.assert_called_once_with(
+            "target_dlm", stream_df, dedup_order=[]
+        )
         assert "source_dlm" in client._data_layer_history[DataCloudObjectType.DMO]
 
     def test_auto_write_to_dlo(self, reset_client, mock_spark):
