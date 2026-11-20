@@ -22,8 +22,8 @@ entry without ``partition`` runs per target primary key. Entries with
 
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping, Sequence
+import re
 from typing import Final
 
 from datacustomcode.io import cdf
