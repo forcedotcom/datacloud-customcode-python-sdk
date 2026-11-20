@@ -22,6 +22,8 @@ from datacustomcode.io.writer.base import MERGE_RECORD_TYPE_COLUMN, MergeRecordT
 COMMIT_VERSION: Final = "_commit_version"
 COMMIT_TIMESTAMP: Final = "_commit_timestamp"
 MERGE_RECORD_TYPE: Final = MERGE_RECORD_TYPE_COLUMN
+SOURCE_TABLE_NAME: Final = "_source_table_name"
+SOURCE_RECORD_KEY: Final = "_source_record_key"
 
 CDF_METADATA_COLUMNS: Final = (COMMIT_VERSION, COMMIT_TIMESTAMP, MERGE_RECORD_TYPE)
 
@@ -29,6 +31,8 @@ __all__ = [
     "COMMIT_VERSION",
     "COMMIT_TIMESTAMP",
     "MERGE_RECORD_TYPE",
+    "SOURCE_TABLE_NAME",
+    "SOURCE_RECORD_KEY",
     "CDF_METADATA_COLUMNS",
     "MergeRecordType",
 ]
