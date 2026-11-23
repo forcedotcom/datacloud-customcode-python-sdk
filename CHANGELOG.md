@@ -1,5 +1,35 @@
 # Changelog
 
+## 7.1.0
+
+### Added
+
+- **Per-row `path` in `named_credential_request_col`.**
+
+  `named_credential_request_col(request, body=None, path=None)` (and `SparkNamedCredential.request_col`) accepts an optional per-row `path` Column that is appended to `request.url`, so each row can call a different endpoint of the same Named Credential (for example, per-entity REST lookups). A path not starting with `/` or `?` is joined with `/`. A null or empty value uses `request.url` as is. The Named Credential itself cannot be changed per row.
+
+  ```python
+  from pyspark.sql.functions import col, concat, lit
+  from datacustomcode.client import named_credential_request_col
+
+  df = df.withColumn(
+      "result",
+      named_credential_request_col(request, path=concat(lit("?id="), col("id__c"))),
+  )
+  ```
+
+  Omitting `path` keeps the existing behavior.
+
+### Security
+
+- **PKCE and `state` validation for the browser OAuth login.** The authorization-code flow now sends a PKCE (RFC 7636, S256) code challenge and checks the `state` parameter on the local callback. Callbacks with a missing or mismatched `state` are rejected.
+- **Secrets are redacted from debug logs.** `Authorization`, `Proxy-Authorization`, `Cookie`, and `Set-Cookie` header values are logged as `[REDACTED]`, and request keyword arguments are logged by name only.
+
+### Changed
+
+- **Clearer function signature-mismatch error on `deploy`.** The error now lists the supported Request/Response pairs instead of naming only the search-index chunking types.
+- **`init` for functions uses the template's sample `tests/test.json`** when the template ships one. It falls back to generating a test file from the request model only if the template has none.
+
 ## 7.0.0
 
 ### Breaking Changes
