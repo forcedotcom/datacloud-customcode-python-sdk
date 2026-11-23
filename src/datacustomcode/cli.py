@@ -289,7 +289,8 @@ def deploy(
     default=None,
     help=(
         "Invoke option for this package. For scripts: 'BatchTransform' "
-        "(default) or 'StreamingTransform'. For functions: 'SearchIndexChunking'."
+        "(default) or 'StreamingTransform'. For functions: 'SearchIndexChunking' "
+        "or 'KnowledgeHarmonizationPostProcessing'."
     ),
 )
 def init(directory: str, code_type: str, use_in_feature: Optional[str]):

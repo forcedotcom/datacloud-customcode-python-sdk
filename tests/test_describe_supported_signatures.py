@@ -19,5 +19,10 @@ def test_describe_supported_signatures(tmp_path):
     assert describe("SearchIndexChunkingV1Request", "dict") == chunk_pair
     assert describe("dict", "SearchIndexChunkingV1Response") == chunk_pair
     # Unrecognised types fall back to listing every supported pair
+    kh_pair = (
+        "KnowledgeHarmonizationPostProcessingV1Request/"
+        "KnowledgeHarmonizationPostProcessingV1Response "
+        "for use_in_feature: KnowledgeHarmonizationPostProcessing"
+    )
     fallback = describe("dict", "dict")
-    assert fallback == chunk_pair
+    assert fallback == f"{chunk_pair} or {kh_pair}"
