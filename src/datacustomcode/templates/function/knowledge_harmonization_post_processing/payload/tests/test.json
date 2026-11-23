@@ -1,0 +1,12 @@
+{
+  "input": {
+    "text": "<html><head><title>Doc</title></head><body><h1>Quarterly Report</h1><p>Online Remittance Instructions</p></body></html>",
+    "metadata": {
+      "source_dmo_fields": {
+        "FilePath__c": "quarterly_report.html",
+        "ContentType__c": "text/html",
+        "LastModified__c": "2026-03-25T02:01:24.918000"
+      }
+    }
+  }
+}

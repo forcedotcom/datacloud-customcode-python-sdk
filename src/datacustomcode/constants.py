@@ -31,11 +31,13 @@ DEFAULT_CPU_SIZE = "CPU_2XL"
 # Feature to template folder mapping
 FEATURE_TEMPLATE_MAPPING = {
     "SearchIndexChunking": "chunking",
+    "KnowledgeHarmonizationPostProcessing": "knowledge_harmonization_post_processing",
 }
 
 # Feature name to Connect API name mapping
 USE_IN_FEATURE_MAPPING_FOR_CONNECT_API = {
     "SearchIndexChunking": "UnstructuredChunking",
+    "KnowledgeHarmonizationPostProcessing": "KnowledgeHarmonizationPostProcessing",
 }
 
 # Script (data transform) invoke options
@@ -51,4 +53,8 @@ REQUEST_TYPE_TO_FEATURE = {
     ("SearchIndexChunkingV1Request", "SearchIndexChunkingV1Response"): (
         "SearchIndexChunking"
     ),
+    (
+        "KnowledgeHarmonizationPostProcessingV1Request",
+        "KnowledgeHarmonizationPostProcessingV1Response",
+    ): "KnowledgeHarmonizationPostProcessing",
 }

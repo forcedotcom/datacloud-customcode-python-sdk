@@ -362,6 +362,7 @@ Argument:
 - `DIRECTORY`: Directory to create project in (default: ".")
 Options:
 - `--code-type TEXT`: This can be either `function` or `script`. The default value is `script` if the argument is missing.
+- `--use-in-feature TEXT`, `-u TEXT`: Invoke option for this package. For scripts: `BatchTransform` (default) or `StreamingTransform`. For functions: `SearchIndexChunking` or `KnowledgeHarmonizationPostProcessing`.
 
 
 #### `datacustomcode scan`
@@ -414,7 +415,7 @@ Options:
 - `--network TEXT`: docker network (default: "default")
 - `--cpu-size TEXT`: CPU size for the deployment (default: `CPU_2XL`). Available options: CPU_L(Large), CPU_XL(Extra Large), CPU_2XL(2X Large), CPU_4XL(4X Large)
 - `--sf-cli-org TEXT`: Salesforce CLI org alias or username (e.g. `myorg`). Fetches credentials via `sf org display` — no `datacustomcode configure` step needed. Takes precedence over `--profile` if both are supplied.
-- `--function-invoke-opt TEXT`: Currently we support only `UnstructuredChunking` for functions.
+- Function invoke option: inferred from the function signature on deploy. `SearchIndexChunking` is sent as `UnstructuredChunking`. `KnowledgeHarmonizationPostProcessing` is sent as `KnowledgeHarmonizationPostProcessing`.
 
 
 ## Testing LLM Gateway
