@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+### Breaking Changes
+
+- **`StreamingClient.write_dlo_deltas` and `write_dmo_deltas` require a `dedup_order` keyword argument.**
+
+  `dedup_order` is an ordered list of `{"column", "direction", "partition"}` entries (`partition` optional) that decides which row wins when several rows in a micro-batch share a target key. The SDK checks the shape and raises `ValueError` before the stream starts.
+
+  **Migration:** Add `dedup_order` to each call. `SOURCE_RECORD_STANDARD` (from `datacustomcode.io.dedup_order`) keeps the latest version of each source record and prefers UPSERT over DELETE; pass `[]` to fail the batch whenever two different rows share a key.
+
+  ```python
+  # Before
+  client.write_dlo_deltas("Output__dll", df)
+
+  # After
+  from datacustomcode.io.dedup_order import SOURCE_RECORD_STANDARD
+
+  client.write_dlo_deltas("Output__dll", df, dedup_order=SOURCE_RECORD_STANDARD)
+  ```
+
+### Added
+
+- **`datacustomcode.io.dedup_order`** – `SOURCE_RECORD_BY_LATEST_COMMIT_VERSION`, `SOURCE_RECORD_UPSERT_OVER_DELETE` and `SOURCE_RECORD_STANDARD` entries to start a `dedup_order` from.
+
 ## 7.1.0
 
 ### Added

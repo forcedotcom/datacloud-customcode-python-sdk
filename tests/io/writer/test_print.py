@@ -62,13 +62,13 @@ class TestPrintDataCloudWriter:
     def test_write_dlo_deltas_not_supported_locally(self, print_writer, mock_dataframe):
         """Streaming delta writes are not supported by the local writer."""
         with pytest.raises(NotImplementedError) as exc_info:
-            print_writer.write_dlo_deltas("test_dll", mock_dataframe)
+            print_writer.write_dlo_deltas("test_dll", mock_dataframe, dedup_order=[])
         assert "write_dlo_deltas" in str(exc_info.value)
 
     def test_write_dmo_deltas_not_supported_locally(self, print_writer, mock_dataframe):
         """Streaming delta writes are not supported by the local writer."""
         with pytest.raises(NotImplementedError) as exc_info:
-            print_writer.write_dmo_deltas("test_dlm", mock_dataframe)
+            print_writer.write_dmo_deltas("test_dlm", mock_dataframe, dedup_order=[])
         assert "write_dmo_deltas" in str(exc_info.value)
 
     def test_config_name(self):

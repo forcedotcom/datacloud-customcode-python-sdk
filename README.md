@@ -157,8 +157,8 @@ For a batch transform, use `Client`. You should only need the following methods:
 For a streaming (delta) transform, use `StreamingClient`, which exposes the streaming counterparts:
 * `read_dlo_deltas()` – Read the streaming change feed (deltas) of a Data Lake Object as a streaming DataFrame.
 * `read_dmo_deltas()` – Read the streaming change feed (deltas) of a Data Model Object as a streaming DataFrame.
-* `write_dlo_deltas(name, spark_dataframe)` – Write a streaming DataFrame of deltas to a Data Lake Object; returns the started `StreamingQuery`
-* `write_dmo_deltas(name, spark_dataframe)` – Write a streaming DataFrame of deltas to a Data Model Object; returns the started `StreamingQuery`
+* `write_dlo_deltas(name, spark_dataframe, dedup_order=...)` – Write a streaming DataFrame of deltas to a Data Lake Object; returns the started `StreamingQuery`
+* `write_dmo_deltas(name, spark_dataframe, dedup_order=...)` – Write a streaming DataFrame of deltas to a Data Model Object; returns the started `StreamingQuery`
 
 `find_file_path`, `llm_gateway_generate_text`, and `einstein_predict` are available on both clients.
 
@@ -206,6 +206,7 @@ Streaming BYOC transforms process a Data Lake Object's Change Data Feed continuo
 from pyspark.sql.functions import col, upper
 
 from datacustomcode import StreamingClient
+from datacustomcode.io.dedup_order import SOURCE_RECORD_STANDARD
 
 client = StreamingClient()
 
@@ -218,8 +219,10 @@ transformed = deltas.withColumn("description__c", upper(col("description__c")))
 
 # write_dlo_deltas starts a streaming query and returns the StreamingQuery.
 # The runtime owns the trigger and checkpoint location; you
-# choose only the target table.
-query = client.write_dlo_deltas("Output__dll", transformed)
+# choose the target table and how to pick one row per key (dedup_order).
+query = client.write_dlo_deltas(
+    "Output__dll", transformed, dedup_order=SOURCE_RECORD_STANDARD
+)
 query.awaitTermination()
 ```
 
@@ -228,9 +231,24 @@ A streaming transform can also read and write Data Model Objects with `read_dmo_
 ```python
 deltas = client.read_dmo_deltas()
 transformed = deltas.withColumn("description__c", upper(col("description__c")))
-query = client.write_dmo_deltas("Output__dlm", transformed)
+query = client.write_dmo_deltas(
+    "Output__dlm", transformed, dedup_order=SOURCE_RECORD_STANDARD
+)
 query.awaitTermination()
 ```
+
+`dedup_order` is required on both write methods. It is an ordered list of entries `{"column", "direction", "partition"}`; each entry narrows, within its partition, to the rows tied for best on its column. `partition` is optional and names any column in your DataFrame; an entry without it runs per target primary key. Entries with `partition` must come before entries without it. If more than one row is left for a key after the last entry, the batch fails.
+
+`SOURCE_RECORD_STANDARD` provides two dedup_order entries partitioned by `_source_record_key`: keep the latest by `_commit_version`, then prefer UPSERT over DELETE. Add your own entries after it to break ties across source records:
+
+```python
+dedup_order=[
+    *SOURCE_RECORD_STANDARD,
+    {"column": "lead_score__c", "direction": "desc"},
+]
+```
+
+Pass `dedup_order=[]` to fail the batch whenever two different rows share a key.
 
 Notes:
 
