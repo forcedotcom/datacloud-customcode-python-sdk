@@ -1,8 +1,8 @@
-# Data Cloud Custom Code SDK
+# Data 360 Code Extension SDK
 
-This package provides a development kit for creating custom data transformations in [Data Cloud](https://www.salesforce.com/data/). It allows you to write your own data processing logic in Python while leveraging Data Cloud's infrastructure for data access and running data transformations, mapping execution into Data Cloud data structures like [Data Model Objects](https://help.salesforce.com/s/articleView?id=data.c360_a_data_model_objects.htm&type=5) and [Data Lake Objects](https://help.salesforce.com/s/articleView?id=sf.c360_a_data_lake_objects.htm&language=en_US&type=5).
+This package is the development kit for [Data 360 Code Extensions](https://developer.salesforce.com/docs/data/data-cloud-code-ext/guide/use-custom-code.html). It allows you to write your own data processing logic in Python while leveraging Data 360's infrastructure for data access and running data transformations, mapping execution into data structures like [Data Model Objects](https://help.salesforce.com/s/articleView?id=data.c360_a_data_model_objects.htm&type=5) and [Data Lake Objects](https://help.salesforce.com/s/articleView?id=sf.c360_a_data_lake_objects.htm&language=en_US&type=5).
 
-More specifically, this codebase gives you ability to test code locally before pushing to Data Cloud's remote execution engine, greatly reducing how long it takes to develop.
+More specifically, this codebase gives you ability to test code locally before pushing to Data 360's remote execution engine, greatly reducing how long it takes to develop.
 
 Use of this project with Salesforce is subject to the [TERMS OF USE](./TERMS_OF_USE.md)
 
@@ -12,10 +12,7 @@ Use of this project with Salesforce is subject to the [TERMS OF USE](./TERMS_OF_
 - JDK 17
 - Docker support like [Docker Desktop](https://docs.docker.com/desktop/)
 - A salesforce org with some DLOs or DMOs with data and this feature enabled
-- **One of the following** for authentication:
-  - A Salesforce org already authenticated via the [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli)
-    (simplest — no External Client App needed)
-  - An [External Client App](#creating-an-external-client-app) configured with OAuth settings
+- the [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli) and [data-code-extension plugin](https://github.com/salesforcecli/plugin-data-code-extension)
 
 ## Installation
 The SDK can be downloaded directly from PyPI with `pip`:
@@ -37,10 +34,10 @@ mkdir datacloud && cd datacloud
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install salesforce-data-customcode
-datacustomcode init my_package
+sf data-code-extension script init -p my_package
 ```
 
-To create a package of type function, pass the parameter `--code-type=function` with the init command.
+To create a package of type function, use `sf data-code-extension function init`
 
 This will yield all necessary files to get started:
 ```
@@ -63,57 +60,40 @@ This will yield all necessary files to get started:
   * `config.json` – This config defines permissions on the back and can be generated programmatically with `scan` CLI method.
   * `entrypoint.py` – The script that defines the data transformation logic.
 
-A functional entrypoint.py is provided so you can run once you've configured your External Client App:
+A functional entrypoint.py is provided so you can run once you've configured authention with your org:
 ```zsh
 cd my_package
-datacustomcode configure
-datacustomcode run ./payload/entrypoint.py
+sf data-code-extension script run -e ./payload/entrypoint.py -o myorg
 ```
-
-> [!TIP]
-> **Already using the Salesforce CLI?** If you have authenticated an org with `sf org login web
-> --alias myorg`, you can skip `datacustomcode configure` entirely:
-> ```zsh
-> datacustomcode run ./payload/entrypoint.py --sf-cli-org myorg
-> ```
 
 > [!IMPORTANT]
 > The example entrypoint.py requires a `Account_std__dll` DLO to be present.  And in order to deploy the script (next step), the output DLO (which is `Account_std_copy__dll` in the example entrypoint.py) also needs to exist and be in the same dataspace as `Account_std__dll`.
 
-After modifying the `entrypoint.py` as needed, using any dependencies you add in the `.venv` virtual environment, you can run this script in Data Cloud:
-
-**To Add New Dependencies**:
-1. Make sure your virtual environment is activated
-2. Add dependencies to `requirements.txt`
-3. Run `pip install -r requirements.txt`
-4. The SDK automatically packages all dependencies when you run `datacustomcode zip`
+After modifying the `entrypoint.py` as needed, using any dependencies you add in the `.venv` virtual environment, you can run this script in Data 360:
 
 ```zsh
 cd my_package
-datacustomcode scan ./payload/entrypoint.py
-datacustomcode deploy --path ./payload --name my_custom_script --cpu-size CPU_L --sf-cli-org myorg
+sf data-code-extension script scan -e ./payload/entrypoint.py
+sf data-code-extension script deploy -p ./payload --name my_custom_script -d description --cpu-size CPU_L --package-version 1 -o myorg
 ```
-
-> [!TIP]
-> The `deploy` process can take several minutes.  If you'd like more feedback on the underlying process, you can add `--debug` to the command like `datacustomcode --debug deploy --path ./payload --name my_custom_script`
 
 > [!NOTE]
 > **CPU Size**: Choose the appropriate CPU/Compute Size based on your workload requirements:
 > - **CPU_L / CPU_XL / CPU_2XL / CPU_4XL**: Large, X-Large, 2X-Large and 4X-Large CPU instances for data processing
 > - Default is `CPU_2XL` which provides a good balance of performance and cost for most use cases
 
-You can now use the Salesforce Data Cloud UI to find the created Data Transform and use the `Run Now` button to run it.
+You can now use the Salesforce Data 360 UI to find the created Data Transform and use the `Run Now` button to run it.
 Once the Data Transform run is successful, check the DLO your script is writing to and verify the correct records were added.
 
 ## Dependency Management
 
-The SDK automatically handles all dependency packaging for Data Cloud deployment. Here's how it works:
+The SDK automatically handles all dependency packaging for Data 360 deployment. Here's how it works:
 
 1. **Add dependencies to `requirements.txt`** - List any Python packages your script needs
 2. **Install locally** - Use `pip install -r requirements.txt` in your virtual environment
-3. **Automatic packaging** - When you run `datacustomcode zip`, the SDK automatically:
+3. **Automatic packaging** - When you run `sf data-code-extension script zip`, the SDK automatically:
    - Packages all dependencies from `requirements.txt`
-   - Uses the correct platform and architecture for Data Cloud
+   - Uses the correct platform and architecture for Data 360
 
 **No need to worry about platform compatibility** - the SDK handles this automatically through the Docker-based packaging process.
 
@@ -148,7 +128,7 @@ Your Python dependencies can be packaged as .py files, .zip archives (containing
 Your entry point script will define logic using the `Client` object (for batch transforms) or the `StreamingClient` object (for streaming delta transforms), which wrap the data access layers. Both are singletons; a single transform should use one or the other, not both.
 
 For a batch transform, use `Client`. You should only need the following methods:
-* `find_file_path(file_name)` – Resolve a bundled file (placed under `payload/files/`) to a `pathlib.Path` that exists. Works the same locally and inside Data Cloud — see [Bundled file resolution](#bundled-file-resolution) below for the full lookup order. Raises `FileNotFoundError` if the file isn't found.
+* `find_file_path(file_name)` – Resolve a bundled file (placed under `payload/files/`) to a `pathlib.Path` that exists. Works the same locally and inside Data 360 — see [Bundled file resolution](#bundled-file-resolution) below for the full lookup order. Raises `FileNotFoundError` if the file isn't found.
 * `read_dlo(name)` – Read from a Data Lake Object by name
 * `read_dmo(name)` – Read from a Data Model Object by name
 * `write_to_dlo(name, spark_dataframe, write_mode)` – Write to a Data Lake Object by name with a Spark dataframe
@@ -198,62 +178,23 @@ df = df.withColumn("cdp_sys_record_currency__c", lit("EUR"))
 
 See [`docs/examples/script/currency_totals`](docs/examples/script/currency_totals) for a complete example.
 
-### Streaming (delta) transforms
-
-Streaming BYOC transforms process a Data Lake Object's Change Data Feed continuously instead of reading a bounded snapshot. Use a `StreamingClient` and its `*_deltas` methods in place of the batch `Client` read/write methods:
-
-```python
-from pyspark.sql.functions import col, upper
-
-from datacustomcode import StreamingClient
-
-client = StreamingClient()
-
-# read_dlo_deltas returns a *streaming* DataFrame over the change feed.
-# The runtime resolves the single streaming source, so no name is passed.
-deltas = client.read_dlo_deltas()
-
-# Ordinary PySpark transform.
-transformed = deltas.withColumn("description__c", upper(col("description__c")))
-
-# write_dlo_deltas starts a streaming query and returns the StreamingQuery.
-# The runtime owns the trigger and checkpoint location; you
-# choose only the target table.
-query = client.write_dlo_deltas("Output__dll", transformed)
-query.awaitTermination()
-```
-
-A streaming transform can also read and write Data Model Objects with `read_dmo_deltas()` and `write_dmo_deltas()`:
-
-```python
-deltas = client.read_dmo_deltas()
-transformed = deltas.withColumn("description__c", upper(col("description__c")))
-query = client.write_dmo_deltas("Output__dlm", transformed)
-query.awaitTermination()
-```
-
-Notes:
-
-- These methods only run inside the Data Cloud streaming (`DELTA_SYNC`) runtime. Locally (`datacustomcode run`) they raise `NotImplementedError`, since there is no change feed to stream.
-- A complete runnable entry point is provided in [`examples/streaming_deltas/entrypoint.py`](src/datacustomcode/templates/script/examples/streaming_deltas/entrypoint.py).
-
 ### Bundled file resolution
 
 Place bundled files (CSVs, prompt files, etc.) under `payload/files/`. The same `client.find_file_path("data.csv")` call resolves consistently across all three runtimes:
 
 - `datacustomcode run` (local) → `<cwd>/payload/files/data.csv`
-- Data Cloud script package → `$LIBRARY_PATH/files/data.csv`
-- Data Cloud function package → `$LIBRARY_PATH/files/data.csv`
+- Data 360 script package → `$LIBRARY_PATH/files/data.csv`
+- Data 360 function package → `$LIBRARY_PATH/files/data.csv`
 
 Resolution order (first existing path wins):
 
-1. `$LIBRARY_PATH/files/<file_name>`, then `$LIBRARY_PATH/<file_name>` — when `LIBRARY_PATH` is set. Data Cloud sets this for you to the package root.
+1. `$LIBRARY_PATH/files/<file_name>`, then `$LIBRARY_PATH/<file_name>` — when `LIBRARY_PATH` is set. Data 360 sets this for you to the package root.
 2. `payload/files/<file_name>` relative to the current working directory.
 3. `<config_dir>/files/<file_name>` where `<config_dir>` is the directory of the nearest `config.json` discoverable by walking down from cwd.
 
 If none of these exist, `find_file_path` raises `FileNotFoundError` with the list of paths it tried.
 
-`$LIBRARY_PATH` is set automatically to the root of the package at runtime inside Data Cloud.
+`$LIBRARY_PATH` is set automatically to the root of the package at runtime inside Data 360.
 
 ### Generating lineage
 
@@ -279,143 +220,9 @@ The entry point runs exactly as it would locally (same config, reader, and crede
 - Only batch script packages are supported.
 
 
-## CLI
+## CLI (Deprecated)
 
-The Data Cloud Custom Code SDK provides a command-line interface (CLI) with the following commands:
-
-### Global Options
-- `--debug`: Enable debug-level logging
-
-### Commands
-
-#### `datacustomcode version`
-Display the current version of the package.
-
-#### `datacustomcode configure`
-Configure credentials for connecting to Data Cloud.
-
-**Prerequisites:**
-- An [External Client App](#creating-an-external-client-app) with OAuth settings configured
-- For OAuth Tokens authentication: [refresh token and core token](#obtaining-refresh-token-and-core-token)
-
-Options:
-- `--profile TEXT`: Credential profile name (default: "default")
-- `--auth-type TEXT`: Authentication method (default: `oauth_tokens`)
-  - `oauth_tokens` - OAuth tokens with refresh_token
-  - `client_credentials` - Server-to-server using client_id/secret only
-
-You will be prompted for the following depending on auth type:
-
-*Common to all auth types:*
-- **Login URL**: Salesforce login URL
-- **Client ID**: External Client App Client ID
-
-*For OAuth Tokens authentication:*
-- **Client Secret**: External Client App Client Secret
-- **Redirect URI**: OAuth redirect URI
-
-*For Client Credentials authentication:*
-- **Client Secret**: External Client App Client Secret
-
-##### Using Environment Variables (Alternative)
-
-Instead of using `datacustomcode configure`, you can also set credentials via environment variables.
-
-> [!NOTE]
-> Environment variables take precedence over the credentials INI file when both are present.
-
-**Common (required for all auth types):**
-| Variable | Description |
-|----------|-------------|
-| `SFDC_LOGIN_URL` | Salesforce login URL (e.g., `https://login.salesforce.com`) |
-| `SFDC_CLIENT_ID` | External Client App Client ID |
-| `SFDC_AUTH_TYPE` | Authentication type: `oauth_tokens` (default) or `client_credentials` |
-
-**For OAuth Tokens authentication (`SFDC_AUTH_TYPE=oauth_tokens`):**
-| Variable | Description |
-|----------|-------------|
-| `SFDC_CLIENT_SECRET` | External Client App Client Secret |
-| `SFDC_REFRESH_TOKEN` | OAuth refresh token |
-| `SFDC_ACCESS_TOKEN` | (Optional) OAuth core/access token |
-
-**Einstein Platform API Environment (Optional):**
-| Variable | Description |
-|----------|-------------|
-| `SFDC_EINSTEIN_API_ENV` | Einstein Platform API environment: `dev`, `test`, `stage`, or `prod`. If not set, automatically inferred from login URL. Set this explicitly if auto-detection fails. |
-
-Example usage:
-```bash
-export SFDC_LOGIN_URL="https://login.salesforce.com"
-export SFDC_CLIENT_ID="your_client_id"
-export SFDC_CLIENT_SECRET="your_client_secret"
-export SFDC_REFRESH_TOKEN="your_refresh_token"
-export SFDC_EINSTEIN_API_ENV="test"  # optional
-
-datacustomcode run ./payload/entrypoint.py
-```
-
-
-#### `datacustomcode init`
-Initialize a new development environment with a code package template.
-
-Argument:
-- `DIRECTORY`: Directory to create project in (default: ".")
-Options:
-- `--code-type TEXT`: This can be either `function` or `script`. The default value is `script` if the argument is missing.
-
-
-#### `datacustomcode scan`
-Scan a Python file to generate a Data Cloud configuration.
-
-Argument:
-- `FILENAME`: Python file to scan
-
-Options:
-- `--config TEXT`: Path to save the configuration file (default: same directory as FILENAME)
-- `--dry-run`: Preview the configuration without saving to a file
-
-
-#### `datacustomcode run`
-Run an entrypoint file locally for testing.
-
-Argument:
-- `ENTRYPOINT`: Path to entrypoint Python file
-
-Options:
-- `--config-file TEXT`: Path to configuration file
-- `--dependencies TEXT`: Additional dependencies (can be specified multiple times)
-- `--profile TEXT`: Credential profile name (default: "default")
-- `--sf-cli-org TEXT`: Salesforce CLI org alias or username (e.g. `dev1`). Fetches
-  credentials via `sf org display` — no `datacustomcode configure` step needed.
-  Takes precedence over `--profile` if both are supplied.
-
-
-#### `datacustomcode zip`
-Zip a transformation job in preparation to upload to Data Cloud. Make sure to change directory into your code package folder (e.g., `my_package`) before running this command.
-
-Symlinks inside the payload folder are not followed or packaged. Each symlinked file that is skipped is reported with a warning, and symlinked directories are not included. `datacustomcode deploy` zips the same way.
-
-Arguments:
-- `PATH`: Path to the code directory i.e. the payload folder (default: "payload")
-
-Options:
-- `--network TEXT`: docker network (default: "default")
-
-
-#### `datacustomcode deploy`
-Deploy a transformation job to Data Cloud. Note that this command takes care of creating a zip file from provided path before deployment. Make sure to change directory into your code package folder (e.g., `my_package`) before running this command.
-
-Options:
-- `--profile TEXT`: Credential profile name (default: "default")
-- `--path TEXT`: Path to the code directory i.e. the payload folder (default: ".")
-- `--name TEXT`: Name of the transformation job [required]
-- `--version TEXT`: Version of the transformation job (default: "0.0.1")
-- `--description TEXT`: Description of the transformation job (default: "")
-- `--network TEXT`: docker network (default: "default")
-- `--cpu-size TEXT`: CPU size for the deployment (default: `CPU_2XL`). Available options: CPU_L(Large), CPU_XL(Extra Large), CPU_2XL(2X Large), CPU_4XL(4X Large)
-- `--sf-cli-org TEXT`: Salesforce CLI org alias or username (e.g. `myorg`). Fetches credentials via `sf org display` — no `datacustomcode configure` step needed. Takes precedence over `--profile` if both are supplied.
-- `--function-invoke-opt TEXT`: Currently we support only `UnstructuredChunking` for functions.
-
+The command-line interface (CLI) bundled with the SDK has been deprecated. Users must use the [SF CLI plugin](https://github.com/salesforcecli/plugin-data-code-extension) instead.
 
 ## Testing LLM Gateway
 
@@ -449,7 +256,7 @@ if __name__ == "__main__":
   main()
 ```
 
-In order to test this code on your local machine before deploying it to Data Cloud, you must first set up an External Client App that allows access to the Agent API. Follow this guide to create the ECA https://developer.salesforce.com/docs/ai/agentforce/guide/agent-api-get-started.html#create-a-salesforce-app. You must use `http://localhost:1717/OauthRedirect` as the callback URL.
+In order to test this code on your local machine before deploying it to Data 360, you must first set up an External Client App that allows access to the Agent API. Follow this guide to create the ECA https://developer.salesforce.com/docs/ai/agentforce/guide/agent-api-get-started.html#create-a-salesforce-app. You must use `http://localhost:1717/OauthRedirect` as the callback URL.
 
 Once the ECA is set up, log in to your org using this ECA
 ```
@@ -462,9 +269,8 @@ sf org login web \
 
 then you can test your code using `myorg` alias
 ```
-datacustomcode run ./payload/entrypoint.py --sf-cli-org myorg
+sf data-code-extension script run -e ./payload/entrypoint.py -o myorg
 ```
-
 
 ## Testing Einstein Predictions
 
@@ -512,13 +318,12 @@ Testing this code locally uses the same External Client App setup described in
 [Testing LLM Gateway](#testing-llm-gateway). Once your `myorg` alias is set up,
 run:
 ```
-datacustomcode run ./payload/entrypoint.py --sf-cli-org myorg
+sf data-code-extension script run -e ./payload/entrypoint.py -o myorg
 ```
-
 
 ## Docker usage
 
-The SDK provides Docker-based development options that allow you to test your code in an environment that closely resembles Data Cloud's execution environment.
+The SDK provides Docker-based development options that allow you to test your code in an environment that closely resembles Data 360's execution environment.
 
 ### How Docker Works with the SDK
 
@@ -526,7 +331,7 @@ When you initialize a project with `datacustomcode init my_package`, a `Dockerfi
 
 - **Isn't used during local development** with virtual environments
 - **Becomes active during packaging** when you run `datacustomcode zip` or `deploy`
-- **Ensures compatibility** by using the same base image as Data Cloud
+- **Ensures compatibility** by using the same base image as Data 360
 - **Handles dependencies automatically** regardless of platform differences
 
 ### VS Code Dev Containers
@@ -548,7 +353,7 @@ Containers: Rebuild and Reopen in Container"
 Once inside the Dev Container:
 - **Terminal access**: Open a terminal within the container
 - **Run your code**: Execute `datacustomcode run ./payload/entrypoint.py`
-- **Environment consistency**: Your code will run inside a docker container that more closely resembles Data Cloud compute than your machine
+- **Environment consistency**: Your code will run inside a docker container that more closely resembles Data 360 compute than your machine
 
 > [!TIP]
 > **IDE Configuration**: Use `CMD+Shift+P` (or `Ctrl+Shift+P` on Windows/Linux), then select "Python: Select Interpreter" to configure the correct Python Interpreter
@@ -559,7 +364,7 @@ Once inside the Dev Container:
 ### JupyterLab
 
 Within your `init`ed package, you will find a `jupyterlab.sh` file that can open a jupyter notebook for you.  Jupyter notebooks, in
-combination with Data Cloud's [Query Editor](https://help.salesforce.com/s/articleView?id=data.c360_a_add_queries_to_a_query_workspace.htm&type=5)
+combination with Data 360's [Query Editor](https://help.salesforce.com/s/articleView?id=data.c360_a_add_queries_to_a_query_workspace.htm&type=5)
 and [Data Explorer](https://help.salesforce.com/s/articleView?id=data.c360_a_data_explorer.htm&type=5), can be extremely helpful for data
 exploration.  Instead of running an entire script, one can run one code cell at a time as they discover and experiment with the DLO or DMO data.
 
@@ -603,19 +408,11 @@ You now have all fields necessary for the `datacustomcode configure` command.
 
 ### Using the Salesforce CLI for authentication
 
-The [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli) (`sf`) lets you authenticate an org once and then reference it by alias across tools — including this SDK via `--sf-cli-org`.
+The [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli) (`sf`) lets you authenticate an org once and then reference it by alias across tools.
 
 #### Installing the Salesforce CLI
 
 Follow the [official install guide](https://developer.salesforce.com/docs/atlas.en-us.sfdx_setup.meta/sfdx_setup/sfdx_setup_install_cli.htm), or use a package manager:
-
-```zsh
-# macOS (Homebrew)
-brew install sf
-
-# npm (all platforms)
-npm install --global @salesforce/cli
-```
 
 Verify the install:
 ```zsh
@@ -642,11 +439,6 @@ Each command opens a browser tab. After you log in and approve access, the CLI s
 ```zsh
 sf org list
 sf org display --target-org myorg
-```
-
-Once authenticated, pass the alias directly to `datacustomcode run`:
-```zsh
-datacustomcode run ./payload/entrypoint.py --sf-cli-org myorg
 ```
 
 ### Obtaining Refresh Token and Core Token
